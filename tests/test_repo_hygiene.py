@@ -25,6 +25,7 @@ REQUIRED_FILES = [
     ".editorconfig",
     "CONTRIBUTING.md",
     ".github/pull_request_template.md",
+    ".github/CODEOWNERS",
 ]
 
 

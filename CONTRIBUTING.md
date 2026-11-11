@@ -17,7 +17,7 @@ roadmap (próxima [ ] com dependências [x]) → branch → commits → PR → C
 7. **CI verde** (`ci-ok`) é obrigatório. **Merge: squash, feito pelo mantenedor.**
 
 ## Paths sensíveis
-Listados em `.github/CODEOWNERS` (criado na P0.6). Mudanças em `commission/` (etapa irreversível), `semantic/` (definição única das métricas), `docs/specs/mission.md`, `docs/adr/`, `.claude/` e `.github/` exigem atenção redobrada na revisão e justificativa no PR.
+Listados em [`.github/CODEOWNERS`](.github/CODEOWNERS). Mudanças em `commission/` (etapa irreversível), `semantic/` (definição única das métricas), `docs/specs/mission.md`, `docs/adr/`, `.claude/` e `.github/` exigem atenção redobrada na revisão e justificativa no PR.
 
 ## Proteção da `main`
 PR obrigatório, `ci-ok` obrigatório, histórico linear, sem force push, valendo também para admins. São 0 aprovações formais porque o projeto tem um único mantenedor e o GitHub não permite autoaprovação; a revisão humana é garantida por **só o mantenedor fazer o merge**. Ver [ADR-0014](docs/adr/0014-branch-protection-solo-maintainer.md).
