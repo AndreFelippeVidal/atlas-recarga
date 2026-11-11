@@ -16,19 +16,27 @@
 - **MCPs** (`system.ai`): `genie_one_mcp` e `dbsql` (Beta) ativos; `atlassian`, `github` e `gmail` com "Action needed".
 - Evidências: _(anexar os 2 prints da aba Models e o da aba MCPs)_
 
+### Execução do notebook (2026-11-11)
+
+- A 1ª tentativa com o nome curto `gpt-oss-120b` deu `403 PERMISSION_DENIED`: "is no longer available. Use Unity Catalog model services". O nome curto cai no endpoint legado; o model service é endereçado por **três partes** (`system.ai.<nome>`).
+- `ChatDatabricks(model="system.ai.gpt-oss-120b", use_ai_gateway=True)` respondeu `ok`.
+- `system.ai.claude-sonnet-4-5` falhou com `404 ENDPOINT_NOT_FOUND`.
+- `system.ai_gateway.usage` existe e registra chamadas a model services (`MODEL_SERVICE`, `PAY_PER_TOKEN_FOUNDATION_MODEL`, `status_code`, tokens, `requester_type`, `api_type`). Nas 20 linhas lidas (de uma query ordenada por `account_id`, ou seja, sem ordem útil) havia chamadas anteriores a `system.ai.gpt-oss-120b`, mas **nenhuma comprovadamente da execução de hoje**. A query do notebook foi corrigida para filtrar por `event_time`.
+- Pelo `model_metadata`, cada model service tem `rate_limits` e `service_policies` configuráveis (vazios por padrão).
+- Não colar e-mail ou IP do solicitante nas evidências.
+
 ### Checklist
 
 | Verificação | Resultado | Evidência |
 |---|---|---|
-| Há um model service Claude em `system.ai`? | ❌ não listado (confirmar em Providers / `+ Model`) | prints |
-| Chamada via `ChatDatabricks(use_ai_gateway=True)` com um modelo disponível retorna 200 | _(preencher)_ | saída do notebook |
-| Chamada ao candidato Claude | _(preencher; colar o erro exato)_ | saída do notebook |
-| Linha correspondente em `system.ai_gateway.usage` | _(preencher)_ | query + resultado |
+| Há um model service Claude em `system.ai`? | ❌ não: aba Models sem Claude; `system.ai.claude-sonnet-4-5` → 404 | prints; saída do notebook |
+| Chamada via `ChatDatabricks(use_ai_gateway=True)` retorna 200 | ✅ com `system.ai.gpt-oss-120b` | saída do notebook |
+| Linha em `system.ai_gateway.usage` da chamada de hoje | ⏳ pendente: reexecutar a query filtrada | _(preencher)_ |
 
 ### Resultado
 
-_(passou · falhou → plano B · passou com ressalva)_
+_(passou · falhou → plano B · passou com ressalva; fechar depois da linha de uso)_
 
 ### Decisão
 
-_(ex.: manter o gateway com o modelo X; ou plano B do ADR-0007; e o que muda em `ATLAS_LLM_SERVICE`)_
+_(ex.: manter o Unity Gateway com um modelo não-Claude e ajustar SPEC-005 / `ATLAS_LLM_SERVICE`, na P3.8)_
