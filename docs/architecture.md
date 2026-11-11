@@ -29,34 +29,34 @@ flowchart TB
         direction TB
 
         subgraph dataplat["Plataforma de dados"]
-            landing[("<b>raw.landing</b><br/>[Volume UC: parquet]")]
-            daily["<b>atlas_daily</b><br/>[Lakeflow Job · 06:00 BRT]"]
+            landing[("<b>raw.landing</b><br/>[Container: Volume UC · parquet]")]
+            daily["<b>atlas_daily</b><br/>[Container: Lakeflow Job · 06:00 BRT]"]
             pipeline["<b>atlas_medallion</b><br/>[Container: Lakeflow SDP serverless]<br/>bronze → silver → gold · F2"]
-            gold[("<b>bronze · silver · gold</b><br/>[Delta, linhagem UC]")]
+            gold[("<b>bronze · silver · gold</b><br/>[Container: Delta · linhagem UC]")]
         end
 
         subgraph humanb["🔒 FRONTEIRA DO HUMANO · comissão · F3"]
-            calc["<b>Cálculo + reconciliação</b><br/>[Job task: PySpark + SQL independente]"]
-            review["<b>atlas_commission_review</b><br/>[Lakeflow Job, disparo manual]"]
-            commission[("<b>commission.*</b><br/>[Delta append-only + Volume remittance]")]
+            calc["<b>Cálculo + reconciliação</b><br/>[Container: job task · PySpark + SQL independente]"]
+            review["<b>atlas_commission_review</b><br/>[Container: Lakeflow Job · disparo manual]"]
+            commission[("<b>commission.*</b><br/>[Container: Delta · batch_events e locked_lines append-only<br/>+ Volume remittance]")]
         end
 
         subgraph sem["Camada semântica · a única porta de leitura · F4"]
-            mv[("<b>semantic.mv_recharges<br/>semantic.mv_commission</b><br/>[Metric views YAML]")]
-            fns["<b>semantic.fn_*</b><br/>[UC functions SQL, lista fechada]"]
-            wh["<b>SQL warehouse</b><br/>[2X-Small serverless]"]
+            mv[("<b>semantic.mv_recharges<br/>semantic.mv_commission</b><br/>[Container: metric views YAML]")]
+            fns["<b>semantic.fn_*</b><br/>[Container: UC functions SQL · lista fechada]"]
+            wh["<b>SQL warehouse</b><br/>[Container: SQL warehouse 2X-Small serverless]"]
         end
 
         subgraph aib["🤖 FRONTEIRA DA IA · só leitura de atlas.semantic"]
-            agent["<b>atlas-agent</b><br/>[Databricks App: Agent Framework + LangGraph] · F6"]
-            mcp["<b>atlas-mcp</b><br/>[Databricks App: FastMCP, Streamable HTTP] · F7"]
-            genie["<b>Genie Space Atlas Recarga</b><br/>[Genie] · F5"]
-            gateway["<b>Unity Gateway</b><br/>[model service Claude: rate limit, PII, spend cap]"]
+            agent["<b>atlas-agent</b><br/>[Container: Databricks App · Agent Framework + LangGraph] · F6"]
+            mcp["<b>atlas-mcp</b><br/>[Container: Databricks App · FastMCP, Streamable HTTP] · F7"]
+            genie["<b>Genie Space Atlas Recarga</b><br/>[Container: Genie] · F5"]
+            gateway["<b>Unity Gateway</b><br/>[Container: model service Claude · só o agente passa por ele]"]
         end
 
-        web["<b>atlas-web</b><br/>[Databricks App: FastAPI + React + d3-geo] · F8"]
-        aibi["<b>Atlas — Visão Comercial</b><br/>[AI/BI Dashboard] · F5"]
-        obs[("<b>observability.* · eval.*</b><br/>[Delta + MLflow 3 experiment] · F9")]
+        web["<b>atlas-web</b><br/>[Container: Databricks App · FastAPI + React + d3-geo] · F8"]
+        aibi["<b>Atlas — Visão Comercial</b><br/>[Container: AI/BI Dashboard] · F5"]
+        obs[("<b>observability.* · eval.*</b><br/>[Container: Delta + MLflow 3 experiment] · F9")]
     end
 
     maint -->|"generate + upload"| cli
@@ -70,7 +70,7 @@ flowchart TB
     review -->|"transição de estado + lock"| commission
 
     gold --> mv
-    commission -->|"só locked_lines"| mv
+    commission -->|"só lotes locked"| mv
     fns --> mv
     wh --> mv
 
@@ -88,7 +88,7 @@ flowchart TB
     agent -->|"ChatDatabricks use_ai_gateway"| gateway
 
     agent -.->|"traces"| obs
-    gateway -.->|"system.ai_gateway.usage"| obs
+    gateway -.->|"uso e inference tables"| obs
     github -.->|"agent-eval.yml: mlflow.genai.evaluate"| agent
 
     classDef human fill:#fff4e5,stroke:#d97706,stroke-width:2px,color:#000
@@ -113,12 +113,12 @@ Tudo no catálogo `atlas` (no target `dev`, `atlas_dev`), um schema por camada e
 | `bronze` | Cópia fiel + `_source_file`, `_ingested_at_utc` | `atlas_medallion` | `atlas_medallion` |
 | `silver` | Limpo, tipado, deduplicado; `recharges_quarantine` com os órfãos | `atlas_medallion` (expectations drop/fail/warn) | `atlas_medallion` |
 | `gold` | `dim_*`, `fct_recharges`, `agg_pos_month`, com `COMMENT` em tudo | `atlas_medallion` | Cálculo de comissão; dono das metric views. **Nenhum consumidor** |
-| `commission` | `batches`, `batch_lines`, `batch_events` e `locked_lines` (append-only), `reconciliation`, Volume `remittance/` | Task 2 do `atlas_daily` (rascunho) e `atlas_commission_review` (transições) | Analista e diretora (relatório `commission_review`); `mv_commission` só via `locked_lines` |
-| `semantic` | Metric views `mv_recharges`, `mv_commission` e UC functions `fn_*` | Bundle, a partir de `semantic/*.yaml` | Grupo `atlas_readers`: pessoas, Genie e os service principals dos 3 Apps |
+| `commission` | `batches`, `batch_lines`, `batch_events` e `locked_lines` (append-only), `reconciliation`, Volume `remittance/` | Task 2 do `atlas_daily` (rascunho) e `atlas_commission_review` (transições) | Analista e diretora pelo relatório `commission_review` (os grants de leitura ainda não estão definidos na SPEC-003); `mv_commission`, só sobre `locked_lines` + `batches` de lotes `locked` |
+| `semantic` | Metric views `mv_recharges`, `mv_commission` e UC functions `fn_*` | Bundle, a partir de `semantic/*.yaml` | Grupo `atlas_readers`: Helena, gerentes e os service principals dos 3 Apps (SPEC-004 §7); o Genie Space consulta só as metric views |
 | `eval` | `agent_golden_set` (sincronizado do YAML), `review_queue` | Script de sync e monitoramento (SPEC-008) | Avaliação offline, gate de PR, revisor humano |
 | `observability` | `pipeline_freshness`, trace tables `agent_*`, `agent_quality_daily` | Task 3 do `atlas_daily`, MLflow, job de monitoramento | Página "Qualidade do agente" do AI/BI |
 
-Fora do catálogo: experiment MLflow `/Shared/atlas/agent` e a system table `system.ai_gateway.usage`.
+Fora do catálogo: experiment MLflow `/Shared/atlas/agent` e a system table `system.ai_gateway.usage`, onde o Unity Gateway registra o uso do LLM.
 
 ## 4. Fronteira do humano: a comissão
 
@@ -130,7 +130,7 @@ flowchart LR
         d["draft<br/>cálculo PySpark"] --> r{"reconciliação SQL<br/>independente<br/>Δ = R$ 0,00?"}
     end
     subgraph pessoas["Pessoas"]
-        a["Analista<br/>aprova ou rejeita<br/>com justificativa"] --> h["Diretora<br/>ator diferente<br/>aprova ou rejeita"]
+        a["Analista<br/>aprova, ou rejeita<br/>com justificativa ≥ 20 caracteres"] --> h["Diretora<br/>ator diferente do analista<br/>aprova ou rejeita"]
     end
     r -->|"sim"| ur["under_review"] --> a
     r -->|"não"| d
@@ -147,7 +147,7 @@ A trava não depende de um só controle:
 | **Processo** | Duas aprovações com atores distintos (`SEGREGATION_OF_DUTIES_VIOLATION`); justificativa de ≥ 20 caracteres para rejeitar |
 | **Dados** | `batch_events` e `locked_lines` com `delta.appendOnly`: o Delta rejeita `UPDATE`/`DELETE`; correção só por lote de ajuste |
 | **Permissão UC** | Nenhum consumidor tem grant em `commission`; só lotes `locked` chegam à camada semântica |
-| **Permissão de job** | Só os grupos `atlas_commission_analysts` e `atlas_commission_directors` podem rodar `atlas_commission_review`; nenhum service principal de App |
+| **Quem dispara** | `atlas_commission_review` é disparado manualmente por uma pessoa, e cada transição exige que o ator seja membro de `atlas_commission_analysts` ou `atlas_commission_directors`; nenhum agente, MCP ou app executa o job (SPEC-003 §4) |
 | **Agente de código** | O hook do harness nega qualquer execução de `atlas_commission_review` ([SPEC-010](specs/010-agent-harness/spec.md) §3.3) |
 
 **Concessão da Free Edition:** com um usuário só, `ALLOW_SAME_APPROVER_DEMO=true` permite o mesmo ator nas duas etapas, mas marca cada uso com `role = 'demo_override'` e o lote com `demo_mode = true` (SPEC-003 §9, Spike S0.6).
@@ -156,15 +156,15 @@ A trava não depende de um só controle:
 
 Há duas IAs no projeto, e as duas têm limites escritos.
 
-**IA no produto** (agente e MCP, [SPEC-005](specs/005-business-agent/spec.md), [SPEC-006](specs/006-mcp-server/spec.md)). Gera valor ao responder em linguagem natural; gera risco ao inventar número ou agir. Por isso:
+**IA no produto** (agente e MCP, [SPEC-005](specs/005-business-agent/spec.md), [SPEC-006](specs/006-mcp-server/spec.md)). Gera valor ao responder em linguagem natural; gera risco ao inventar número ou agir. Por isso (a linha **Gateway** vale só para o agente; o MCP não passa pelo Unity Gateway, ver [ADR-0008](adr/0008-fastmcp-on-databricks-apps.md)):
 
 | Camada | Controle | Verificado por |
 |---|---|---|
 | Ferramentas | Lista fechada: Genie e 3 UC functions no agente; 5 tools no MCP. Nenhuma de SQL livre, escrita ou execução de job | Scorer `read_only_tools` em 100% dos traces |
 | Parâmetros | Medidas e dimensões validadas contra listas; valores como parâmetros vinculados | Teste de injeção (SPEC-006 §7) |
-| Permissão UC | Service principals só com `SELECT` em `atlas.semantic`; `PERMISSION_DENIED` em `gold` | Critério de aceite SPEC-004 §8 |
+| Permissão UC | Nada fora de `atlas.semantic`: `SELECT` nas metric views, `EXECUTE` nas `fn_*` e `CAN RUN` no Genie Space (agente); o MCP usa o token do próprio usuário (on-behalf-of-user) ou, no plano B, um service principal só com `SELECT`. `PERMISSION_DENIED` em `gold` | Critério de aceite SPEC-004 §8 |
 | Comportamento | Citação `Fonte:` obrigatória, nenhum número sem tool, recusa de ação e PII | Scorers `cites_metric_view`, `no_tool_on_refusal`, `refusal_quality` |
-| Gateway | Rate limit 30 req/min por usuário, teto de gasto, guardrail de PII ([ADR-0007](adr/0007-unity-gateway-llm-governance.md)) | `system.ai_gateway.usage` |
+| Gateway (só agente) | Rate limit 30 req/min por usuário, teto de gasto, guardrail de PII ([ADR-0007](adr/0007-unity-gateway-llm-governance.md)) | `system.ai_gateway.usage` |
 | Regressão | Gate de PR: acurácia ≥ 90% e 100% das recusas ([SPEC-008](specs/008-agent-evaluation/spec.md)) | `agent-eval.yml` |
 
 A IA **não** participa do cálculo nem da aprovação de comissão, e não lê dado pessoal (o dataset nem tem PII real).
@@ -179,7 +179,7 @@ A IA **não** participa do cálculo nem da aprovação de comissão, e não lê 
 | F2 | `atlas_medallion` + job `atlas_daily` | Lakeflow SDP + Jobs | `pipeline/` | [SPEC-002](specs/002-medallion-pipeline/spec.md) · [0002](adr/0002-lakeflow-declarative-pipelines.md), [0003](adr/0003-medallion-unity-catalog.md) |
 | F3 | Cálculo, reconciliação e `atlas_commission_review` | Jobs | `commission/` | [SPEC-003](specs/003-commission-closing/spec.md) · [0010](adr/0010-commission-human-in-the-loop.md) |
 | F4 | Metric views e UC functions | Unity Catalog + SQL warehouse | `semantic/` | [SPEC-004](specs/004-metric-views/spec.md) · [0005](adr/0005-metric-views-semantic-layer.md) |
-| F5 | AI/BI Dashboard e Genie Space | Workspace | `semantic/` | [SPEC-004](specs/004-metric-views/spec.md) · [0005](adr/0005-metric-views-semantic-layer.md) |
+| F5 | AI/BI Dashboard e Genie Space | Workspace | a definir (SPEC-004 não fixa) | [SPEC-004](specs/004-metric-views/spec.md) · [0005](adr/0005-metric-views-semantic-layer.md) |
 | F6 | `atlas-agent` + Unity Gateway | Databricks App | `apps/agent/` | [SPEC-005](specs/005-business-agent/spec.md) · [0006](adr/0006-agent-framework-genie.md), [0007](adr/0007-unity-gateway-llm-governance.md) |
 | F7 | `atlas-mcp` | Databricks App | `apps/mcp/` | [SPEC-006](specs/006-mcp-server/spec.md) · [0008](adr/0008-fastmcp-on-databricks-apps.md) |
 | F8 | `atlas-web` | Databricks App | `apps/web/` | [SPEC-007](specs/007-react-geo-dashboard/spec.md) · [0004](adr/0004-ibge-code-geojson-geo.md), [0009](adr/0009-three-apps-allocation.md) |
@@ -189,16 +189,16 @@ Todos os recursos do workspace são declarados num Databricks Asset Bundle (`dat
 
 ## 7. Limites da Free Edition que moldam o desenho
 
-| Limite ([ADR-0001](adr/0001-databricks-free-edition.md)) | Consequência no desenho |
+| Limite ([ADR-0001](adr/0001-databricks-free-edition.md), salvo indicação) | Consequência no desenho |
 |---|---|
 | 1 SQL warehouse 2X-Small | Todos os consumidores dividem o mesmo warehouse: cache de 10 min no `atlas-web`, 1 nova tentativa após 20s no agente e no MCP, aviso de "aquecendo" na UI |
 | 1 pipeline ativo por tipo | Um único `atlas_medallion` cobre bronze, silver e gold |
-| 5 tasks de job concorrentes | `atlas_daily` tem 3 tasks sequenciais; o monitoramento do agente roda às 07:00, depois do pipeline |
+| 5 tasks de job concorrentes | Teto que os jobs do projeto respeitam: `atlas_daily` tem 3 tasks ([SPEC-002](specs/002-medallion-pipeline/spec.md) §2). Se o Spike S0.3 cair no plano B, entra o job `atlas_agent_monitoring` às 07:00 ([SPEC-008](specs/008-agent-evaluation/spec.md) §6) |
 | Até 3 Apps, parados após 24h | Os 3 slots vão para agente, MCP e web, sem slot livre; runbook de start antes da demo ([ADR-0009](adr/0009-three-apps-allocation.md)) |
-| Sem GPU nem provisioned throughput | O LLM é um foundation model atrás do Unity Gateway; nada de modelo próprio |
-| Um usuário no workspace | Modo demo de aprovação na comissão (seção 4); RLS por região fica para a v3 |
+| Serving sem GPU, alguns modelos indisponíveis | O LLM é um model service Claude do Unity Gateway, com o nome exato confirmado no Spike S0.1 ([SPEC-005](specs/005-business-agent/spec.md) §2) |
+| Possivelmente um único usuário (a confirmar no Spike S0.6) | Se confirmado, o modo demo de aprovação da comissão (seção 4) |
 
-Os recursos em Beta (Unity Gateway como agent service, production monitoring do MLflow, OAuth de cliente MCP) são confirmados no Spike S0 (Fase 3) antes de qualquer código depender deles; cada um tem plano B no ADR correspondente.
+Os recursos em Beta (Unity Gateway como agent service, production monitoring do MLflow, OAuth de cliente MCP) são confirmados no Spike S0 (Fase 3) antes de qualquer código depender deles; cada um tem plano B escrito: Unity Gateway no ADR-0007, monitoramento no ADR-0013 e OAuth do MCP na SPEC-006 §5 (proxy `mcp-remote`).
 
 ## 8. Modos de falha
 

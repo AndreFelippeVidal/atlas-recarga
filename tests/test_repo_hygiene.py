@@ -133,12 +133,14 @@ def test_claude_md_stays_short() -> None:
 
 
 def test_architecture_covers_every_prd_capability() -> None:
-    """SPEC-011 §3: every PRD capability and its spec appear in docs/architecture.md."""
+    """SPEC-011 §4: every PRD capability is in the diagram and in the component table."""
     prd = (ROOT / "docs" / "prd.md").read_text(encoding="utf-8")
     arch = (ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
     capabilities = re.findall(r"^\| (F\d+) \|.*?\(specs/(\d{3}-[a-z0-9-]+)/spec\.md\)", prd, re.M)
     assert capabilities, "no F<n> rows found in the PRD scope table"
-    missing = [
+    diagram = arch.split("```mermaid", 1)[1].split("```", 1)[0]
+    missing = [f"{cap} (diagram)" for cap, _ in capabilities if f"· {cap}" not in diagram]
+    missing += [
         f"{cap} ({spec})"
         for cap, spec in capabilities
         if f"| {cap} |" not in arch or f"specs/{spec}/spec.md" not in arch
