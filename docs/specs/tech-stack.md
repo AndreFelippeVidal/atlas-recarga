@@ -18,7 +18,7 @@
 | Agente | Mosaic AI Agent Framework: LangGraph + `databricks-langchain` em Databricks App | MLflow ≥ 3.x | 0006 | `ChatDatabricks(use_ai_gateway=True)` |
 | Governança de IA | Unity Gateway (model service; agent service em Beta) · plano B: AI Gateway clássico | — | 0007 | Alternável por `ATLAS_GATEWAY_MODE` |
 | Avaliação | MLflow 3 GenAI (`mlflow.genai.evaluate`, scorers, production monitoring) | MLflow ≥ 3.x | 0013 | Golden set em `atlas.eval` |
-| MCP | FastMCP (Streamable HTTP) em Databricks App | FastMCP ≥ 2.x | 0008 | Path `/mcp` |
+| MCP | FastMCP (Streamable HTTP) em Databricks App + MLflow tracing manual (spans só com atributos) | FastMCP ≥ 2.x · MLflow ≥ 3.x | 0008 | Path `/mcp`; rate limit e auditoria no App (SPEC-006 §6) |
 | Backend web | FastAPI + `databricks-sql-connector` | Python 3.12 | 0009 | Serve o build do React e `/api/*` |
 | Frontend | React 18 + TypeScript + Vite + `d3-geo` | Node 22 LTS | 0004, 0009 | SVG, sem tiles nem chaves externas |
 | Geometria | Malhas do IBGE (API v3) simplificadas com mapshaper, versionadas em TopoJSON | — | 0004 | Baixadas no build, nunca em runtime |

@@ -13,7 +13,7 @@ Confirmar **no workspace real** os recursos que a documentação mostra existir 
 | S0.2 | Agent service (Beta) | Registrar um agente "hello" deployado como App | O agente aparece no Unity Gateway com uso registrado | Governar só o LLM; o agente fica como App direto | 0007 |
 | S0.3 | Production monitoring MLflow 3 (Beta) | Agendar um scorer de código num experiment com 5 traces sintéticos | Feedback anexado aos traces | Job diário com `search_traces` + `evaluate` | 0013 |
 | S0.4 | Metric views + Genie | Criar uma metric view mínima sobre `samples` e um Genie Space em cima dela | `MEASURE()` funciona e o Genie responde usando a view | Views SQL + Genie sobre o gold | 0005 |
-| S0.5 | OAuth de cliente externo num App MCP | Deploy do template MCP "health" e `claude mcp add --transport http` | O tool `health` responde a partir do Claude Code | Proxy `mcp-remote` com token do `databricks auth` | 0008 |
+| S0.5 | OAuth de cliente externo num App MCP | Deploy do template MCP "health" e `claude mcp add --transport http` | O tool `health` responde a partir do Claude Code; uma query do App aparece em `system.query.history` com `executed_by` = usuário (on-behalf-of-user) | Proxy `mcp-remote` com token do `databricks auth`; sem OBO, a auditoria por usuário fica só no trace (SPEC-006 §6) | 0008 |
 | S0.6 | Mais de um usuário no workspace | Tentar convidar um segundo usuário | O segundo usuário entra e recebe um grupo | Modo `ALLOW_SAME_APPROVER_DEMO` | 0010 |
 | S0.7 | Cotas práticas | Rodar o CLI com 2M de linhas e um pipeline mínimo | Termina sem erro de cota em < 30 min | Reduzir o `--rows` padrão e registrar no PRD | 0001 |
 

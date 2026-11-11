@@ -20,10 +20,15 @@
 - **Depende de:** P11.2
 - **Pronto quando:** Contrato de erros da SPEC-006 §4 coberto
 
-### P11.4 🤖 Logs estruturados + teste de paridade com o golden set
+### P11.4 🤖 Traces MLflow, rate limit por usuário, logs estruturados + teste de paridade com o golden set
 
-- **Depende de:** P11.3, P9.1
-- **Pronto quando:** Critério 6 da SPEC-006 §7
+- **Depende de:** P11.3, P9.1, P3.5
+- **Pronto quando:** Critérios 6 a 10 da SPEC-006 §7 (o 9 na forma do plano B, se o S0.5 cair nele)
+- **Passos:**
+  - Span manual `mlflow.start_span` por tool, só com atributos (nunca `@mlflow.trace`), experiment `/Shared/atlas/mcp`
+  - Comentário `request_id` no SQL das tools que consultam o warehouse
+  - Limitador de 30 chamadas/min por usuário antes da query, com `RATE_LIMITED`
+  - Página "Uso do MCP" no AI/BI sobre `atlas.observability.mcp_*`
 
 ### P11.5 👤 Conectar ao Claude Code/Desktop e documentar no README
 

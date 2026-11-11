@@ -16,5 +16,6 @@ Encontre a próxima task do Atlas Recarga seguindo a SPEC-010 §6.
    - **Branch proposta:** `task/<ID>-<slug-curto-em-ingles>`
 5. **Se o executor for 👤**, diga que a task é exclusiva do mantenedor, explique o que ele precisa fazer e **pare**. Não proponha branch.
 6. **Não crie a branch nem altere arquivos.** Espere o mantenedor confirmar.
+7. **Importante**: Você **deve** usar o AskUserQuestion tool para esclarecimentos antes de começar a task.
 
 $ARGUMENTS
