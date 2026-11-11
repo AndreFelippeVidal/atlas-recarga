@@ -97,6 +97,13 @@ Duas chamadas do agente ao modelo (as duas do `curl` com OAuth; a chamada do not
 
 **Passou com ressalva:** o agente `agent-*` é listado na aba Agents e as chamadas dele ao LLM passam pelo gateway e são rastreáveis por service principal. **Não há uso nativo por agente** (sem `service_type` de agente, sem tokens ou custo na aba Agents) e o registro como agent service (REST, só agentes externos, sem invocação em runtime) não foi necessário nem tentado.
 
+### Pendências para a P3.8 / P10.2 (não validadas no S0.2)
+
+- `request_tags`: o agente consegue enviar tags na chamada ao modelo e elas aparecem na `usage`? Sem isso, o consumo por agente só se atribui pelo service principal do App.
+- `ask_genie` via `genie_one_mcp`: a chamada aparece como `MCP_SERVICE` (com `mcp_metadata.tool_name`) na `usage`? Define se o gateway governa essa tool.
+- Trace de tool call: o span de cada tool aparece no experiment MLflow a partir de um App? Os acessos do service principal também devem ser conferidos em `system.access.audit`.
+- Limite: a `usage` atrasa cerca de 1 hora, então alertas de uso quase em tempo real devem vir do trace; registrar isso em `docs/architecture.md`.
+
 ### Decisão
 
 Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec, em versão parcial (o agente é listado em Agents, mas sem uso nativo por agente). A governança e a medição ficam na **camada do LLM**; o agente é um App com prefixo `agent-` e a atribuição de uso é por `requester` (service principal do App) e `invocation_metadata.source`. O agente deve enviar `request_tags` se quisermos dimensionar por agente (não validado). Ajustes na SPEC-005 na P3.8.
