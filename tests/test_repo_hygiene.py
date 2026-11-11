@@ -161,38 +161,64 @@ def test_architecture_lists_every_catalog_schema() -> None:
 
 def _failure_rows() -> list[str]:
     arch = (ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
-    section = arch.split("## 8. Modos de falha", 1)[1].split("\n## ", 1)[0]
+    section = arch.split("\n## 8. Modos de falha", 1)[1].split("\n## ", 1)[0]
     return [
         line
         for line in section.splitlines()
-        if line.startswith("| ") and not line.startswith("| Componente") and "---" not in line
+        if line.startswith("| ") and not line.startswith("| Componente |")
     ]
+
+
+# One anchor term per failure the spec defines (SPEC-011 §4, P2.2). A new failure
+# in one of these specs must add its anchor here and a row in architecture.md §8.
+FAILURE_ANCHORS = {
+    "002-medallion-pipeline": [
+        "freshness_status = 'stale'",
+        "expect_or_fail",
+        "quality_status = 'degraded'",
+        "Full refresh",
+        "recharges_quarantine",
+    ],
+    "003-commission-closing": [
+        "status = 'passed'",
+        "SEGREGATION_OF_DUTIES_VIOLATION",
+        "JUSTIFICATION_REQUIRED",
+        "vN+1",
+        "append-only",
+        "ADJ-n",
+        "remittance_sha256",
+    ],
+    "005-business-agent": ["Genie indisponível", "error_type = rate_limited", "20s", "Auto-stop"],
+    "007-react-geo-dashboard": [
+        "Não foi possível carregar os dados",
+        "Aquecendo o banco de dados",
+        "HTTP 400",
+        "dim_municipality",
+    ],
+}
 
 
 def test_every_failure_mode_points_to_its_spec() -> None:
     """SPEC-011 §4 (P2.2): each failure row links to the spec or ADR that defines it."""
     rows = _failure_rows()
     assert rows, "no failure-mode rows in architecture.md §8"
-    orphans = [
-        r for r in rows if not re.search(r"\]\((specs/\d{3}-[a-z0-9-]+/spec\.md|adr/\d{4}-)", r)
-    ]
+    link = re.compile(r"\]\((specs/\d{3}-[a-z0-9-]+/spec\.md|adr/\d{4}-)")
+    orphans = [r for r in rows if not link.search(r)]
     assert orphans == [], orphans
 
 
-def test_failure_modes_cover_spec_failure_tables() -> None:
-    """SPEC-011 §4 (P2.2): no row of the specs' failure tables is left out."""
-    rows = "\n".join(_failure_rows())
+def test_failure_modes_cover_spec_failures() -> None:
+    """SPEC-011 §4 (P2.2): every failure of SPECs 002, 003, 005, 006 and 007 has a row."""
+    rows = _failure_rows()
     mcp_spec = (SPECS / "006-mcp-server" / "spec.md").read_text(encoding="utf-8")
-    codes = re.findall(
-        r"^\| `([A-Z_]+)` \|", mcp_spec.split("## 4.", 1)[1].split("\n## ", 1)[0], re.M
-    )
+    errors = mcp_spec.split("\n## 4.", 1)[1].split("\n## ", 1)[0]
+    codes = re.findall(r"^\| `([A-Z_]+)` \|", errors, re.M)
     assert codes, "no error codes found in SPEC-006 §4"
-    missing = [c for c in codes if f"`{c}`" not in rows]
-    for spec, heading in [("002-medallion-pipeline", "## 4."), ("005-business-agent", "## 6.")]:
-        text = (SPECS / spec / "spec.md").read_text(encoding="utf-8")
-        table = text.split(heading, 1)[1].split("\n## ", 1)[0]
-        expected = len([ln for ln in table.splitlines() if ln.startswith("| ")]) - 1  # minus header
-        linked = rows.count(f"specs/{spec}/spec.md")
-        if linked < expected:
-            missing.append(f"{spec}: {linked} rows, spec has {expected}")
+    expected = {"006-mcp-server": [f"`{c}`" for c in codes], **FAILURE_ANCHORS}
+    missing = [
+        f"{spec}: {anchor}"
+        for spec, anchors in expected.items()
+        for anchor in anchors
+        if not any(anchor in r and f"specs/{spec}/spec.md" in r for r in rows)
+    ]
     assert missing == [], missing
