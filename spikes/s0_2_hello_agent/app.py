@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 MODEL = os.environ.get("ATLAS_LLM_SERVICE", "system.ai.gpt-oss-120b")
 
-app = FastAPI(title="atlas-hello-agent")
+app = FastAPI(title="agent-hello")
 
 
 class Ask(BaseModel):

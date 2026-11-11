@@ -99,4 +99,4 @@ Duas chamadas do agente ao modelo (as duas do `curl` com OAuth; a chamada do not
 
 ### Decisão
 
-Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec. A governança e a medição ficam na **camada do LLM**; o agente é um App com prefixo `agent-` e a atribuição de uso é por `requester` (service principal do App) e `invocation_metadata.source`. O agente deve enviar `request_tags` se quisermos dimensionar por agente (não validado). Ajustes na SPEC-005 na P3.8.
+Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec, em versão parcial (o agente é listado em Agents, mas sem uso nativo por agente). A governança e a medição ficam na **camada do LLM**; o agente é um App com prefixo `agent-` e a atribuição de uso é por `requester` (service principal do App) e `invocation_metadata.source`. O agente deve enviar `request_tags` se quisermos dimensionar por agente (não validado). Ajustes na SPEC-005 na P3.8.

@@ -14,9 +14,9 @@
 # MAGIC    de `spikes/s0_2_hello_agent/` (Compute > Apps > Create app > Custom) e fazer o deploy.
 # MAGIC 2. Se a chamada der `PERMISSION_DENIED`, dar ao service principal do App acesso ao model
 # MAGIC    service `system.ai.gpt-oss-120b` (lição da S0.1: permissão de serving endpoint não vale).
-# MAGIC 3. Em *Unity Gateway > Agents*, tentar registrar o App como agent service. Anotar os passos
-# MAGIC    e o que a UI oferece. Não há comando de CLI para agent service (a v1.24.0 de
-# MAGIC    `databricks ai-gateway` só tem model, model-provider, MCP e skills).
+# MAGIC 3. Em *AI Gateway > Agents*, conferir se o App aparece (o prefixo `agent-` basta; não há
+# MAGIC    passo de registro) e o que a UI oferece. Não há comando de CLI para agent service
+# MAGIC    (a v1.24.0 de `databricks ai-gateway` só tem model, model-provider, MCP e skills).
 # MAGIC 4. Chamar do terminal com um token OAuth de usuário (obtido pelo CLI do Databricks; não
 # MAGIC    cole o token em lugar nenhum): `POST $URL/invocations` com o cabeçalho
 # MAGIC    `Authorization: Bearer <token>` e o corpo `{"message":"Responda apenas: ok"}`.
