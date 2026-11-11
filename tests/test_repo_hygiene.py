@@ -157,3 +157,42 @@ def test_architecture_lists_every_catalog_schema() -> None:
     schemas = [s.strip() for s in listed.group(1).split(",")]
     missing = [s for s in schemas if f"| `{s}` |" not in arch]
     assert missing == [], f"architecture.md has no row for: {missing}"
+
+
+def _failure_rows() -> list[str]:
+    arch = (ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
+    section = arch.split("## 8. Modos de falha", 1)[1].split("\n## ", 1)[0]
+    return [
+        line
+        for line in section.splitlines()
+        if line.startswith("| ") and not line.startswith("| Componente") and "---" not in line
+    ]
+
+
+def test_every_failure_mode_points_to_its_spec() -> None:
+    """SPEC-011 §4 (P2.2): each failure row links to the spec or ADR that defines it."""
+    rows = _failure_rows()
+    assert rows, "no failure-mode rows in architecture.md §8"
+    orphans = [
+        r for r in rows if not re.search(r"\]\((specs/\d{3}-[a-z0-9-]+/spec\.md|adr/\d{4}-)", r)
+    ]
+    assert orphans == [], orphans
+
+
+def test_failure_modes_cover_spec_failure_tables() -> None:
+    """SPEC-011 §4 (P2.2): no row of the specs' failure tables is left out."""
+    rows = "\n".join(_failure_rows())
+    mcp_spec = (SPECS / "006-mcp-server" / "spec.md").read_text(encoding="utf-8")
+    codes = re.findall(
+        r"^\| `([A-Z_]+)` \|", mcp_spec.split("## 4.", 1)[1].split("\n## ", 1)[0], re.M
+    )
+    assert codes, "no error codes found in SPEC-006 §4"
+    missing = [c for c in codes if f"`{c}`" not in rows]
+    for spec, heading in [("002-medallion-pipeline", "## 4."), ("005-business-agent", "## 6.")]:
+        text = (SPECS / spec / "spec.md").read_text(encoding="utf-8")
+        table = text.split(heading, 1)[1].split("\n## ", 1)[0]
+        expected = len([ln for ln in table.splitlines() if ln.startswith("| ")]) - 1  # minus header
+        linked = rows.count(f"specs/{spec}/spec.md")
+        if linked < expected:
+            missing.append(f"{spec}: {linked} rows, spec has {expected}")
+    assert missing == [], missing

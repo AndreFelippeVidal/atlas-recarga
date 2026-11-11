@@ -58,7 +58,7 @@ _O Claude Code trabalha neste repo com contexto e limites aplicados pela ferrame
 _Um desenho e um texto curto: componentes, onde estão os dados, onde entram a IA e o humano, o que acontece na falha._
 
 - [x] **P2.1** 🤖 Escrever `docs/architecture.md` com o diagrama Mermaid (C4 nível 2) — _pronto quando:_ Revisado por PR; todos os componentes do PRD aparecem (#11) · depende de P1.6
-- [ ] **P2.2** 🤖 Tabela de modos de falha por componente (o que quebra, o efeito, a detecção, a recuperação) — _pronto quando:_ Cada linha aponta para a spec que define o comportamento · depende de P2.1
+- [x] **P2.2** 🤖 Tabela de modos de falha por componente (o que quebra, o efeito, a detecção, a recuperação) — _pronto quando:_ Cada linha aponta para a spec que define o comportamento (#12) · depende de P2.1
 
 ## Fase 3 — Spike S0: validações de plataforma → [000-platform-spike](000-platform-spike/spec.md)
 
