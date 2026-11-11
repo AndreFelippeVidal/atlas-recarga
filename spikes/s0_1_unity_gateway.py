@@ -20,11 +20,12 @@
 
 from databricks_langchain import ChatDatabricks
 
-# Troque `MODEL` por um nome da aba Models do Unity Gateway.
+# Use o nome de TRÊS PARTES do model service (catalog.schema.nome). O nome curto cai
+# no endpoint legado e dá 403 "no longer available".
 # Candidatos vistos no workspace: gpt-oss-120b, llama-4-maverick, gemma-3-12b.
 # Candidato Claude (esperado falhar; registrar o erro exato): claude-sonnet-4-5
-MODEL = "gpt-oss-120b"
-CLAUDE_CANDIDATE = "claude-sonnet-4-5"
+MODEL = "system.ai.gpt-oss-120b"
+CLAUDE_CANDIDATE = "system.ai.claude-sonnet-4-5"
 
 # COMMAND ----------
 
