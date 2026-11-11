@@ -1,0 +1,14 @@
+# Sensitive paths (SPEC-009 §8). With 0 required approvals (ADR-0014) this is
+# informative: it documents ownership and requests review notifications.
+# Becomes blocking when a second human maintainer joins.
+
+# Irreversible step: commission rules and closing (ADR-0010)
+/commission/              @AndreFelippeVidal
+# Single definition of every business metric (ADR-0005)
+/semantic/                @AndreFelippeVidal
+# Constitution and decisions
+/docs/specs/mission.md    @AndreFelippeVidal
+/docs/adr/                @AndreFelippeVidal
+# Agent harness limits (ADR-0012) and CI/protection
+/.claude/                 @AndreFelippeVidal
+/.github/                 @AndreFelippeVidal
