@@ -1,0 +1,198 @@
+# Roadmap — Atlas Recarga
+
+> Constituição do projeto, parte 3 de 3 · [mission](mission.md) · [tech-stack](tech-stack.md) · [roadmap](roadmap.md)
+
+## Como usar
+
+- **Este arquivo é a única fonte de status.** Os `tasks.md` de cada spec têm o detalhe (passos), mas **não** têm checkbox.
+- **1 task = 1 branch = 1 PR.** Branch: `task/P4.3-pos-generation`. O título do PR começa com o ID da task.
+- **Próxima task** = a primeira `[ ]` cujas dependências estão todas `[x]`. Peça: *"aplique a próxima task aberta do roadmap"* (ou `/next-task` depois da P1.5).
+- Ao fazer o merge, marque `[x]` e acrescente o PR: `- [x] **P4.3** … (#12)`.
+- Os IDs de spec (000–011) são estáveis e **não** indicam ordem de execução; a ordem é a das fases abaixo.
+- Executor: 🤖 o agente de código executa sozinho · 🤝 o agente prepara, você executa ou aprova no workspace · 👤 só você. Tasks 👤 nunca são iniciadas pelo agente.
+
+## Visão geral
+
+| Fase | Tema | Spec | Tasks |
+|---|---|---|---|
+| 0 | Fundação do repositório | [009-repo-foundation](009-repo-foundation/spec.md) | 7 |
+| 1 | Harness do agente de código | [010-agent-harness](010-agent-harness/spec.md) | 6 |
+| 2 | Arquitetura explicada | [011-architecture](011-architecture/spec.md) | 2 |
+| 3 | Spike S0: validações de plataforma | [000-platform-spike](000-platform-spike/spec.md) | 8 |
+| 4 | Dados sintéticos | [001-synthetic-data-cli](001-synthetic-data-cli/spec.md) | 9 |
+| 5 | Bundle e catálogo como código | [002-medallion-pipeline](002-medallion-pipeline/spec.md) | 2 |
+| 6 | Pipeline medalhão | [002-medallion-pipeline](002-medallion-pipeline/spec.md) | 7 |
+| 7 | Camada semântica (recargas) | [004-metric-views](004-metric-views/spec.md) | 5 |
+| 8 | Fechamento de comissão | [003-commission-closing](003-commission-closing/spec.md) | 11 |
+| 9 | Avaliação do agente: golden set antes do agente | [008-agent-evaluation](008-agent-evaluation/spec.md) | 3 |
+| 10 | Agente de negócio | [005-business-agent](005-business-agent/spec.md) | 8 |
+| 11 | MCP server | [006-mcp-server](006-mcp-server/spec.md) | 5 |
+| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 8 |
+| 13 | Demo e release v1.0 | — | 4 |
+
+## Fase 0 — Fundação do repositório → [009-repo-foundation](009-repo-foundation/spec.md)
+
+_Repositório com cara de time: main protegida, PR obrigatório, CI que bloqueia, segredos fora._
+
+- [ ] **P0.1** 🤖 Escrever a SPEC-009 (fundação do repo) — _pronto quando:_ spec.md aprovado por você na revisão local (ainda não há repo remoto)
+- [ ] **P0.2** 🤖 `git init`, `.gitignore`, `.editorconfig`, layout de pastas vazio e README esqueleto — _pronto quando:_ Primeiro commit local `chore: bootstrap repository` contendo também todo o `docs/` já escrito · depende de P0.1
+- [ ] **P0.3** 👤 Criar o repositório no GitHub e fazer o push inicial — _pronto quando:_ `origin/main` existe com o commit de bootstrap · depende de P0.2
+- [ ] **P0.4** 🤖 Template de PR, template de issue e CONTRIBUTING (Conventional Commits, 1 task = 1 PR) — _pronto quando:_ PR #1 aberto com os templates · depende de P0.3
+- [ ] **P0.5** 🤖 CI base: ruff, mypy, pytest, gitleaks, link check dos docs — _pronto quando:_ Workflow `ci.yml` verde no PR e vermelho num PR de teste com segredo falso · depende de P0.4
+- [ ] **P0.6** 🤖 CODEOWNERS para `commission/**`, `semantic/**`, `docs/specs/mission.md`, `.claude/**` — _pronto quando:_ Arquivo no PR; a revisão do owner é exigida · depende de P0.4
+- [ ] **P0.7** 👤 Branch protection da `main`: PR obrigatório, 1 aprovação, checks obrigatórios, sem force push — _pronto quando:_ Um push direto na `main` é rejeitado · depende de P0.5, P0.6
+
+## Fase 1 — Harness do agente de código → [010-agent-harness](010-agent-harness/spec.md)
+
+_O Claude Code trabalha neste repo com contexto e limites aplicados pela ferramenta (ADR-0012)._
+
+- [ ] **P1.1** 🤖 Escrever a SPEC-010 (harness): o que o agente faz, o que é bloqueado, como é revisado — _pronto quando:_ spec.md aprovado; ADR-0012 vira `aceito` · depende de P0.7
+- [ ] **P1.2** 🤖 `CLAUDE.md`: missão resumida, princípios, mapa do repo, comandos, como pegar a próxima task — _pronto quando:_ O agente, numa sessão nova, responde corretamente "qual a próxima task?" · depende de P1.1
+- [ ] **P1.3** 🤖 `.claude/settings.json`: permissões allow/deny — _pronto quando:_ `deny` cobre `.env*`, `git push origin main`, `--force`, `bundle deploy -t demo`, `jobs run-now *commission_review*` · depende de P1.1
+- [ ] **P1.4** 🤖 Hooks `PreToolUse` que bloqueiam edições em `docs/specs/**` e `docs/adr/**` sem a flag da task e em `commission/rules.py` — _pronto quando:_ Teste manual: o agente tenta editar e o hook nega com uma mensagem clara · depende de P1.3
+- [ ] **P1.5** 🤖 Commands `/next-task` (lê o roadmap e propõe a próxima task aberta) e `/close-task` (marca [x] e linka o PR) — _pronto quando:_ `/next-task` devolve a primeira task aberta cujas dependências estão concluídas · depende de P1.2
+- [ ] **P1.6** 🤖 Fluxo de revisão: subagente revisor + checklist de princípios no PR + revisão humana obrigatória — _pronto quando:_ Seção "Como reviso o agente" no CONTRIBUTING e um PR de exemplo revisado · depende de P1.5
+
+## Fase 2 — Arquitetura explicada → [011-architecture](011-architecture/spec.md)
+
+_Um desenho e um texto curto: componentes, onde estão os dados, onde entram a IA e o humano, o que acontece na falha._
+
+- [ ] **P2.1** 🤖 Escrever `docs/architecture.md` com o diagrama Mermaid (C4 nível 2) — _pronto quando:_ Revisado por PR; todos os componentes do PRD aparecem · depende de P1.6
+- [ ] **P2.2** 🤖 Tabela de modos de falha por componente (o que quebra, o efeito, a detecção, a recuperação) — _pronto quando:_ Cada linha aponta para a spec que define o comportamento · depende de P2.1
+
+## Fase 3 — Spike S0: validações de plataforma → [000-platform-spike](000-platform-spike/spec.md)
+
+_Confirmar na Free Edition os recursos em Beta antes de depender deles._
+
+- [ ] **P3.1** 🤝 S0.1 Unity Gateway + model service Claude — _pronto quando:_ Resultado em `docs/spikes/S0-results.md`; ADR-0007 atualizado · depende de P2.2
+- [ ] **P3.2** 🤝 S0.2 Agent service (Beta) — _pronto quando:_ Idem; ADR-0007 · depende de P3.1
+- [ ] **P3.3** 🤝 S0.3 Production monitoring MLflow 3 — _pronto quando:_ Idem; ADR-0013 · depende de P2.2
+- [ ] **P3.4** 🤝 S0.4 Metric views + Genie — _pronto quando:_ Idem; ADR-0005 · depende de P2.2
+- [ ] **P3.5** 🤝 S0.5 OAuth de cliente externo num App MCP — _pronto quando:_ Idem; ADR-0008 · depende de P2.2
+- [ ] **P3.6** 👤 S0.6 Múltiplos usuários — _pronto quando:_ Idem; ADR-0010 · depende de P2.2
+- [ ] **P3.7** 🤝 S0.7 Cotas práticas (rodar depois de P4.6) — _pronto quando:_ Idem; ADR-0001 · depende de P4.6
+- [ ] **P3.8** 🤖 Ajustar as specs afetadas pelos planos B — _pronto quando:_ PR único com os ajustes; a Fase 3 é fechada · depende de P3.1, P3.2, P3.3, P3.4, P3.5, P3.6
+
+## Fase 4 — Dados sintéticos → [001-synthetic-data-cli](001-synthetic-data-cli/spec.md)
+
+_`atlas-cli` gera o dataset determinístico com cenários e o envia ao Volume._
+
+- [ ] **P4.1** 🤖 Esqueleto do pacote `cli/` (uv, Typer, `atlas-cli --help`, testes rodando no CI) — _pronto quando:_ `atlas-cli --help` lista os comandos; CI verde · depende de P3.8
+- [ ] **P4.2** 🤖 Snapshot da referência IBGE (`data/reference/municipalities_ibge.csv`) com população e DDD — _pronto quando:_ 5.570 linhas; teste de unicidade e de 7 dígitos · depende de P4.1
+- [ ] **P4.3** 🤖 `generate`: distributors + pos com pesos regionais — _pronto quando:_ Invariantes 3 e 4 da SPEC-001 passam · depende de P4.2
+- [ ] **P4.4** 🤖 `generate`: recharges com valores de face, curva intradiária e status — _pronto quando:_ Invariantes 2 e 5 passam com `--scenarios none` · depende de P4.3
+- [ ] **P4.5** 🤖 Sazonalidade (salário, dezembro, fevereiro, domingo) — _pronto quando:_ Teste estatístico simples de que os dias 5 a 10 têm volume > média · depende de P4.4
+- [ ] **P4.6** 🤖 Cenários da SPEC-001 §5 + `_manifest.json` com contagens e sha256 — _pronto quando:_ Os testes leem o manifest e conferem cada contagem · depende de P4.5
+- [ ] **P4.7** 🤖 `validate` + teste de determinismo (seed igual = sha igual) — _pronto quando:_ Critério 1 da SPEC-001 §7 · depende de P4.6
+- [ ] **P4.8** 🤖 `--incremental-day` — _pronto quando:_ Critério 3 da SPEC-001 §7 · depende de P4.7
+- [ ] **P4.9** 🤝 `upload` idempotente para `/Volumes/atlas/raw/landing/` — _pronto quando:_ Critério 5 da SPEC-001 §7 (o agente implementa; você roda contra o workspace) · depende de P4.8, P5.2
+
+## Fase 5 — Bundle e catálogo como código → [002-medallion-pipeline](002-medallion-pipeline/spec.md)
+
+_`databricks.yml` cria o catálogo, os schemas, o Volume e os grupos, de forma reproduzível._
+
+- [ ] **P5.1** 🤖 `databricks.yml` com targets `dev`/`demo` e `bundle validate` no CI — _pronto quando:_ `databricks bundle validate -t dev` passa no CI · depende de P3.8
+- [ ] **P5.2** 🤝 Catálogo `atlas`, schemas, Volume `raw.landing` e grupos `atlas_readers`, `atlas_commission_*` — _pronto quando:_ Deploy em `dev` feito por você; os objetos aparecem no Catalog Explorer · depende de P5.1
+
+## Fase 6 — Pipeline medalhão → [002-medallion-pipeline](002-medallion-pipeline/spec.md)
+
+_Bronze → silver → gold com expectations e linhagem; gold D-1 até 08:00._
+
+- [ ] **P6.1** 🤖 Bronze: Auto Loader de `recharges`, MVs de `pos`, `distributors`, `municipalities` — _pronto quando:_ As contagens no bronze são iguais às do manifest · depende de P4.9, P5.2
+- [ ] **P6.2** 🤖 Silver `recharges`: dedup, `recharge_date` em America/Sao_Paulo, expectations drop/warn — _pronto quando:_ Critério 1 da SPEC-002 §5 · depende de P6.1
+- [ ] **P6.3** 🤖 Silver `recharges_quarantine` (PDV órfão) — _pronto quando:_ Critério 2 da SPEC-002 §5 · depende de P6.2
+- [ ] **P6.4** 🤖 Silver das dimensões com `expect_or_fail` — _pronto quando:_ Critério 4 da SPEC-002 §5 (teste com um PDV de município inválido) · depende de P6.1
+- [ ] **P6.5** 🤖 Gold: `dim_*` + `fct_recharges` com COMMENT em tabelas e colunas — _pronto quando:_ Linhagem visível; todas as colunas descritas · depende de P6.3, P6.4
+- [ ] **P6.6** 🤖 Gold `agg_pos_month` — _pronto quando:_ A soma bate com `fct_recharges` por mês · depende de P6.5
+- [ ] **P6.7** 🤝 Job `atlas_daily` (06:00) + task de frescor em `observability.pipeline_freshness` — _pronto quando:_ Execução agendada termina antes das 08:00 · depende de P6.6
+
+## Fase 7 — Camada semântica (recargas) → [004-metric-views](004-metric-views/spec.md)
+
+_`mv_recharges` como a única porta de leitura, com AI/BI e Genie em cima._
+
+- [ ] **P7.1** 🤖 `semantic/mv_recharges.yaml` + deploy — _pronto quando:_ `SELECT MEASURE(gross_revenue)` funciona · depende de P6.5
+- [ ] **P7.2** 🤖 Teste de consistência metric view × SQL direto no gold — _pronto quando:_ Critério 1 da SPEC-004 §8 · depende de P7.1
+- [ ] **P7.3** 🤝 Grants: `atlas_readers` só em `semantic` + teste de PERMISSION_DENIED — _pronto quando:_ Critério 4 da SPEC-004 §8 · depende de P7.1
+- [ ] **P7.4** 🤝 AI/BI Dashboard "Atlas — Visão Comercial" (páginas Brasil, UF, Rede) — _pronto quando:_ Publicado; filtros de mês, região e UF · depende de P7.1
+- [ ] **P7.5** 🤝 Genie Space "Atlas Recarga" com instruções e 10 exemplos — _pronto quando:_ Critério 5 da SPEC-004 §8 · depende de P7.1
+
+## Fase 8 — Fechamento de comissão → [003-commission-closing](003-commission-closing/spec.md)
+
+_Cálculo determinístico, reconciliação, 2 aprovações humanas e lote imutável._
+
+- [ ] **P8.1** 🤖 `commission/rules.py` (faixas, taxas, arredondamento) + testes de borda — _pronto quando:_ Critério 2 da SPEC-003 §8; cobertura ≥ 95% no módulo · depende de P6.6
+- [ ] **P8.2** 🤖 Tabelas `commission.*` com `delta.appendOnly` em `batch_events` e `locked_lines` — _pronto quando:_ Teste: um UPDATE é rejeitado · depende de P8.1
+- [ ] **P8.3** 🤖 Cálculo do rascunho (`draft`) em PySpark — _pronto quando:_ Lote `COM-YYYY-MM-v1` criado para o último mês fechado · depende de P8.2
+- [ ] **P8.4** 🤖 Reconciliação independente em SQL + totais de controle — _pronto quando:_ Critério 1 da SPEC-003 §8 (R$ 0,00) · depende de P8.3
+- [ ] **P8.5** 🤖 Flags de revisão (`spike_3x`, `fractioning_suspect`, `tier_jump`, `closed_pos`) — _pronto quando:_ Critério 3 da SPEC-003 §8 · depende de P8.4
+- [ ] **P8.6** 🤖 Job `atlas_commission_review`: máquina de estados, segregação de funções, justificativa — _pronto quando:_ Critérios 4 e 6 da SPEC-003 §8 · depende de P8.5
+- [ ] **P8.7** 🤖 Lock + remessa simulada + sha256 — _pronto quando:_ Critério 7 da SPEC-003 §8 · depende de P8.6
+- [ ] **P8.8** 🤖 Dashboard/notebook `commission_review` — _pronto quando:_ A analista vê os totais, o top 20, os flags e a comparação com o mês anterior · depende de P8.5
+- [ ] **P8.9** 👤 Primeiro fechamento ponta a ponta (você aprova nas 2 etapas) — _pronto quando:_ Lote `locked` com 2 eventos de aprovação · depende de P8.7, P8.8
+- [ ] **P8.10** 🤖 Lote de ajuste `ADJ` — _pronto quando:_ SPEC-003 §7 coberto por teste · depende de P8.7
+- [ ] **P8.11** 🤖 `semantic/mv_commission.yaml` (só `locked`) + página Comissão no AI/BI — _pronto quando:_ Critério 2 da SPEC-004 §8 · depende de P8.9
+
+## Fase 9 — Avaliação do agente: golden set antes do agente → [008-agent-evaluation](008-agent-evaluation/spec.md)
+
+_Escrever o teste antes do agente: golden set e scorers prontos._
+
+- [ ] **P9.1** 🤖 `eval/golden_set.yaml` com ~30 casos (20 métricas, 5 comparativos, 5 recusas) — _pronto quando:_ Toda `reference_sql` executa e retorna 1 valor · depende de P7.5, P8.11
+- [ ] **P9.2** 🤖 Sync do golden set para `atlas.eval.agent_golden_set` (dataset MLflow) — _pronto quando:_ O dataset aparece no UC com versão · depende de P9.1
+- [ ] **P9.3** 🤖 Scorers de código (`numeric_match`, `cites_metric_view`, `read_only_tools`, `no_tool_on_refusal`) + testes unitários com traces fake — _pronto quando:_ Cobertura ≥ 90% nos scorers · depende de P9.1
+
+## Fase 10 — Agente de negócio → [005-business-agent](005-business-agent/spec.md)
+
+_Agente somente leitura, via Unity Gateway, com tracing, aprovado no golden set._
+
+- [ ] **P10.1** 🤖 UC functions `fn_list_metrics`, `fn_metric_by_region`, `fn_compare_months` — _pronto quando:_ Retornos batem com as metric views; `measure` inválido gera erro · depende de P7.1
+- [ ] **P10.2** 🤖 Esqueleto do App `atlas-agent` a partir do template oficial, LLM via Unity Gateway — _pronto quando:_ Responde "olá"; o trace aparece no experiment; uso em `system.ai_gateway.usage` · depende de P3.8
+- [ ] **P10.3** 🤖 Tools: `ask_genie` + UC functions (lista fechada) — _pronto quando:_ Uma pergunta simples do golden set acerta · depende de P10.1, P10.2
+- [ ] **P10.4** 🤖 System prompt: citação `Fonte:`, recusa, último mês fechado, PT-BR — _pronto quando:_ Os casos de recusa do golden set passam · depende de P10.3
+- [ ] **P10.5** 🤝 Rate limit, spend cap e guardrails no gateway + trace tables em `atlas.observability` — _pronto quando:_ 429 testado; política de PII ativa · depende de P10.2
+- [ ] **P10.6** 🤖 Avaliação offline completa: acurácia ≥ 90% — _pronto quando:_ Run do MLflow linkado no PR · depende de P9.3, P10.4
+- [ ] **P10.7** 🤖 Gate de CI `agent-eval.yml` com path filter + comentário no PR — _pronto quando:_ Critérios 2 e 3 da SPEC-008 §7 · depende de P10.6
+- [ ] **P10.8** 🤝 Production monitoring (ou o plano B) + página "Qualidade do agente" + alerta — _pronto quando:_ Critérios 5 e 6 da SPEC-008 §7 · depende de P10.6
+
+## Fase 11 — MCP server → [006-mcp-server](006-mcp-server/spec.md)
+
+_FastMCP em App, somente leitura, conectado ao Claude._
+
+- [ ] **P11.1** 🤖 Esqueleto FastMCP no App `atlas-mcp` com `health` — _pronto quando:_ Critério 1 da SPEC-006 §7 · depende de P3.8
+- [ ] **P11.2** 🤖 `list_metrics` + `query_metric` com validação por lista fechada e parâmetros vinculados — _pronto quando:_ Critérios 3 e 4 (injeção) da SPEC-006 §7 · depende de P11.1, P7.1
+- [ ] **P11.3** 🤖 `top_regions` + `compare_months` + erros padronizados — _pronto quando:_ Contrato de erros da SPEC-006 §4 coberto · depende de P11.2
+- [ ] **P11.4** 🤖 Logs estruturados + teste de paridade com o golden set — _pronto quando:_ Critério 6 da SPEC-006 §7 · depende de P11.3, P9.1
+- [ ] **P11.5** 👤 Conectar ao Claude Code/Desktop e documentar no README — _pronto quando:_ Você pergunta no Claude e recebe a resposta com `source` · depende de P11.4
+
+## Fase 12 — Dashboard React com mapa → [007-react-geo-dashboard](007-react-geo-dashboard/spec.md)
+
+_KPIs + mapa coroplético UF → município, p95 < 3s._
+
+- [ ] **P12.1** 🤖 `scripts/fetch_geo.py`: malhas do IBGE → TopoJSON simplificado em `apps/web/public/geo/` — _pronto quando:_ Tamanhos dentro do limite; teste de match de 100% com `dim_municipality` · depende de P4.2
+- [ ] **P12.2** 🤖 Backend FastAPI: `/api/months`, `/api/kpis`, `/api/health` + cache — _pronto quando:_ Os KPIs batem com o AI/BI · depende de P7.1
+- [ ] **P12.3** 🤖 `/api/map/uf` e `/api/map/municipality` (com `mom_change`) + validação de `measure` — _pronto quando:_ 400 para medida inválida; a soma das UFs é igual ao KPI · depende de P12.2
+- [ ] **P12.4** 🤖 Frontend: esqueleto Vite + React + TS, layout, KPI cards — _pronto quando:_ Build no CI (`tsc`, `eslint`, `vitest`) · depende de P0.5
+- [ ] **P12.5** 🤖 Mapa por UF com `d3-geo`, escala de quantis, legenda, tooltip — _pronto quando:_ Visual conferido por você · depende de P12.1, P12.3, P12.4
+- [ ] **P12.6** 🤖 Drill-down: clique → zoom → municípios; breadcrumb e Esc — _pronto quando:_ Critério 1 da SPEC-007 §6 (queda no PA visível) · depende de P12.5
+- [ ] **P12.7** 🤖 Escala divergente `mom_change`, estados de loading e erro, acessibilidade — _pronto quando:_ Critério 6 da SPEC-007 §6 + navegação por teclado · depende de P12.6
+- [ ] **P12.8** 🤝 Deploy do App `atlas-web` + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.7
+
+## Fase 13 — Demo e release v1.0
+
+_Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medidas e publicadas._
+
+- [ ] **P13.1** 🤖 `make apps-start` + runbook de demo (auto-stop de 24h) — _pronto quando:_ Os 3 Apps sobem com um comando e os healthchecks passam · depende de P10.8, P11.5, P12.8
+- [ ] **P13.2** 🤖 Teste de consistência entre os 5 consumidores — _pronto quando:_ Mesmo `gross_revenue` no AI/BI, Genie, agente, MCP e React · depende de P13.1
+- [ ] **P13.3** 🤖 README final (repo-readme-generator) com as métricas medidas do PRD §4 — _pronto quando:_ Uma pessoa nova roda a demo sem perguntar nada · depende de P13.2
+- [ ] **P13.4** 👤 Tag `v1.0.0` + release notes — _pronto quando:_ Release publicado · depende de P13.3
+
+## Depois do MVP
+
+| Versão | Item |
+|---|---|
+| v1.1 | Geo híbrido: CEP → código IBGE em tabela de referência cacheada (ADR-0004) |
+| v1.1 | Medidas com janela nas metric views; filtros de distribuidor e tipo de PDV no mapa |
+| v2 | Forecast e metas regionais com backtesting |
+| v2 | Personas do agente (Helena, Analista, Regional) com golden set por persona |
+| v2 | DQ por camada + Lakehouse Monitoring; expectations de volume bloqueantes |
+| v2 | UI de aprovação de comissão (novo ADR sobre o slot de App) |
+| v3 | Row-level security por região; alertas proativos de queda regional |
