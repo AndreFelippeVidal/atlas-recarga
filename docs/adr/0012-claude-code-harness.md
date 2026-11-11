@@ -1,6 +1,6 @@
 # ADR-0012 — Usar Claude Code como harness do agente de código, com limites explícitos
 
-- **Status:** proposto (detalhado no PR de configuração do harness) · **Data:** 2026-11-11 · **Relacionados:** ADR-0010, todas as SPECs
+- **Status:** aceito (detalhado na SPEC-010) · **Data:** 2026-11-11 · **Relacionados:** SPEC-010, ADR-0010, ADR-0014
 
 ## Contexto
 O desafio exige construir com um agente de código e deixar explícito o que ele faz sozinho, o que passa por revisão humana e como o código dele é revisado antes da `main`. O projeto mexe com uma etapa financeira irreversível (comissão) e com permissões de dados.
@@ -23,19 +23,17 @@ O desafio exige construir com um agente de código e deixar explícito o que ele
 **Cursor.** 👍 Ótima experiência no IDE. 👎 Limites menos determinísticos (rules são orientação, não bloqueio).
 **Codex ou Aider.** 👍 `AGENTS.md` é um padrão aberto. 👎 Menos mecanismos de bloqueio por hook nativo.
 
-## Limites (resumo; o detalhe vai para o `CLAUDE.md` e os hooks)
+## Limites
+A matriz completa e verificável está na [SPEC-010 §3](../specs/010-agent-harness/spec.md). Ela tem três níveis:
+- **Livre:** implementar a partir de uma spec aprovada, rodar checks e o CLI local, commitar, fazer push da própria branch `task/*`, abrir PR.
+- **Exige confirmação (`ask`):** editar specs, ADRs, a constituição, `commission/`, `semantic/`, `.claude/` e o CI; fazer deploy em `dev`; fazer upload para o Volume.
+- **Proibido (`deny`):** merge de PR, push na `main`, force push, mexer na proteção do repo, deploy em `demo`, executar a aprovação de comissão, ler segredos, `--no-verify`.
 
-| O agente **pode** sozinho | O agente **não pode** (bloqueado por hook ou permissão) |
-|---|---|
-| Implementar código a partir de uma SPEC aprovada | Alterar `docs/specs/**` ou `docs/adr/**` sem pedido explícito |
-| Rodar testes, lint, `atlas-cli` local e `databricks bundle validate` | `databricks bundle deploy -t demo`, `databricks jobs run-now atlas_commission_review` |
-| Abrir branch, commitar e abrir PR | Fazer push na `main`, `--force`, merge de PR |
-| Rodar a avaliação do agente (SPEC-008) | Alterar faixas de comissão (`commission/rules.py`) sem a aprovação do CODEOWNER |
-| Ler logs e traces | Ler ou gravar `.env`, secrets ou tokens |
+A aplicação é feita em **três camadas**: permissões no `settings.json`, o hook `PreToolUse` (que inspeciona o comando inteiro, porque uma regra Bash casa só com o comando como foi escrito) e a proteção da `main` no GitHub (ADR-0014).
 
-**Revisão:** todo PR passa pelo CI (lint, tipos, testes, segurança e, quando aplicável, o gate de avaliação), por um subagente de revisão e pela **revisão humana obrigatória** (branch protection). Os paths `commission/**` e `semantic/**` têm CODEOWNERS.
+**Revisão:** checks locais → `/code-review` → PR com template → CI (`ci-ok`) → **revisão e merge humanos**. O agente nunca faz merge.
 
 ## Consequências
 - **Positivas:** os limites são verificáveis (o hook nega e loga) e não dependem de o modelo "lembrar".
-- **Negativas aceitas:** atrito: o deploy em `demo` e a aprovação de comissão são sempre manuais.
+- **Negativas aceitas:** atrito: editar uma spec ou um path sensível exige confirmação, e o deploy em `demo` e a aprovação de comissão são sempre manuais. O hook é código próprio: mantê-lo e testá-lo é custo do projeto.
 - **Revisitar:** depois das primeiras 3 features, medindo quantos bloqueios foram falsos positivos.

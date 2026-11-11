@@ -46,10 +46,10 @@ _Repositório com cara de time: main protegida, PR obrigatório, CI que bloqueia
 
 _O Claude Code trabalha neste repo com contexto e limites aplicados pela ferramenta (ADR-0012)._
 
-- [ ] **P1.1** 🤖 Escrever a SPEC-010 (harness): o que o agente faz, o que é bloqueado, como é revisado — _pronto quando:_ spec.md aprovado; ADR-0012 vira `aceito` · depende de P0.7
+- [x] **P1.1** 🤖 Escrever a SPEC-010 (harness): o que o agente faz, o que é bloqueado, como é revisado — _pronto quando:_ spec.md aprovado; ADR-0012 vira `aceito` (#8) · depende de P0.7
 - [ ] **P1.2** 🤖 `CLAUDE.md`: missão resumida, princípios, mapa do repo, comandos, como pegar a próxima task — _pronto quando:_ O agente, numa sessão nova, responde corretamente "qual a próxima task?" · depende de P1.1
-- [ ] **P1.3** 🤖 `.claude/settings.json`: permissões allow/deny — _pronto quando:_ `deny` cobre `.env*`, `git push origin main`, `--force`, `bundle deploy -t demo`, `jobs run-now *commission_review*` · depende de P1.1
-- [ ] **P1.4** 🤖 Hooks `PreToolUse` que bloqueiam edições em `docs/specs/**` e `docs/adr/**` sem a flag da task e em `commission/rules.py` — _pronto quando:_ Teste manual: o agente tenta editar e o hook nega com uma mensagem clara · depende de P1.3
+- [ ] **P1.3** 🤖 `.claude/settings.json`: permissões allow/deny — _pronto quando:_ allow/ask/deny conforme SPEC-010 §3; o hook é registrado no mesmo arquivo · depende de P1.1
+- [ ] **P1.4** 🤖 Hook `PreToolUse` `guard.py` com as regras deny/ask da SPEC-010 §3–§4 — _pronto quando:_ `tests/test_guard_hook.py` cobre cada regra (positivo e negativo) no CI; teste manual de `gh pr merge` negado · depende de P1.3
 - [ ] **P1.5** 🤖 Commands `/next-task` (lê o roadmap e propõe a próxima task aberta) e `/close-task` (marca [x] e linka o PR) — _pronto quando:_ `/next-task` devolve a primeira task aberta cujas dependências estão concluídas · depende de P1.2
 - [ ] **P1.6** 🤖 Fluxo de revisão: subagente revisor + checklist de princípios no PR + revisão humana obrigatória — _pronto quando:_ Seção "Como reviso o agente" no CONTRIBUTING e um PR de exemplo revisado · depende de P1.5
 

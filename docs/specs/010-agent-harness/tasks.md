@@ -24,18 +24,20 @@
 ### P1.3 🤖 `.claude/settings.json`: permissões allow/deny
 
 - **Depende de:** P1.1
-- **Pronto quando:** `deny` cobre `.env*`, `git push origin main`, `--force`, `bundle deploy -t demo`, `jobs run-now *commission_review*`
+- **Pronto quando:** allow/ask/deny conforme SPEC-010 §3; o hook é registrado no mesmo arquivo
 - **Passos:**
-  - Allow: testes, lint, `atlas-cli`, `databricks bundle validate`
-  - Deny explícito para os itens do ADR-0012
+  - Allow: SPEC-010 §3.1
+  - Ask: SPEC-010 §3.2 (os que dependem de path ficam no hook)
+  - Deny: SPEC-010 §3.3 (repetidos no hook, defesa em profundidade)
 
-### P1.4 🤖 Hooks `PreToolUse` que bloqueiam edições em `docs/specs/**` e `docs/adr/**` sem a flag da task e em `commission/rules.py`
+### P1.4 🤖 Hook `PreToolUse` `guard.py` com as regras deny/ask da SPEC-010 §3–§4
 
 - **Depende de:** P1.3
-- **Pronto quando:** Teste manual: o agente tenta editar e o hook nega com uma mensagem clara
+- **Pronto quando:** `tests/test_guard_hook.py` cobre cada regra (positivo e negativo) no CI; teste manual de `gh pr merge` negado
 - **Passos:**
-  - Script em `.claude/hooks/` com testes em pytest
-  - Logar os bloqueios em `.claude/hooks.log` (ignorado no git)
+  - `.claude/hooks/guard.py` só com stdlib, tabela `RULES` no topo
+  - Fail closed em erro interno
+  - Logar deny/ask em `.claude/hooks.log` (ignorado no git), sem conteúdo de segredos
 
 ### P1.5 🤖 Commands `/next-task` (lê o roadmap e propõe a próxima task aberta) e `/close-task` (marca [x] e linka o PR)
 
