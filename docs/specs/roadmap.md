@@ -64,7 +64,7 @@ _Um desenho e um texto curto: componentes, onde estão os dados, onde entram a I
 
 _Confirmar na Free Edition os recursos em Beta antes de depender deles._
 
-- [ ] **P3.1** 🤝 S0.1 Unity Gateway + model service Claude — _pronto quando:_ Resultado em `docs/spikes/S0-results.md`; ADR-0007 atualizado · depende de P2.2
+- [x] **P3.1** 🤝 S0.1 Unity Gateway + model service Claude — _pronto quando:_ Resultado em `docs/spikes/S0-results.md`; ADR-0007 atualizado (#13) — passou com ressalva: sem Claude em `system.ai`; ver ADR-0007 · depende de P2.2
 - [ ] **P3.2** 🤝 S0.2 Agent service (Beta) — _pronto quando:_ Idem; ADR-0007 · depende de P3.1
 - [ ] **P3.3** 🤝 S0.3 Production monitoring MLflow 3 — _pronto quando:_ Idem; ADR-0013 · depende de P2.2
 - [ ] **P3.4** 🤝 S0.4 Metric views + Genie — _pronto quando:_ Idem; ADR-0005 · depende de P2.2

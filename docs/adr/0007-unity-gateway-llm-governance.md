@@ -1,6 +1,6 @@
 # ADR-0007 — Governar o tráfego de IA pelo Unity Gateway
 
-- **Status:** aceito (depende do Spike S0.1/S0.2) · **Data:** 2026-11-11 · **Relacionados:** SPEC-005, ADR-0008
+- **Status:** aceito (S0.1 concluído com ressalva: sem Claude; depende ainda do Spike S0.2) · **Data:** 2026-11-11 · **Relacionados:** SPEC-005, ADR-0008
 
 ## Contexto
 O requisito principal do projeto é ter **o agente passando pelo Unity Gateway**, com tracing, controle de uso e limites. A documentação atual mostra:
@@ -32,3 +32,9 @@ O requisito principal do projeto é ter **o agente passando pelo Unity Gateway**
 - **Positivas:** o custo e o volume do agente ficam visíveis no AI/BI ("Qualidade do agente" + uso); os limites são aplicados mesmo que haja um bug no agente.
 - **Negativas aceitas:** dependência de Beta; o código lê `ATLAS_LLM_SERVICE` e `ATLAS_GATEWAY_MODE` (`unity` | `classic`) para alternar sem refatorar.
 - **Revisitar:** quando o agent services virar GA, ou se o S0.1 falhar (atualizar para "aceito com plano B").
+
+## Resultado do Spike S0.1 (2026-11-11)
+- O Unity Gateway está disponível na Free Edition, e `ChatDatabricks(model="system.ai.gpt-oss-120b", use_ai_gateway=True)` respondeu 200. A chamada apareceu em `system.ai_gateway.usage` (com atraso de minutos), inclusive a tentativa Claude que deu 404; evidência em `docs/spikes/S0-results.md`.
+- **Não há model service Claude em `system.ai`** neste workspace (aba Models sem Claude; tentativa de chamar um Claude → 404 `ENDPOINT_NOT_FOUND`). A suposição "LLM Claude" do contexto deste ADR e da SPEC-005 não se confirma.
+- O nome curto do modelo (`gpt-oss-120b`) cai no endpoint legado e dá 403; o model service é endereçado pelo **nome de três partes**.
+- **Decisão:** manter a Opção 1 (Unity Gateway) com um modelo não-Claude; `ATLAS_LLM_SERVICE` padrão provisório = `system.ai.gpt-oss-120b`. O plano B (Opção 2) **não** foi acionado. A SPEC-005 e a SPEC-000 são ajustadas na P3.8.
