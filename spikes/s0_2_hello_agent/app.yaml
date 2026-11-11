@@ -1,0 +1,4 @@
+command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+env:
+  - name: ATLAS_LLM_SERVICE
+    value: system.ai.gpt-oss-120b
