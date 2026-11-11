@@ -26,12 +26,15 @@
 # COMMAND ----------
 
 # MAGIC %pip install -U databricks-sdk requests
-# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
-import requests
-from databricks.sdk import WorkspaceClient
+dbutils.library.restartPython()  # noqa: F821
+
+# COMMAND ----------
+
+import requests  # noqa: E402
+from databricks.sdk import WorkspaceClient  # noqa: E402
 
 APP_NAME = "agent-hello"  # o prefixo agent- faz o App entrar na lista Agents
 w = WorkspaceClient()
@@ -57,10 +60,11 @@ print(resp.status_code, "LOGIN PAGE (sem token OAuth)" if is_login_page else res
 
 # MAGIC %sql
 # MAGIC -- Uso do LLM chamado pelo agente (camada do modelo). Pode demorar minutos.
-# MAGIC SELECT event_time, destination_name, status_code, input_tokens, output_tokens,
-# MAGIC        requester_type, api_type
+# MAGIC SELECT event_time, service_type, destination_name, status_code, input_tokens,
+# MAGIC        output_tokens, requester_type, auth_mode, invocation_metadata.source AS source,
+# MAGIC        request_tags
 # MAGIC FROM system.ai_gateway.usage
-# MAGIC WHERE event_time >= current_timestamp() - INTERVAL 2 HOURS
+# MAGIC WHERE event_time >= current_timestamp() - INTERVAL 3 HOURS
 # MAGIC ORDER BY event_time DESC
 # MAGIC LIMIT 20
 

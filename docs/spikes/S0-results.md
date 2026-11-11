@@ -73,7 +73,7 @@ Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-C
 
 ### Evidência na `system.ai_gateway.usage` (2026-11-11, UTC)
 
-Duas chamadas do agente ao modelo (as duas do `curl` com OAuth; a chamada do notebook só recebeu a tela de login e não chegou ao agente):
+Duas chamadas do agente ao modelo, feitas via `/invocations` com token OAuth no terminal (a chamada do notebook só recebeu a tela de login e não chegou ao agente; o mantenedor registrou o resultado de uma delas):
 
 | event_time | service_type | destination_name | status_code | input/output tokens | requester_type | auth_mode | invocation_metadata.source |
 |---|---|---|---|---|---|---|---|

@@ -1,6 +1,6 @@
 # ADR-0007 — Governar o tráfego de IA pelo Unity Gateway
 
-- **Status:** aceito com plano B parcial ("parcial": o agente é listado no gateway como App `agent-*`, mas sem uso nativo por agente; a governança fica no LLM; S0.1 com ressalva: sem Claude; S0.2 com ressalva: sem uso nativo por agente) · **Data:** 2026-11-11 · **Relacionados:** SPEC-005, ADR-0008
+- **Status:** aceito, com o plano B do S0.2 (governar só o LLM) em versão parcial ("parcial": o agente é listado no gateway como App `agent-*`, mas sem uso nativo por agente; a governança fica no LLM; S0.1 com ressalva: sem Claude; S0.2 com ressalva: sem uso nativo por agente) · **Data:** 2026-11-11 · **Relacionados:** SPEC-005, ADR-0008
 
 ## Contexto
 O requisito principal do projeto é ter **o agente passando pelo Unity Gateway**, com tracing, controle de uso e limites. A documentação atual mostra:
@@ -44,4 +44,4 @@ O requisito principal do projeto é ter **o agente passando pelo Unity Gateway**
 - As chamadas do agente ao `system.ai.gpt-oss-120b` aparecem em `system.ai_gateway.usage` (atraso de cerca de 1 hora) com `requester_type = SERVICE_PRINCIPAL` (o do App), `auth_mode = OAUTH` e `invocation_metadata.source = DATABRICKS_APPS`. A tabela não tem tipo de serviço para agente; só `MODEL_SERVICE`, `MCP_SERVICE` e `MODEL_PROVIDER_SERVICE`.
 - O registro como agent service (REST, `AGENT_SERVICE_TYPE_EXTERNAL`, exige conexão do UC) é para agentes externos e, em Beta, não tem invocação em runtime; não foi usado.
 - **Decisão (proposta; o mantenedor confirma no PR #15):** a camada do agente **não** é governada pelo gateway além da listagem. A governança de custo, limite e guardrail fica na camada do LLM (Opção 1, primeira camada). O agente é um App `agent-*` (ex.: `agent-atlas`); o consumo é atribuído pelo service principal do App. A SPEC-005 é ajustada na P3.8. Evidência em `docs/spikes/S0-results.md`.
-- **Pendências (P3.8 / P10.2):** validar `request_tags` do agente, o `ask_genie` via `genie_one_mcp` como `MCP_SERVICE` na `usage` e o trace de tool call num App. O gateway do LLM não vê a execução das tools: ela é observada pelo trace MLflow e limitada pelas permissões do Unity Catalog e pela lista fechada de tools.
+- **Pendências (P3.8 / P10.2):** validar `request_tags` do agente, o `ask_genie` via `genie_one_mcp` como `MCP_SERVICE` na `usage` e o trace de tool call num App. Em princípio o gateway do LLM só vê o pedido e a resposta do modelo, não a execução das tools (premissa a validar): ela seria observada pelo trace MLflow e limitada pelas permissões do Unity Catalog e pela lista fechada de tools.
