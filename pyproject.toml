@@ -30,7 +30,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests"]
+files = ["tests", ".claude/hooks"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

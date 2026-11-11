@@ -66,6 +66,12 @@ E, do `tech-stack.md` (Proibido):
 - Dados reais, PII ou telefones com formato real; segredo ou token versionado.
 - Adicionar uma tecnologia estrutural sem atualizar o `tech-stack.md` e escrever um ADR.
 
+## Limites do harness (SPEC-010)
+
+- Deny/ask vêm do `.claude/settings.json` e do hook `.claude/hooks/guard.py`. Uma negação traz o motivo: leia e ajuste, **não tente contornar** (ex.: `sh -c`).
+- **Falso positivo conhecido:** o hook lê o comando inteiro, então uma mensagem de commit ou o corpo de PR que **cite** um comando proibido (ex.: o texto "gh pr merge") é negado. Escreva a mensagem num arquivo temporário e use `git commit -F <arquivo>` / `gh pr create --body-file <arquivo>`.
+- Antes do PR: subagente `spec-reviewer` + `/code-review` (CONTRIBUTING, "Como reviso o agente").
+
 ## Comandos úteis
 
 ```bash
