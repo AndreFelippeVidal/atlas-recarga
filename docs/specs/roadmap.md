@@ -48,10 +48,10 @@ _O Claude Code trabalha neste repo com contexto e limites aplicados pela ferrame
 
 - [x] **P1.1** 🤖 Escrever a SPEC-010 (harness): o que o agente faz, o que é bloqueado, como é revisado — _pronto quando:_ spec.md aprovado; ADR-0012 vira `aceito` (#8) · depende de P0.7
 - [x] **P1.2** 🤖 `CLAUDE.md`: missão resumida, princípios, mapa do repo, comandos, como pegar a próxima task — _pronto quando:_ O agente, numa sessão nova, responde corretamente "qual a próxima task?" (#9) · depende de P1.1
-- [ ] **P1.3** 🤖 `.claude/settings.json`: permissões allow/deny — _pronto quando:_ allow/ask/deny conforme SPEC-010 §3; o hook é registrado no mesmo arquivo · depende de P1.1
-- [ ] **P1.4** 🤖 Hook `PreToolUse` `guard.py` com as regras deny/ask da SPEC-010 §3–§4 — _pronto quando:_ `tests/test_guard_hook.py` cobre cada regra (positivo e negativo) no CI; teste manual de `gh pr merge` negado · depende de P1.3
-- [ ] **P1.5** 🤖 Commands `/next-task` (lê o roadmap e propõe a próxima task aberta) e `/close-task` (marca [x] e linka o PR) — _pronto quando:_ `/next-task` devolve a primeira task aberta cujas dependências estão concluídas · depende de P1.2
-- [ ] **P1.6** 🤖 Fluxo de revisão: subagente revisor + checklist de princípios no PR + revisão humana obrigatória — _pronto quando:_ Seção "Como reviso o agente" no CONTRIBUTING e um PR de exemplo revisado · depende de P1.5
+- [x] **P1.3** 🤖 `.claude/settings.json`: permissões allow/deny — _pronto quando:_ allow/ask/deny conforme SPEC-010 §3; o hook é registrado no mesmo arquivo (#10) · depende de P1.1
+- [x] **P1.4** 🤖 Hook `PreToolUse` `guard.py` com as regras deny/ask da SPEC-010 §3–§4 — _pronto quando:_ `tests/test_guard_hook.py` cobre cada regra (positivo e negativo) no CI; teste manual de `gh pr merge` negado (#10) · depende de P1.3
+- [x] **P1.5** 🤖 Commands `/next-task` (lê o roadmap e propõe a próxima task aberta) e `/close-task` (marca [x] e linka o PR) — _pronto quando:_ `/next-task` devolve a primeira task aberta cujas dependências estão concluídas (#10) · depende de P1.2
+- [x] **P1.6** 🤖 Fluxo de revisão: subagente revisor + checklist de princípios no PR + revisão humana obrigatória — _pronto quando:_ Seção "Como reviso o agente" no CONTRIBUTING e um PR de exemplo revisado (#10) · depende de P1.5
 
 ## Fase 2 — Arquitetura explicada → [011-architecture](011-architecture/spec.md)
 
