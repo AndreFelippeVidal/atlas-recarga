@@ -25,7 +25,7 @@ Se quem implementa (pessoa ou agente de código) precisa adivinhar, a spec está
 | [006](006-mcp-server/spec.md) | MCP server (FastMCP) | 11 | F7 | 0008, 0009 | rascunho |
 | [007](007-react-geo-dashboard/spec.md) | Dashboard React com mapa | 12 | F8 | 0004, 0009 | rascunho |
 | [008](008-agent-evaluation/spec.md) | Avaliação e monitoramento do agente | 9, 10 | F9 | 0013 | rascunho |
-| [009](009-repo-foundation/spec.md) | Fundação do repositório | 0 | — | — | a escrever (P0.1) |
+| [009](009-repo-foundation/spec.md) | Fundação do repositório | 0 | — | 0014 | aprovado |
 | [010](010-agent-harness/spec.md) | Harness do agente de código | 1 | — | 0012 | a escrever (P1.1) |
 | [011](011-architecture/spec.md) | Arquitetura explicada | 2 | — | todos | a escrever (P2.1) |
 
