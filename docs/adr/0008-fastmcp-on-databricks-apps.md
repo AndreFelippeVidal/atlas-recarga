@@ -29,5 +29,6 @@ A Helena quer perguntar sobre os dados direto do Claude. Um requisito do projeto
 
 ## Consequências
 - **Positivas:** o MCP é testável com o mesmo golden set do agente (SPEC-006 §7).
-- **Negativas aceitas:** sem rate limit centralizado no MCP; o controle é a validação de entrada + o limite de 500 linhas + o warehouse 2X-Small como teto natural. A autenticação de clientes externos depende do Spike S0.5.
+- **Negativas aceitas:** sem rate limit nem auditoria **centralizados** no gateway. Compensação no próprio App (SPEC-006 §6, decidido em 2026-11-11): MLflow traces por tool, auditoria por `system.query.history` (com on-behalf-of-user, o usuário real), limitador de 30 chamadas/min por usuário e página "Uso do MCP" no AI/BI. Continuam valendo a validação de entrada, o limite de 500 linhas e o warehouse 2X-Small como teto natural. O que fica sem equivalente: teto de gasto e política única com o agente. A autenticação de clientes externos depende do Spike S0.5.
+- **Não se aplica ao MCP:** os controles de LLM do gateway (tokens, guardrail de PII na saída), porque o MCP não chama LLM; quem raciocina é o cliente.
 - **Revisitar se:** o Unity Gateway passar a aceitar registro de Apps como MCP Service. Nesse caso, migrar e herdar rate limit e auditoria.
