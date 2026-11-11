@@ -35,6 +35,6 @@ O requisito principal do projeto é ter **o agente passando pelo Unity Gateway**
 
 ## Resultado do Spike S0.1 (2026-11-11)
 - O Unity Gateway está disponível na Free Edition, e `ChatDatabricks(model="system.ai.gpt-oss-120b", use_ai_gateway=True)` respondeu 200. A chamada apareceu em `system.ai_gateway.usage` (com atraso de minutos), inclusive a tentativa Claude que deu 404; evidência em `docs/spikes/S0-results.md`.
-- **Não há model service Claude em `system.ai`** neste workspace (aba Models sem Claude; `system.ai.claude-sonnet-4-5` → 404 `ENDPOINT_NOT_FOUND`). A suposição "LLM Claude" do contexto deste ADR e da SPEC-005 não se confirma.
+- **Não há model service Claude em `system.ai`** neste workspace (aba Models sem Claude; tentativa de chamar um Claude → 404 `ENDPOINT_NOT_FOUND`). A suposição "LLM Claude" do contexto deste ADR e da SPEC-005 não se confirma.
 - O nome curto do modelo (`gpt-oss-120b`) cai no endpoint legado e dá 403; o model service é endereçado pelo **nome de três partes**.
 - **Decisão:** manter a Opção 1 (Unity Gateway) com um modelo não-Claude; `ATLAS_LLM_SERVICE` padrão provisório = `system.ai.gpt-oss-120b`. O plano B (Opção 2) **não** foi acionado. A SPEC-005 e a SPEC-000 são ajustadas na P3.8.

@@ -50,7 +50,7 @@ except Exception as exc:
 # MAGIC %sql
 # MAGIC -- Evidência do "passou se": a chamada acima deve aparecer aqui (pode demorar).
 # MAGIC SELECT event_time, destination_name, status_code, input_tokens, output_tokens,
-# MAGIC        requester_type, api_type, left(user_agent, 40) AS user_agent
+# MAGIC        requester_type, api_type
 # MAGIC FROM system.ai_gateway.usage
 # MAGIC WHERE event_time >= current_timestamp() - INTERVAL 2 HOURS
 # MAGIC ORDER BY event_time DESC
