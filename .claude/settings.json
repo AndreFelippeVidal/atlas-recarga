@@ -29,13 +29,6 @@
       "Bash(gh run list*)",
       "Bash(databricks bundle validate*)"
     ],
-    "ask": [
-      "Bash(databricks bundle deploy*)",
-      "Bash(databricks fs *)",
-      "Bash(databricks jobs run-now*)",
-      "Bash(databricks pipelines start-update*)",
-      "Bash(uv run atlas-cli upload*)"
-    ],
     "deny": [
       "Bash(gh pr merge*)",
       "Bash(git push origin main*)",
@@ -59,6 +52,13 @@
       "Read(~/.databrickscfg)",
       "Read(**/*.pem)",
       "Read(**/*.key)"
+    ],
+    "ask": [
+      "Bash(databricks bundle deploy*)",
+      "Bash(databricks fs *)",
+      "Bash(databricks jobs run-now*)",
+      "Bash(databricks pipelines start-update*)",
+      "Bash(uv run atlas-cli upload*)"
     ]
   },
   "hooks": {
@@ -73,5 +73,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "databricks@claude-plugins-official": true
   }
 }
