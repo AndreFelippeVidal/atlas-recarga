@@ -26,6 +26,7 @@ REQUIRED_FILES = [
     "CONTRIBUTING.md",
     ".github/pull_request_template.md",
     ".github/CODEOWNERS",
+    "CLAUDE.md",
 ]
 
 
@@ -123,3 +124,9 @@ def test_adrs_have_status_and_at_least_two_options() -> None:
         if len(options) < 2:
             problems.append(f"{adr.name}: fewer than 2 options")
     assert problems == [], problems
+
+
+def test_claude_md_stays_short() -> None:
+    """SPEC-010 §5: CLAUDE.md points to the constitution instead of duplicating it."""
+    lines = (ROOT / "CLAUDE.md").read_text(encoding="utf-8").splitlines()
+    assert len(lines) <= 150, f"CLAUDE.md has {len(lines)} lines (max 150)"
