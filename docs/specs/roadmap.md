@@ -40,7 +40,7 @@ _Repositório com cara de time: main protegida, PR obrigatório, CI que bloqueia
 - [x] **P0.4** 🤖 Template de PR, template de issue e CONTRIBUTING (Conventional Commits, 1 task = 1 PR) — _pronto quando:_ PR mergeado com os templates; o próximo PR já usa o template (#3) · depende de P0.3
 - [x] **P0.5** 🤖 CI base: ruff, mypy, pytest, gitleaks, link check dos docs — _pronto quando:_ Workflow `ci.yml` verde no PR e vermelho num PR de teste com segredo falso (#4) · depende de P0.4
 - [x] **P0.6** 🤖 CODEOWNERS dos paths sensíveis (SPEC-009 §8) — _pronto quando:_ CODEOWNERS válido (sem erros na aba do GitHub); informativo com 0 aprovações (ADR-0014) (#6) · depende de P0.4
-- [x] **P0.7** 👤 Branch protection da `main` conforme SPEC-009 §5 (PR + `ci-ok`, 0 aprovações, vale para admins) — _pronto quando:_ Um push direto na `main` é rejeitado (#7; GH006 verificado em 2026-11-11, aplicado pelo agente por autorização do mantenedor, ADR-0014) · depende de P0.5, P0.6
+- [x] **P0.7** 👤 Branch protection da `main` conforme SPEC-009 §5 (PR + `ci-ok`, 0 aprovações, vale para admins) — _pronto quando:_ Um push direto na `main` é rejeitado (#7) — GH006 verificado em 2026-11-11; aplicado pelo agente por autorização do mantenedor (ADR-0014) · depende de P0.5, P0.6
 
 ## Fase 1 — Harness do agente de código → [010-agent-harness](010-agent-harness/spec.md)
 
