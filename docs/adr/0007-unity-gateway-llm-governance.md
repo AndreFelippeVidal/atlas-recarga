@@ -1,6 +1,6 @@
 # ADR-0007 — Governar o tráfego de IA pelo Unity Gateway
 
-- **Status:** aceito (S0.1 concluído com ressalva: sem Claude; depende ainda do Spike S0.2) · **Data:** 2026-11-11 · **Relacionados:** SPEC-005, ADR-0008
+- **Status:** aceito com plano B parcial (S0.1 com ressalva: sem Claude; S0.2 com ressalva: sem uso nativo por agente) · **Data:** 2026-11-11 · **Relacionados:** SPEC-005, ADR-0008
 
 ## Contexto
 O requisito principal do projeto é ter **o agente passando pelo Unity Gateway**, com tracing, controle de uso e limites. A documentação atual mostra:
@@ -38,3 +38,9 @@ O requisito principal do projeto é ter **o agente passando pelo Unity Gateway**
 - **Não há model service Claude em `system.ai`** neste workspace (aba Models sem Claude; tentativa de chamar um Claude → 404 `ENDPOINT_NOT_FOUND`). A suposição "LLM Claude" do contexto deste ADR e da SPEC-005 não se confirma.
 - O nome curto do modelo (`gpt-oss-120b`) cai no endpoint legado e dá 403; o model service é endereçado pelo **nome de três partes**.
 - **Decisão:** manter a Opção 1 (Unity Gateway) com um modelo não-Claude; `ATLAS_LLM_SERVICE` padrão provisório = `system.ai.gpt-oss-120b`. O plano B (Opção 2) **não** foi acionado. A SPEC-005 e a SPEC-000 são ajustadas na P3.8.
+
+## Resultado do Spike S0.2 (2026-11-11)
+- Um App com nome `agent-*` aparece na aba Agents do AI Gateway, sem passo de registro. Sem o prefixo (`atlas-hello-agent`), não aparece. A aba leva à página do App; as métricas são do App (viewers, uptime, requests, latência, CPU, memória), sem tokens nem custo.
+- As chamadas do agente ao `system.ai.gpt-oss-120b` aparecem em `system.ai_gateway.usage` (atraso de cerca de 1 hora) com `requester_type = SERVICE_PRINCIPAL` (o do App), `auth_mode = OAUTH` e `invocation_metadata.source = DATABRICKS_APPS`. A tabela não tem tipo de serviço para agente; só `MODEL_SERVICE`, `MCP_SERVICE` e `MODEL_PROVIDER_SERVICE`.
+- O registro como agent service (REST, `AGENT_SERVICE_TYPE_EXTERNAL`, exige conexão do UC) é para agentes externos e, em Beta, não tem invocação em runtime; não foi usado.
+- **Decisão:** a camada do agente **não** é governada pelo gateway além da listagem. A governança de custo, limite e guardrail fica na camada do LLM (Opção 1, primeira camada). O agente é um App `agent-*` (ex.: `agent-atlas`); o consumo é atribuído pelo service principal do App. A SPEC-005 é ajustada na P3.8. Evidência em `docs/spikes/S0-results.md`.

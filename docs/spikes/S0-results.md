@@ -71,11 +71,19 @@ Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-C
 - `POST /invocations` com token OAuth de usuário (terminal): resposta `{"output":"ok"}`.
 - Registro como agent service: não houve passo de registro; o App aparece na aba Agents pelo prefixo. O registro por REST (agent service externo, sem invocação em runtime) não foi tentado.
 
-### Evidência na `system.ai_gateway.usage` (UTC)
+### Evidência na `system.ai_gateway.usage` (2026-11-11, UTC)
 
-| event_time | destination_name | status_code | requester_type | api_type |
-|---|---|---|---|---|
-| _(preencher)_ | | | | |
+Duas chamadas do agente ao modelo (as duas do `curl` com OAuth; a chamada do notebook só recebeu a tela de login e não chegou ao agente):
+
+| event_time | service_type | destination_name | status_code | input/output tokens | requester_type | auth_mode | invocation_metadata.source |
+|---|---|---|---|---|---|---|---|
+| 22:46:31 | MODEL_SERVICE | `system.ai.gpt-oss-120b` | 200 | 107 / 28 | SERVICE_PRINCIPAL | OAUTH | DATABRICKS_APPS |
+| 22:55:38 | MODEL_SERVICE | `system.ai.gpt-oss-120b` | 200 | 107 / 32 | SERVICE_PRINCIPAL | OAUTH | DATABRICKS_APPS |
+
+- O `requester` é o service principal do App (UUID não colado aqui), não o usuário que chamou o `curl`.
+- `invocation_metadata.source = DATABRICKS_APPS` identifica que a chamada veio de um App; `user_agent` = `DatabricksOpenAI/Python`; `request_tags` vazio.
+- `service_type` só admite `MODEL_SERVICE`, `MCP_SERVICE` e `MODEL_PROVIDER_SERVICE`: **não há tipo de agente** na tabela. Não há coluna com o nome do App; o App só é distinguível pelo service principal em `requester` e por `source`.
+- Atraso de cerca de uma hora até a linha aparecer na system table (na S0.1 foram minutos).
 
 ### Checklist
 
@@ -83,12 +91,12 @@ Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-C
 |---|---|---|
 | O App hello responde em `/invocations` (OAuth) | ✅ `{"output":"ok"}` | saída do curl |
 | O agente aparece no AI Gateway (aba Agents) | ✅ com o prefixo `agent-` | aba Agents |
-| Uso do agente registrado no gateway | ⚠️ só métricas do App (Insights); uso do LLM: _(pendente da query)_ | captura do Insights |
+| Uso do agente registrado no gateway | ⚠️ parcial: as chamadas do agente ao LLM aparecem (requester = service principal do App, `source` = DATABRICKS_APPS); não há entidade "agente" na `usage` e as métricas do agente na aba Agents são só as do App | tabela de evidência; captura do Insights |
 
 ### Resultado
 
-_(passou | passou com ressalva | falhou → plano B)_
+**Passou com ressalva:** o agente `agent-*` é listado na aba Agents e as chamadas dele ao LLM passam pelo gateway e são rastreáveis por service principal. **Não há uso nativo por agente** (sem `service_type` de agente, sem tokens ou custo na aba Agents) e o registro como agent service (REST, só agentes externos, sem invocação em runtime) não foi necessário nem tentado.
 
 ### Decisão
 
-_(mantenedor)_
+Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec. A governança e a medição ficam na **camada do LLM**; o agente é um App com prefixo `agent-` e a atribuição de uso é por `requester` (service principal do App) e `invocation_metadata.source`. O agente deve enviar `request_tags` se quisermos dimensionar por agente (não validado). Ajustes na SPEC-005 na P3.8.
