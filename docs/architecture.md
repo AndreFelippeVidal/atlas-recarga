@@ -1,0 +1,205 @@
+# Arquitetura — Atlas Recarga
+
+> Spec: [SPEC-011](specs/011-architecture/spec.md) · Base: [PRD](prd.md) · Status: v1 (MVP), antes do Spike S0
+> Este documento **resume** as specs, não as substitui. Se divergir de uma spec, vale a spec e este arquivo é corrigido.
+
+## 1. Em uma frase
+
+Um CLI gera dados sintéticos e os envia a um Volume; um pipeline declarativo os leva de bronze a gold; a comissão é calculada pela máquina mas **só é travada por duas pessoas**; e todos os consumidores (dashboards, agente de IA, MCP e app React) leem **uma única camada semântica**, sem acesso ao que está por baixo dela.
+
+## 2. Diagrama de containers (C4 nível 2)
+
+Caixas em linha cheia são containers; cilindros guardam dados; as duas fronteiras destacadas são o que este projeto quer provar.
+
+```mermaid
+flowchart TB
+    helena(["👤 Helena Duarte<br/>Diretora Comercial"])
+    analyst(["👤 Analista de Comissões"])
+    regional(["👤 Gerente Regional"])
+    maint(["👤 Mantenedor"])
+
+    subgraph laptop["Máquina do mantenedor"]
+        cli["<b>atlas-cli</b><br/>[Container: Python + Typer]<br/>dados sintéticos determinísticos · F1"]
+    end
+
+    mcpclient["<b>Cliente MCP</b><br/>[Sistema externo: Claude Code / Desktop]"]
+    github["<b>GitHub</b><br/>[Sistema externo: repo + Actions]<br/>CI e gate de avaliação · F9"]
+
+    subgraph ws["Databricks Free Edition · workspace · catálogo atlas (Unity Catalog)"]
+        direction TB
+
+        subgraph dataplat["Plataforma de dados"]
+            landing[("<b>raw.landing</b><br/>[Volume UC: parquet]")]
+            daily["<b>atlas_daily</b><br/>[Lakeflow Job · 06:00 BRT]"]
+            pipeline["<b>atlas_medallion</b><br/>[Container: Lakeflow SDP serverless]<br/>bronze → silver → gold · F2"]
+            gold[("<b>bronze · silver · gold</b><br/>[Delta, linhagem UC]")]
+        end
+
+        subgraph humanb["🔒 FRONTEIRA DO HUMANO · comissão · F3"]
+            calc["<b>Cálculo + reconciliação</b><br/>[Job task: PySpark + SQL independente]"]
+            review["<b>atlas_commission_review</b><br/>[Lakeflow Job, disparo manual]"]
+            commission[("<b>commission.*</b><br/>[Delta append-only + Volume remittance]")]
+        end
+
+        subgraph sem["Camada semântica · a única porta de leitura · F4"]
+            mv[("<b>semantic.mv_recharges<br/>semantic.mv_commission</b><br/>[Metric views YAML]")]
+            fns["<b>semantic.fn_*</b><br/>[UC functions SQL, lista fechada]"]
+            wh["<b>SQL warehouse</b><br/>[2X-Small serverless]"]
+        end
+
+        subgraph aib["🤖 FRONTEIRA DA IA · só leitura de atlas.semantic"]
+            agent["<b>atlas-agent</b><br/>[Databricks App: Agent Framework + LangGraph] · F6"]
+            mcp["<b>atlas-mcp</b><br/>[Databricks App: FastMCP, Streamable HTTP] · F7"]
+            genie["<b>Genie Space Atlas Recarga</b><br/>[Genie] · F5"]
+            gateway["<b>Unity Gateway</b><br/>[model service Claude: rate limit, PII, spend cap]"]
+        end
+
+        web["<b>atlas-web</b><br/>[Databricks App: FastAPI + React + d3-geo] · F8"]
+        aibi["<b>Atlas — Visão Comercial</b><br/>[AI/BI Dashboard] · F5"]
+        obs[("<b>observability.* · eval.*</b><br/>[Delta + MLflow 3 experiment] · F9")]
+    end
+
+    maint -->|"generate + upload"| cli
+    cli -->|"arquivos + _manifest.json"| landing
+    daily -->|"task 1: refresh"| pipeline
+    landing --> pipeline --> gold
+    daily -->|"task 2, dia 1º: rascunho"| calc
+    gold --> calc --> commission
+    analyst -->|"1ª aprovação"| review
+    helena -->|"2ª aprovação"| review
+    review -->|"transição de estado + lock"| commission
+
+    gold --> mv
+    commission -->|"só locked_lines"| mv
+    fns --> mv
+    wh --> mv
+
+    helena --> web
+    helena --> agent
+    helena --> mcpclient
+    regional --> aibi
+    mcpclient -->|"HTTPS /mcp"| mcp
+
+    web --> wh
+    aibi --> wh
+    mcp --> wh
+    agent --> genie --> mv
+    agent --> fns
+    agent -->|"ChatDatabricks use_ai_gateway"| gateway
+
+    agent -.->|"traces"| obs
+    gateway -.->|"system.ai_gateway.usage"| obs
+    github -.->|"agent-eval.yml: mlflow.genai.evaluate"| agent
+
+    classDef human fill:#fff4e5,stroke:#d97706,stroke-width:2px,color:#000
+    classDef ai fill:#eef2ff,stroke:#4f46e5,stroke-width:2px,color:#000
+    classDef semantic fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#000
+    class humanb human
+    class aib ai
+    class sem semantic
+```
+
+**Como ler as setas:** cheia = dados ou comando; pontilhada = telemetria ou avaliação. Nenhuma seta sai da fronteira da IA em direção a `gold`, `commission` ou `atlas_commission_review`: essa ausência é a regra.
+
+**Nada sai do workspace.** A remessa de comissão é um CSV num Volume; a malha do IBGE é baixada **no build** por `scripts/` e versionada; o pipeline nunca chama API externa ([tech-stack](specs/tech-stack.md), Proibido).
+
+## 3. Onde ficam os dados
+
+Tudo no catálogo `atlas` (no target `dev`, `atlas_dev`), um schema por camada e propósito ([ADR-0003](adr/0003-medallion-unity-catalog.md)).
+
+| Schema | Guarda | Quem escreve | Quem lê |
+|---|---|---|---|
+| `raw` | Volume `landing/` com os arquivos do CLI (fonte imutável para full refresh) | `atlas-cli upload` (pede confirmação no harness) | `atlas_medallion` |
+| `bronze` | Cópia fiel + `_source_file`, `_ingested_at_utc` | `atlas_medallion` | `atlas_medallion` |
+| `silver` | Limpo, tipado, deduplicado; `recharges_quarantine` com os órfãos | `atlas_medallion` (expectations drop/fail/warn) | `atlas_medallion` |
+| `gold` | `dim_*`, `fct_recharges`, `agg_pos_month`, com `COMMENT` em tudo | `atlas_medallion` | Cálculo de comissão; dono das metric views. **Nenhum consumidor** |
+| `commission` | `batches`, `batch_lines`, `batch_events` e `locked_lines` (append-only), `reconciliation`, Volume `remittance/` | Task 2 do `atlas_daily` (rascunho) e `atlas_commission_review` (transições) | Analista e diretora (relatório `commission_review`); `mv_commission` só via `locked_lines` |
+| `semantic` | Metric views `mv_recharges`, `mv_commission` e UC functions `fn_*` | Bundle, a partir de `semantic/*.yaml` | Grupo `atlas_readers`: pessoas, Genie e os service principals dos 3 Apps |
+| `eval` | `agent_golden_set` (sincronizado do YAML), `review_queue` | Script de sync e monitoramento (SPEC-008) | Avaliação offline, gate de PR, revisor humano |
+| `observability` | `pipeline_freshness`, trace tables `agent_*`, `agent_quality_daily` | Task 3 do `atlas_daily`, MLflow, job de monitoramento | Página "Qualidade do agente" do AI/BI |
+
+Fora do catálogo: experiment MLflow `/Shared/atlas/agent` e a system table `system.ai_gateway.usage`.
+
+## 4. Fronteira do humano: a comissão
+
+O pagamento de comissão é a única etapa **irreversível** do negócio ([discovery](discovery.md)). Aqui a máquina calcula e confere; só pessoas decidem ([SPEC-003](specs/003-commission-closing/spec.md), [ADR-0010](adr/0010-commission-human-in-the-loop.md)).
+
+```mermaid
+flowchart LR
+    subgraph maquina["Máquina (determinística, sem IA)"]
+        d["draft<br/>cálculo PySpark"] --> r{"reconciliação SQL<br/>independente<br/>Δ = R$ 0,00?"}
+    end
+    subgraph pessoas["Pessoas"]
+        a["Analista<br/>aprova ou rejeita<br/>com justificativa"] --> h["Diretora<br/>ator diferente<br/>aprova ou rejeita"]
+    end
+    r -->|"sim"| ur["under_review"] --> a
+    r -->|"não"| d
+    h -->|"aprova"| l["locked<br/>locked_lines + remessa + sha256"]
+    a -->|"rejeita"| v["nova versão vN+1"]
+    h -->|"rejeita"| v
+    l -->|"erro descoberto depois"| adj["lote de ajuste ADJ-n<br/>mesmo fluxo completo"]
+```
+
+A trava não depende de um só controle:
+
+| Camada | O que impede |
+|---|---|
+| **Processo** | Duas aprovações com atores distintos (`SEGREGATION_OF_DUTIES_VIOLATION`); justificativa de ≥ 20 caracteres para rejeitar |
+| **Dados** | `batch_events` e `locked_lines` com `delta.appendOnly`: o Delta rejeita `UPDATE`/`DELETE`; correção só por lote de ajuste |
+| **Permissão UC** | Nenhum consumidor tem grant em `commission`; só lotes `locked` chegam à camada semântica |
+| **Permissão de job** | Só os grupos `atlas_commission_analysts` e `atlas_commission_directors` podem rodar `atlas_commission_review`; nenhum service principal de App |
+| **Agente de código** | O hook do harness nega qualquer execução de `atlas_commission_review` ([SPEC-010](specs/010-agent-harness/spec.md) §3.3) |
+
+**Concessão da Free Edition:** com um usuário só, `ALLOW_SAME_APPROVER_DEMO=true` permite o mesmo ator nas duas etapas, mas marca cada uso com `role = 'demo_override'` e o lote com `demo_mode = true` (SPEC-003 §9, Spike S0.6).
+
+## 5. Fronteira da IA: só leitura
+
+Há duas IAs no projeto, e as duas têm limites escritos.
+
+**IA no produto** (agente e MCP, [SPEC-005](specs/005-business-agent/spec.md), [SPEC-006](specs/006-mcp-server/spec.md)). Gera valor ao responder em linguagem natural; gera risco ao inventar número ou agir. Por isso:
+
+| Camada | Controle | Verificado por |
+|---|---|---|
+| Ferramentas | Lista fechada: Genie e 3 UC functions no agente; 5 tools no MCP. Nenhuma de SQL livre, escrita ou execução de job | Scorer `read_only_tools` em 100% dos traces |
+| Parâmetros | Medidas e dimensões validadas contra listas; valores como parâmetros vinculados | Teste de injeção (SPEC-006 §7) |
+| Permissão UC | Service principals só com `SELECT` em `atlas.semantic`; `PERMISSION_DENIED` em `gold` | Critério de aceite SPEC-004 §8 |
+| Comportamento | Citação `Fonte:` obrigatória, nenhum número sem tool, recusa de ação e PII | Scorers `cites_metric_view`, `no_tool_on_refusal`, `refusal_quality` |
+| Gateway | Rate limit 30 req/min por usuário, teto de gasto, guardrail de PII ([ADR-0007](adr/0007-unity-gateway-llm-governance.md)) | `system.ai_gateway.usage` |
+| Regressão | Gate de PR: acurácia ≥ 90% e 100% das recusas ([SPEC-008](specs/008-agent-evaluation/spec.md)) | `agent-eval.yml` |
+
+A IA **não** participa do cálculo nem da aprovação de comissão, e não lê dado pessoal (o dataset nem tem PII real).
+
+**IA na construção** (Claude Code, [SPEC-010](specs/010-agent-harness/spec.md), [ADR-0012](adr/0012-claude-code-harness.md)). Escreve código e abre PRs; não faz merge, não mexe na proteção da `main`, não faz deploy no target `demo` e não lê segredos. Três camadas: permissões do `.claude/settings.json`, hook `guard.py` e proteção de branch do GitHub ([ADR-0014](adr/0014-branch-protection-solo-maintainer.md)).
+
+## 6. Componentes
+
+| PRD | Componente | Onde roda | Repo | Spec · ADR |
+|---|---|---|---|---|
+| F1 | `atlas-cli` | Máquina do mantenedor | `cli/` | [SPEC-001](specs/001-synthetic-data-cli/spec.md) · [0011](adr/0011-deterministic-synthetic-cli.md), [0004](adr/0004-ibge-code-geojson-geo.md) |
+| F2 | `atlas_medallion` + job `atlas_daily` | Lakeflow SDP + Jobs | `pipeline/` | [SPEC-002](specs/002-medallion-pipeline/spec.md) · [0002](adr/0002-lakeflow-declarative-pipelines.md), [0003](adr/0003-medallion-unity-catalog.md) |
+| F3 | Cálculo, reconciliação e `atlas_commission_review` | Jobs | `commission/` | [SPEC-003](specs/003-commission-closing/spec.md) · [0010](adr/0010-commission-human-in-the-loop.md) |
+| F4 | Metric views e UC functions | Unity Catalog + SQL warehouse | `semantic/` | [SPEC-004](specs/004-metric-views/spec.md) · [0005](adr/0005-metric-views-semantic-layer.md) |
+| F5 | AI/BI Dashboard e Genie Space | Workspace | `semantic/` | [SPEC-004](specs/004-metric-views/spec.md) · [0005](adr/0005-metric-views-semantic-layer.md) |
+| F6 | `atlas-agent` + Unity Gateway | Databricks App | `apps/agent/` | [SPEC-005](specs/005-business-agent/spec.md) · [0006](adr/0006-agent-framework-genie.md), [0007](adr/0007-unity-gateway-llm-governance.md) |
+| F7 | `atlas-mcp` | Databricks App | `apps/mcp/` | [SPEC-006](specs/006-mcp-server/spec.md) · [0008](adr/0008-fastmcp-on-databricks-apps.md) |
+| F8 | `atlas-web` | Databricks App | `apps/web/` | [SPEC-007](specs/007-react-geo-dashboard/spec.md) · [0004](adr/0004-ibge-code-geojson-geo.md), [0009](adr/0009-three-apps-allocation.md) |
+| F9 | Golden set, scorers, gate e monitoramento | GitHub Actions + MLflow 3 | `eval/` | [SPEC-008](specs/008-agent-evaluation/spec.md) · [0013](adr/0013-mlflow-genai-evaluation-monitoring.md) |
+
+Todos os recursos do workspace são declarados num Databricks Asset Bundle (`databricks.yml`, P5.1) com targets `dev` e `demo`.
+
+## 7. Limites da Free Edition que moldam o desenho
+
+| Limite ([ADR-0001](adr/0001-databricks-free-edition.md)) | Consequência no desenho |
+|---|---|
+| 1 SQL warehouse 2X-Small | Todos os consumidores dividem o mesmo warehouse: cache de 10 min no `atlas-web`, 1 nova tentativa após 20s no agente e no MCP, aviso de "aquecendo" na UI |
+| 1 pipeline ativo por tipo | Um único `atlas_medallion` cobre bronze, silver e gold |
+| 5 tasks de job concorrentes | `atlas_daily` tem 3 tasks sequenciais; o monitoramento do agente roda às 07:00, depois do pipeline |
+| Até 3 Apps, parados após 24h | Os 3 slots vão para agente, MCP e web, sem slot livre; runbook de start antes da demo ([ADR-0009](adr/0009-three-apps-allocation.md)) |
+| Sem GPU nem provisioned throughput | O LLM é um foundation model atrás do Unity Gateway; nada de modelo próprio |
+| Um usuário no workspace | Modo demo de aprovação na comissão (seção 4); RLS por região fica para a v3 |
+
+Os recursos em Beta (Unity Gateway como agent service, production monitoring do MLflow, OAuth de cliente MCP) são confirmados no Spike S0 (Fase 3) antes de qualquer código depender deles; cada um tem plano B no ADR correspondente.
+
+## 8. Modos de falha
+
+_A consolidar na P2.2 a partir das seções de falha das SPECs 002, 003, 005, 006 e 007._

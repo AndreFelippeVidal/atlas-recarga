@@ -12,9 +12,10 @@ Plataforma de dados e IA no **Databricks Free Edition** para a rede de recarga p
 | Conhecer os princípios e a stack | [Mission](docs/specs/mission.md) · [Tech stack](docs/specs/tech-stack.md) |
 | Ver o que vem a seguir | [Roadmap](docs/specs/roadmap.md) |
 | Entender as decisões | [ADRs](docs/adr/README.md) |
+| Ver como as peças se encaixam | [Arquitetura](docs/architecture.md) |
 
 ## Arquitetura
-_Em breve (Fase 2, [SPEC-011](docs/specs/011-architecture/spec.md))._
+Componentes, onde ficam os dados, a fronteira do humano (comissão) e a da IA (só leitura): [docs/architecture.md](docs/architecture.md).
 
 ## Como rodar
 _A plataforma em si vem a partir da Fase 4; este README será completado na P13.3._
