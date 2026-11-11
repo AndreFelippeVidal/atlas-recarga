@@ -15,6 +15,11 @@ Deixar explícito, e **aplicado pela ferramenta**, o que o agente de código pod
 
 Nenhuma camada sozinha basta; o desenho supõe que cada uma pode falhar.
 
+**Limitações conhecidas e aceitas** (encontradas na revisão da implementação):
+- **Escrita via Bash em paths sensíveis** (`sed -i … commission/rules.py`, `echo > .claude/settings.json`) não passa pelas regras de path do hook. Ela fica contida porque nenhum desses comandos está no `allow`, então cai no prompt padrão. A revisão humana do diff é a última barreira.
+- **Ofuscação deliberada** (variáveis montadas em runtime, `eval`, base64) não é detectável por regex. O hook cobre erros e atalhos, não um adversário; para isso existe a camada 3.
+- **Aliases do shell** do usuário não são expandidos. `gh alias set` é negado para que o agente não crie aliases novos.
+
 ## 3. Matriz de capacidades
 
 ### 3.1 Livre (sem prompt): `allow`
@@ -42,18 +47,18 @@ Nenhuma camada sozinha basta; o desenho supõe que cada uma pode falhar.
 ### 3.3 Proibido: `deny` (settings **e** hook)
 | Ação | Padrão verificado pelo hook (em qualquer parte do comando) | Mensagem |
 |---|---|---|
-| Merge de PR | `gh pr merge`, `gh api … /merge` | "Merge é do mantenedor (ADR-0014). Peça a revisão no PR." |
+| Merge de PR | `gh pr merge` (inclusive com `-R`/`--repo`), `gh api -X PUT …/pulls/N/merge`, `gh api …/merges`, GraphQL `mergePullRequest`, `gh alias set/import` | "Merge é do mantenedor (ADR-0014). Peça a revisão no PR." |
 | Push para a `main` | `git push … main`, `git push … HEAD:main`, `git push` estando na `main` | "A main só muda por PR (SPEC-009 §5)." |
-| Force push e reescrita de histórico remoto | `--force`, `-f`, `--force-with-lease`, `+refs`, `git push --delete` | "Reescrita de histórico remoto é proibida." |
+| Force push e reescrita ou remoção de branch remota | `--force`, `--force-with-lease`, `--force-if-includes`, flags curtas com `f`/`d` (`-f`, `-uf`, `-d`), `+ref`, `:ref`, `--delete`, `--mirror`, `--prune` | "Reescrita ou remoção de branch remota é proibida." |
 | Mexer na proteção ou nas configurações do repo | `gh api … /protection` ou `/rulesets`, `gh api -X PATCH/PUT/DELETE repos/<o>/<r>`, `gh repo edit/delete/rename/archive`, `gh secret`, `gh variable`, `gh ruleset` | "Configuração do repositório é do mantenedor." |
 | Deploy no ambiente de demo | `bundle deploy … -t demo`, `--target demo` | "Deploy em demo é manual (ADR-0012)." |
 | Executar a aprovação de comissão | Comando `databricks …` ou `run-now` que cite `commission_review` (um `grep` ou `pytest` que cite o nome não é bloqueado; qualquer `databricks jobs run-now` já cai em `ask`) | "Aprovar comissão é decisão humana (ADR-0010)." |
 | Ler segredos | `Read`/`Edit`/`Bash` com `.env`, `.env.*` (exceto `.env.example`), `.databrickscfg`, `*.pem`, `*.key`; `gh auth token`, `databricks auth token`; `printenv`, `env`, `set` ou `export -p` sem argumento | "Segredos nunca passam pelo agente." |
-| Pular os hooks locais | `git commit … --no-verify`, `git push … --no-verify` | "Os hooks de pre-commit não podem ser pulados." |
+| Pular os hooks locais | `--no-verify`, `git commit -n` (inclusive em `-anm`), `-c core.hooksPath=…`, `SKIP=…` | "Os hooks de pre-commit não podem ser pulados." |
 
 ## 4. O hook `guard.py`
 
-**Registro** (em `.claude/settings.json`): `PreToolUse` com `matcher: "Bash|Edit|Write|MultiEdit|NotebookEdit|Read"`, comando `"$CLAUDE_PROJECT_DIR"/.claude/hooks/guard.py`.
+**Registro** (em `.claude/settings.json`): `PreToolUse` com `matcher: "Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Grep|Glob"` (Grep e Glob pelo campo `path`), comando `"$CLAUDE_PROJECT_DIR"/.claude/hooks/guard.py`.
 
 **Contrato:**
 - **Entrada:** JSON no stdin (`tool_name`, `tool_input.command` ou `tool_input.file_path`/`notebook_path`).
@@ -62,7 +67,8 @@ Nenhuma camada sozinha basta; o desenho supõe que cada uma pode falhar.
   - Proibido → exit 0 com `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "<mensagem da §3.3>"}}`.
   - Exige confirmação → mesmo formato com `"permissionDecision": "ask"` e o motivo da §3.2.
 - **Falha interna** (JSON inválido, exceção): **nega** com "guard.py falhou; revise o log". Na dúvida, fecha (*fail closed*).
-- **Normalização antes do regex:** colapsa espaços, resolve caminhos para relativos à raiz do repo e procura padrões **em qualquer posição** (cobre `sh -c`, `&&`, `;`, subshells).
+- **Normalização antes do regex:** cada regra é testada contra duas versões do comando: (a) espaços colapsados, com quebras de linha viradas `;` para preservar a fronteira de segmento; (b) a versão (a) sem aspas e sem opções globais (`git -C . push` → `git push`, `gh -R o/r pr merge` → `gh pr merge`). Os caminhos são resolvidos para relativos à raiz do repo. Os padrões valem **em qualquer posição** (cobre `sh -c`, `&&`, `;`, `$(…)`, subshells).
+- **Compatível com Python 3.9:** o shebang `python3` pode cair no `/usr/bin/python3` do macOS (3.9). Um erro de import sai com exit 1, que o Claude Code trata como não bloqueante, ou seja, abriria tudo. Um teste roda o hook nesse interpretador quando ele existe.
 - **Branch atual:** para os pushes, o hook consulta `git rev-parse --abbrev-ref HEAD`.
 - **Log:** cada `deny`/`ask` é acrescentado a `.claude/hooks.log` (ignorado no git): timestamp, tool, decisão, regra e o comando ou path (segredos nunca aparecem no log, porque o hook só loga o nome da regra para casos de segredo).
 
