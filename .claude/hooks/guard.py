@@ -3,7 +3,11 @@
 
 Layer 2 of 3: settings.json permission rules only match a Bash command as it was
 written, so this hook inspects the *whole* command (``sh -c``, ``&&``, ``;``,
-subshells) and the target path of file tools, and returns ``deny`` or ``ask``.
+subshells, newlines). Each rule is matched against two views of the command:
+
+- ``raw``: whitespace collapsed, newlines turned into ``;`` (segment boundaries kept)
+- ``normalized``: additionally without quotes and without global options
+  (``git -C . push`` -> ``git push``, ``gh -R o/r pr merge`` -> ``gh pr merge``)
 
 Contract:
 - stdin: hook JSON (``tool_name``, ``tool_input``, ``cwd``)
@@ -11,7 +15,8 @@ Contract:
 - objection: exit 0 + ``hookSpecificOutput`` JSON with ``permissionDecision``
 - internal error: **deny** (fail closed)
 
-Stdlib only, so it starts fast and needs no virtualenv.
+Stdlib only and **Python 3.9 compatible** (macOS ``/usr/bin/python3``): an import
+error exits 1, which Claude Code treats as non-blocking, i.e. it would fail *open*.
 """
 
 from __future__ import annotations
@@ -21,7 +26,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, NamedTuple
 
@@ -30,11 +35,13 @@ ASK = "ask"
 
 BASH_TOOLS = frozenset({"Bash"})
 EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
-READ_TOOLS = frozenset({"Read"})
+READ_TOOLS = frozenset({"Read", "Grep", "Glob"})
 FILE_TOOLS = EDIT_TOOLS | READ_TOOLS
 
-# A shell "segment" boundary, so a pattern cannot leak across `cmd1 && cmd2`.
+# Stays inside one shell segment, so a pattern cannot leak across `cmd1 && cmd2`.
 _SEG = r"[^;&|\n]*"
+_END = r"(?=$|[\s;&|)`'\"])"
+_START = r"(?:^|[;&|(`'\"]\s*|\$\(\s*)"  # start of a (sub)command
 
 
 class Rule(NamedTuple):
@@ -53,26 +60,47 @@ def _r(pattern: str) -> re.Pattern[str]:
 
 MSG_MERGE = "Merge é do mantenedor (ADR-0014). Peça a revisão no PR."
 MSG_MAIN = "A main só muda por PR (SPEC-009 §5)."
-MSG_FORCE = "Reescrita de histórico remoto é proibida (SPEC-010 §3.3)."
+MSG_FORCE = "Reescrita ou remoção de branch remota é proibida (SPEC-010 §3.3)."
 MSG_REPO = "Configuração do repositório é do mantenedor (SPEC-010 §3.3)."
 MSG_DEMO = "Deploy em demo é manual (ADR-0012)."
 MSG_COMMISSION = "Aprovar comissão é decisão humana (ADR-0010)."
-MSG_SECRET = "Segredos nunca passam pelo agente (SPEC-010 §3.3)."  # noqa: S105 (a message, not a secret)
+MSG_SECRET = "Segredos nunca passam pelo agente (SPEC-010 §3.3)."  # noqa: S105 (a message)
 MSG_NO_VERIFY = "Os hooks de pre-commit não podem ser pulados (SPEC-010 §3.3)."
 MSG_SPEC = "Mudar spec, ADR ou constituição é decisão humana: confirme (SPEC-010 §3.2)."
 MSG_SENSITIVE = "Path sensível (comissão, semântica, harness ou CI): confirme (SPEC-010 §3.2)."
 MSG_WORKSPACE = "Efeito no workspace Databricks: confirme (SPEC-010 §3.2)."
 
+_GIT_PUSH = rf"\bgit\s+push\b{_SEG}"
+_GH_API = r"\bgh\s+api\b"
+_METHOD = r"(?:-X|--method)[\s=]*"
+_WRITE_METHOD = rf"(?={_SEG}{_METHOD}(?:PATCH|PUT|DELETE)\b)"
+_PUT = rf"(?={_SEG}{_METHOD}PUT\b)"
+
 # Order matters: the first DENY wins; otherwise the first ASK wins.
 RULES: list[Rule] = [
-    # --- deny: Bash -----------------------------------------------------------
+    # --- deny: merge ----------------------------------------------------------
     Rule("merge-pr", BASH_TOOLS, "command", _r(r"\bgh\s+pr\s+merge\b"), DENY, MSG_MERGE),
-    Rule("merge-api", BASH_TOOLS, "command", _r(rf"\bgh\s+api\b{_SEG}/merge\b"), DENY, MSG_MERGE),
+    Rule(
+        "merge-api",
+        BASH_TOOLS,
+        "command",
+        _r(
+            rf"{_GH_API}{_PUT}{_SEG}/pulls/\d+/merge\b"
+            rf"|{_GH_API}{_SEG}\brepos/[^/\s]+/[^/\s]+/merges\b"
+            rf"|{_GH_API}\s+graphql\b{_SEG}\bmerge\w*PullRequest\b"
+        ),
+        DENY,
+        MSG_MERGE,
+    ),
+    Rule(
+        "gh-alias", BASH_TOOLS, "command", _r(r"\bgh\s+alias\s+(?:set|import)\b"), DENY, MSG_MERGE
+    ),
+    # --- deny: main and remote history ------------------------------------------
     Rule(
         "push-main",
         BASH_TOOLS,
         "command",
-        _r(rf"\bgit\s+push\b{_SEG}[\s:](?:refs/heads/)?main(?=$|[\s;&|])"),
+        _r(rf"{_GIT_PUSH}[\s:](?:refs/heads/)?main{_END}"),
         DENY,
         MSG_MAIN,
     ),
@@ -80,15 +108,19 @@ RULES: list[Rule] = [
         "push-force",
         BASH_TOOLS,
         "command",
-        _r(rf"\bgit\s+push\b{_SEG}(?:\s--force(?:-with-lease)?\b|\s-f\b|\s\+\S|\s--delete\b)"),
+        _r(
+            rf"{_GIT_PUSH}(?:\s--(?:force(?:-with-lease|-if-includes)?|delete|mirror|prune)\b"
+            rf"|\s-[a-z]*[fd][a-z]*{_END}|\s\+\S|\s:\S)"
+        ),
         DENY,
         MSG_FORCE,
     ),
+    # --- deny: repository configuration -----------------------------------------
     Rule(
         "repo-protection",
         BASH_TOOLS,
         "command",
-        _r(rf"\bgh\s+api\b{_SEG}/(?:protection|rulesets)\b"),
+        _r(rf"{_GH_API}{_SEG}/(?:protection|rulesets)\b"),
         DENY,
         MSG_REPO,
     ),
@@ -104,17 +136,27 @@ RULES: list[Rule] = [
         "repo-patch",
         BASH_TOOLS,
         "command",
-        _r(
-            rf"\bgh\s+api\b{_SEG}(?:-X|--method)\s*(?:PATCH|PUT|DELETE)\b{_SEG}\brepos/[^/\s]+/[^/\s]+/?(?=$|\s)"
-        ),
+        _r(rf"{_GH_API}{_WRITE_METHOD}{_SEG}\brepos/[^/\s]+/[^/\s]+/?{_END}"),
         DENY,
         MSG_REPO,
     ),
     Rule(
+        "repo-graphql",
+        BASH_TOOLS,
+        "command",
+        _r(
+            rf"{_GH_API}\s+graphql\b{_SEG}"
+            r"\b(?:update|delete|create)\w*(?:Repository|BranchProtectionRule|Ruleset)\b"
+        ),
+        DENY,
+        MSG_REPO,
+    ),
+    # --- deny: Databricks ---------------------------------------------------------
+    Rule(
         "deploy-demo",
         BASH_TOOLS,
         "command",
-        _r(rf"\bbundle\s+deploy\b{_SEG}(?:-t|--target)[\s=]+demo\b"),
+        _r(rf"\bbundle\s+deploy\b{_SEG}(?:-t|--target)[\s=]*demo\b"),
         DENY,
         MSG_DEMO,
     ),
@@ -126,13 +168,14 @@ RULES: list[Rule] = [
         DENY,
         MSG_COMMISSION,
     ),
+    # --- deny: secrets --------------------------------------------------------------
     Rule(
         "secret-file-cmd",
         BASH_TOOLS,
         "command",
         _r(
             r"(?:^|[\s/'\"=<])(?:\.env(?:\.(?!example\b)[\w.-]+)?|\.databrickscfg|[\w.-]+\.(?:pem|key))"
-            r"(?=$|[\s'\";|&)>])"
+            r"(?=$|[\s'\";|&)>*])"
         ),
         DENY,
         MSG_SECRET,
@@ -151,19 +194,28 @@ RULES: list[Rule] = [
         "dump-env",
         BASH_TOOLS,
         "command",
-        _r(r"(?:^|[;&|]\s*)(?:printenv|env|export\s+-p|set)\s*(?=$|[;&|])"),
+        _r(
+            r"\bprintenv\b"
+            rf"|{_START}(?:env(?:\s+-0)?|export(?:\s+-p)?|set|declare\s+-[a-z]*x[a-z]*)"
+            r"\s*(?=$|[;&|)`'\"])"  # the whole (sub)command, not `env FOO=1 cmd`
+        ),
         DENY,
         MSG_SECRET,
     ),
+    # --- deny: skipping local hooks -------------------------------------------------
     Rule(
         "no-verify",
         BASH_TOOLS,
         "command",
-        _r(rf"\bgit\s+(?:commit|push)\b{_SEG}\s--no-verify\b"),
+        _r(
+            rf"\bgit\s+(?:commit|push)\b{_SEG}\s--no-verify\b"
+            rf"|\bgit\s+commit\b{_SEG}\s-[aqvsSeupm]*n[aqvsSeupm]*{_END}"
+            r"|\bcore\.hooksPath\b|(?:^|[\s;&|])SKIP="
+        ),
         DENY,
         MSG_NO_VERIFY,
     ),
-    # --- deny: file tools -----------------------------------------------------
+    # --- deny: file tools -----------------------------------------------------------
     Rule(
         "secret-file-path",
         FILE_TOOLS,
@@ -173,24 +225,25 @@ RULES: list[Rule] = [
         MSG_SECRET,
         sensitive=True,
     ),
-    # --- ask: Bash ------------------------------------------------------------
+    # --- ask: Bash ------------------------------------------------------------------
     Rule("deploy", BASH_TOOLS, "command", _r(r"\bbundle\s+deploy\b"), ASK, MSG_WORKSPACE),
     Rule(
         "workspace-write",
         BASH_TOOLS,
         "command",
         _r(
-            r"\bdatabricks\s+(?:fs\s+(?:cp|rm|mv)|jobs\s+run-now|pipelines\s+start-update)\b|\batlas-cli\s+upload\b"
+            r"\bdatabricks\s+(?:fs\s+(?:cp|rm|mv)|jobs\s+run-now|pipelines\s+start-update)\b"
+            r"|\batlas-cli\s+upload\b"
         ),
         ASK,
         MSG_WORKSPACE,
     ),
-    # --- ask: edit tools ------------------------------------------------------
+    # --- ask: edit tools ------------------------------------------------------------
     Rule(
         "edit-spec",
         EDIT_TOOLS,
         "path",
-        _r(r"^docs/(?:specs/(?:[^/]+/spec\.md|mission\.md|tech-stack\.md)|adr/.+)$"),
+        _r(r"^docs/(?:specs/(?:.+/spec\.md|mission\.md|tech-stack\.md)|adr/.+)$"),
         ASK,
         MSG_SPEC,
     ),
@@ -199,7 +252,8 @@ RULES: list[Rule] = [
         EDIT_TOOLS,
         "path",
         _r(
-            r"^(?:commission/(?:rules\.py|.+\.ya?ml)|semantic/.+|\.claude/.+|\.github/(?:workflows/.+|CODEOWNERS))$"
+            r"^(?:commission/(?:rules\.py|.+\.ya?ml)|semantic/.+|\.claude/.+"
+            r"|\.github/(?:workflows/.+|CODEOWNERS))$"
         ),
         ASK,
         MSG_SENSITIVE,
@@ -208,6 +262,27 @@ RULES: list[Rule] = [
 
 PUSH_FROM_MAIN = "push-from-main"
 GUARD_ERROR = "guard-error"
+
+# Global options that may sit between the program and its subcommand.
+_GIT_GLOBALS = re.compile(
+    r"\bgit((?:\s+(?:-C|-c|--git-dir|--work-tree|--namespace|--exec-path)(?:=|\s+)\S+"
+    r"|\s+--?[a-z][\w-]*)+)(?=\s+[a-z])",
+    re.IGNORECASE,
+)
+_GH_GLOBALS = re.compile(r"\bgh((?:\s+(?:-R|--repo)(?:=|\s+)\S+)+)(?=\s+[a-z])", re.IGNORECASE)
+_PUSH_SEGMENT = re.compile(rf"\bgit\s+push\b{_SEG}", re.IGNORECASE)
+
+
+def flatten(command: str) -> str:
+    """Collapse whitespace but keep newlines as segment boundaries."""
+    return " ".join(command.replace("\r", "\n").replace("\n", " ; ").split())
+
+
+def normalize(command: str) -> str:
+    """Flatten, drop quotes and global options so subcommand rules still match."""
+    flat = flatten(command).replace('"', "").replace("'", "")
+    flat = _GIT_GLOBALS.sub("git", flat)
+    return _GH_GLOBALS.sub("gh", flat)
 
 
 class Decision(NamedTuple):
@@ -249,6 +324,16 @@ def current_branch(root: Path) -> str | None:
     return out.stdout.strip() or None
 
 
+def _file_targets(tool: str, tool_input: dict[str, Any], root: Path) -> list[str]:
+    if tool in ("Grep", "Glob"):
+        raw = tool_input.get("path")
+        return [relative_path(raw, root)] if isinstance(raw, str) and raw else []
+    raw = tool_input.get("file_path") or tool_input.get("notebook_path")
+    if not isinstance(raw, str):
+        raise ValueError(f"{tool} payload without file path")
+    return [relative_path(raw, root)]
+
+
 def decide(payload: dict[str, Any], branch: str | None = None) -> Decision | None:
     """Pure decision function (no I/O except an optional `git` lookup)."""
     tool = payload.get("tool_name", "")
@@ -257,35 +342,33 @@ def decide(payload: dict[str, Any], branch: str | None = None) -> Decision | Non
         raise ValueError("malformed hook payload")
     root = project_root(payload)
 
-    targets: dict[str, str] = {}
+    texts: dict[str, list[str]] = {}
     if tool in BASH_TOOLS:
         command = tool_input.get("command")
         if not isinstance(command, str):
             raise ValueError("Bash payload without command")
-        targets["command"] = " ".join(command.split())
+        texts["command"] = [flatten(command), normalize(command)]
     elif tool in FILE_TOOLS:
-        raw = tool_input.get("file_path") or tool_input.get("notebook_path")
-        if not isinstance(raw, str):
-            raise ValueError(f"{tool} payload without file path")
-        targets["path"] = relative_path(raw, root)
+        texts["path"] = _file_targets(tool, tool_input, root)
     else:
         return None
 
     asks: list[Decision] = []
     for rule in RULES:
-        if tool not in rule.tools or rule.target not in targets:
+        if tool not in rule.tools or rule.target not in texts:
             continue
-        if rule.pattern.search(targets[rule.target]):
+        if any(rule.pattern.search(text) for text in texts[rule.target]):
             hit = Decision(rule.decision, rule.id, rule.message, rule.sensitive)
             if rule.decision == DENY:
                 return hit
             asks.append(hit)
 
-    command = targets.get("command", "")
-    if re.search(r"\bgit\s+push\b", command) and not re.search(r"\btask/\S+", command):
-        on_branch = branch if branch is not None else current_branch(root)
-        if on_branch == "main":
-            return Decision(DENY, PUSH_FROM_MAIN, MSG_MAIN)
+    # A push with no explicit task/* target pushes the current branch: deny it on main.
+    for segment in _PUSH_SEGMENT.findall(texts.get("command", ["", ""])[1]):
+        if not re.search(r"\btask/\S+", segment):
+            on_branch = branch if branch is not None else current_branch(root)
+            if on_branch == "main":
+                return Decision(DENY, PUSH_FROM_MAIN, MSG_MAIN)
 
     return asks[0] if asks else None
 
@@ -293,7 +376,7 @@ def decide(payload: dict[str, Any], branch: str | None = None) -> Decision | Non
 def log(root: Path, tool: str, result: Decision, detail: str) -> None:
     try:
         line = {
-            "ts": datetime.now(UTC).isoformat(timespec="seconds"),
+            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),  # noqa: UP017 (3.9)
             "tool": tool,
             "decision": result.decision,
             "rule": result.rule_id,
@@ -331,7 +414,9 @@ def main() -> int:
         return 0
     if result is not None:
         tool_input = payload.get("tool_input") or {}
-        detail = str(tool_input.get("command") or tool_input.get("file_path") or "")
+        detail = str(
+            tool_input.get("command") or tool_input.get("file_path") or tool_input.get("path") or ""
+        )
         log(project_root(payload), str(payload.get("tool_name")), result, detail)
         emit(result)
     return 0

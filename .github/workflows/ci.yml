@@ -33,6 +33,7 @@ jobs:
               - '**/*.py'
               - 'pyproject.toml'
               - 'uv.lock'
+              - '.claude/**'
               - '.github/workflows/ci.yml'
             docs:
               - '**/*.md'
