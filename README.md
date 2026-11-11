@@ -26,4 +26,4 @@ cli/ pipeline/ semantic/ commission/ apps/{agent,mcp,web}/ eval/ scripts/ data/r
 Cada pasta tem um README dizendo qual spec a governa.
 
 ## Contribuindo
-Veja `CONTRIBUTING.md` (criado na P0.4).
+Veja [CONTRIBUTING.md](CONTRIBUTING.md).

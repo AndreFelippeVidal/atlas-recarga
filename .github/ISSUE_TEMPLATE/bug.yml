@@ -1,0 +1,23 @@
+name: Bug
+description: Comportamento diferente do que a spec define
+labels: ["bug"]
+body:
+  - type: input
+    id: spec
+    attributes:
+      label: Spec e seção violadas
+      placeholder: "SPEC-005 §4.1"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Como reproduzir
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Esperado × obtido
+    validations:
+      required: true
