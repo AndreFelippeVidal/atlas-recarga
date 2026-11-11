@@ -1,0 +1,25 @@
+name: Task / mudança
+description: Proponha uma task nova ou uma mudança em spec
+labels: ["task"]
+body:
+  - type: input
+    id: spec
+    attributes:
+      label: Spec afetada
+      placeholder: "SPEC-003"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: O que e por quê
+      description: Comportamento esperado e o problema que resolve
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Pronto quando
+      description: Critério de aceite verificável (Given/When/Then se possível)
+    validations:
+      required: true
