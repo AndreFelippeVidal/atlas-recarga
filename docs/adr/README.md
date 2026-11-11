@@ -17,3 +17,4 @@ Formato [MADR](https://adr.github.io/madr/). Cada ADR registra o contexto, **pel
 | [0011](0011-deterministic-synthetic-cli.md) | CLI sintético determinístico com cenários | aceito |
 | [0012](0012-claude-code-harness.md) | Claude Code como harness, com limites por hook | proposto |
 | [0013](0013-mlflow-genai-evaluation-monitoring.md) | Avaliação e monitoramento com MLflow 3 GenAI | aceito (Spike S0.3) |
+| [0014](0014-branch-protection-solo-maintainer.md) | Proteção da `main`: PR + checks, 0 aprovações (mantenedor único) | aceito |
