@@ -49,3 +49,42 @@ A tabela registra também a tentativa que falhou (404). A linha aparece com atra
 ### Decisão
 
 Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-Claude, `ATLAS_LLM_SERVICE` provisório = `system.ai.gpt-oss-120b` (nome de três partes). O plano B (AI Gateway clássico) não foi acionado. Ajustes em SPEC-005 e SPEC-000 na P3.8; ADR-0007 atualizado.
+
+## S0.2 — Agent service (Beta)
+
+- **Data:** _(preencher)_
+- **ADR:** [0007](../adr/0007-unity-gateway-llm-governance.md)
+- **Notebook:** `spikes/s0_2_agent_service.py` e App `spikes/s0_2_hello_agent/` (descartáveis)
+
+### Observações do workspace (antes de rodar)
+
+- _(a aba Agents do Unity Gateway existe; o que ela oferece para registrar um agente? Anotar.)_
+- `databricks ai-gateway` (CLI v1.24.0) não tem operações de agent service.
+
+### Execução
+
+- _(deploy do App: estado e erros)_
+- _(`POST /invocations`: status e corpo)_
+- _(registro como agent service: passos, erro exato se falhar)_
+
+### Evidência na `system.ai_gateway.usage` (UTC)
+
+| event_time | destination_name | status_code | requester_type | api_type |
+|---|---|---|---|---|
+| _(preencher)_ | | | | |
+
+### Checklist
+
+| Verificação | Resultado | Evidência |
+|---|---|---|
+| O App hello responde 200 em `/invocations` | _(a preencher)_ | |
+| O agente pode ser registrado como agent service | _(a preencher)_ | |
+| O agente aparece no Unity Gateway com uso registrado | _(a preencher)_ | |
+
+### Resultado
+
+_(passou | passou com ressalva | falhou → plano B)_
+
+### Decisão
+
+_(mantenedor)_
