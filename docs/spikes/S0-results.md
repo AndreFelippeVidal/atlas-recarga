@@ -25,17 +25,26 @@
 - Pelo `model_metadata`, cada model service tem `rate_limits` e `service_policies` configuráveis (vazios por padrão).
 - Não colar e-mail ou IP do solicitante nas evidências.
 
+### Evidência na `system.ai_gateway.usage` (2026-11-11, UTC)
+
+| event_time | destination_name | status_code | input_tokens | output_tokens | requester_type | api_type |
+|---|---|---|---|---|---|---|
+| 19:55:06 | `system.ai.gpt-oss-120b` | 200 | 107 | 24 | USER | `mlflow/v1/chat/completions` |
+| 19:55:11 | `system.ai.databricks-claude-sonnet-4-5` | 404 | null | null | USER | `mlflow/v1/chat/completions` |
+
+A tabela registra também a tentativa que falhou (404). A linha aparece com atraso (minutos), então qualquer dashboard de uso deve tolerar isso.
+
 ### Checklist
 
 | Verificação | Resultado | Evidência |
 |---|---|---|
 | Há um model service Claude em `system.ai`? | ❌ não: aba Models sem Claude; `system.ai.claude-sonnet-4-5` → 404 | prints; saída do notebook |
 | Chamada via `ChatDatabricks(use_ai_gateway=True)` retorna 200 | ✅ com `system.ai.gpt-oss-120b` | saída do notebook |
-| Linha em `system.ai_gateway.usage` da chamada de hoje | ⏳ pendente: reexecutar a query filtrada | _(preencher)_ |
+| Linha em `system.ai_gateway.usage` da chamada de hoje | ✅ sim, com atraso de alguns minutos na system table | linhas abaixo |
 
 ### Resultado
 
-**Passou com ressalva** (pendente a linha em `usage`): o Unity Gateway funciona na Free Edition, mas **não há model service Claude** em `system.ai`.
+**Passou com ressalva:** o Unity Gateway funciona na Free Edition, mas **não há model service Claude** em `system.ai`.
 
 ### Decisão
 
