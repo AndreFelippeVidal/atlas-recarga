@@ -35,8 +35,8 @@
 
 ### Resultado
 
-_(passou · falhou → plano B · passou com ressalva; fechar depois da linha de uso)_
+**Passou com ressalva** (pendente a linha em `usage`): o Unity Gateway funciona na Free Edition, mas **não há model service Claude** em `system.ai`.
 
 ### Decisão
 
-_(ex.: manter o Unity Gateway com um modelo não-Claude e ajustar SPEC-005 / `ATLAS_LLM_SERVICE`, na P3.8)_
+Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-Claude, `ATLAS_LLM_SERVICE` provisório = `system.ai.gpt-oss-120b` (nome de três partes). O plano B (AI Gateway clássico) não foi acionado. Ajustes em SPEC-005 e SPEC-000 na P3.8; ADR-0007 atualizado.
