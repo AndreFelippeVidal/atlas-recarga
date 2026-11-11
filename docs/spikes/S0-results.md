@@ -60,7 +60,8 @@ Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-C
 
 - Tentativa 1: App `atlas-hello-agent` não apareceu na aba Agents. A UI agora se chama AI Gateway.
 - Hipótese (docs): só Apps com nome `agent-*` entram na lista; agent services registrados por REST são só de agentes externos e sem invocação em runtime (Beta).
-- Tentativa 2: App `agent-atlas-hello`: _(aparece na aba Agents? anotar)_.
+- Tentativa 2: App `agent-hello` **apareceu na aba Agents do AI Gateway** (o prefixo `agent-` é o que lista o App; o nome `atlas-hello-agent` não aparecia). Sem passo extra de registro.
+- Pendente: o agente mostra uso/métricas na aba Agents? _(anotar o que a UI exibe)_.
 - `POST /invocations` pelo notebook devolve a tela de Sign In (status 200): Apps exige OAuth de usuário.
 - `databricks ai-gateway` (CLI v1.24.0) não tem operações de agent service.
 

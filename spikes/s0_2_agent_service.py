@@ -10,7 +10,7 @@
 # MAGIC Plano B: governar só o LLM; o agente fica como App direto.
 # MAGIC
 # MAGIC ## Roteiro (mantenedor)
-# MAGIC 1. Criar o App `agent-atlas-hello` (o prefixo `agent-` lista o App em Agents) a partir
+# MAGIC 1. Criar o App `agent-hello` (o prefixo `agent-` lista o App em Agents) a partir
 # MAGIC    de `spikes/s0_2_hello_agent/` (Compute > Apps > Create app > Custom) e fazer o deploy.
 # MAGIC 2. Se a chamada der `PERMISSION_DENIED`, dar ao service principal do App acesso ao model
 # MAGIC    service `system.ai.gpt-oss-120b` (lição da S0.1: permissão de serving endpoint não vale).
@@ -33,7 +33,7 @@
 import requests
 from databricks.sdk import WorkspaceClient
 
-APP_NAME = "agent-atlas-hello"  # o prefixo agent- faz o App entrar na lista Agents
+APP_NAME = "agent-hello"  # o prefixo agent- faz o App entrar na lista Agents
 w = WorkspaceClient()
 app = w.apps.get(APP_NAME)
 print("estado:", app.app_status.state if app.app_status else None, "| url:", app.url)
