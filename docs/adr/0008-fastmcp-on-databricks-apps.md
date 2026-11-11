@@ -29,6 +29,24 @@ A Helena quer perguntar sobre os dados direto do Claude. Um requisito do projeto
 
 ## Consequências
 - **Positivas:** o MCP é testável com o mesmo golden set do agente (SPEC-006 §7).
-- **Negativas aceitas:** sem rate limit nem auditoria **centralizados** no gateway. Compensação no próprio App (SPEC-006 §6, decidido em 2026-11-11): MLflow traces por tool, auditoria por `system.query.history` (com on-behalf-of-user, o usuário real), limitador de 30 chamadas/min por usuário e página "Uso do MCP" no AI/BI. Continuam valendo a validação de entrada, o limite de 500 linhas e o warehouse 2X-Small como teto natural. O que fica sem equivalente: teto de gasto e política única com o agente. A autenticação de clientes externos depende do Spike S0.5.
+- **Negativas aceitas:** sem rate limit nem auditoria **centralizados** no gateway; compensados no App (emenda abaixo). Continuam valendo a validação de entrada, o limite de 500 linhas e o warehouse 2X-Small como teto natural. Fica sem equivalente: teto de gasto e política única com o agente. A autenticação de clientes externos depende do Spike S0.5.
 - **Não se aplica ao MCP:** os controles de LLM do gateway (tokens, guardrail de PII na saída), porque o MCP não chama LLM; quem raciocina é o cliente.
 - **Revisitar se:** o Unity Gateway passar a aceitar registro de Apps como MCP Service. Nesse caso, migrar e herdar rate limit e auditoria.
+
+## Emenda 2026-11-11: observabilidade e controle sem o gateway
+
+**Contexto:** a doc *Register an MCP service* (Limitations) confirma que um MCP em Databricks Apps não pode ser registrado no Unity Gateway. O mantenedor pediu observabilidade e controles próximos dos do agente.
+
+**Opções consideradas:**
+1. **No próprio App:** span MLflow manual por tool (só atributos), auditoria por `system.query.history` com `request_id` no SQL, limitador em memória de 30 chamadas/min por usuário
+2. **Limitador persistente** em tabela Delta ou Lakebase, compartilhado entre instâncias
+3. **Só o que a plataforma já dá:** query history do warehouse e logs do App, sem rate limit
+
+**Decisão:** opção 1, detalhada na SPEC-006 §6.
+
+**Prós e contras:**
+- **No App:** 👍 sem infraestrutura nova; mesmo experiment, padrão de trace tables e AI/BI do agente; o `request_id` liga trace e query. 👎 O limite zera num restart e vale por instância.
+- **Limitador persistente:** 👍 sobrevive a restart. 👎 Uma escrita por chamada; o service principal precisaria de escrita fora de `atlas.semantic`, o que fere o menor privilégio. Com uma instância só na Free Edition, o ganho é pequeno.
+- **Só a plataforma:** 👍 zero código. 👎 Sem rate limit; sem o usuário real no plano B (service principal); sem painel por tool.
+
+**Revisitar se:** o App tiver mais de uma instância, ou o gateway aceitar Apps como MCP Service (aí migrar e remover a opção 1).

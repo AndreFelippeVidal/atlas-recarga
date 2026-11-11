@@ -48,10 +48,12 @@ O MCP não chama LLM, então os controles de tokens e de PII na saída do gatewa
 
 | O gateway daria | No `atlas-mcp` |
 |---|---|
-| Registro de uso em `system.ai_gateway.usage` | **MLflow traces:** cada tool decorada com `@mlflow.trace`, no experiment `/Shared/atlas/mcp`, com as tags `user`, `tool`, `app_version`, `sql_fingerprint`, `rows`, `error_code`. Sem os valores dos resultados |
-| Auditoria de acesso a dados | **`system.query.history`:** toda tool vira SQL no warehouse. Com on-behalf-of-user, `executed_by` é o usuário real. No plano B (service principal), o usuário fica só no trace |
+| Registro de uso em `system.ai_gateway.usage` | **MLflow traces:** cada chamada de tool abre um span **manual** (`mlflow.start_span`) no experiment `/Shared/atlas/mcp` e grava só atributos: `request_id`, `user`, `tool`, `app_version`, `sql_fingerprint`, `rows`, `error_code`, `duration_ms`. **Não** se usa `@mlflow.trace`, porque o decorator grava o retorno da função; os valores dos resultados nunca entram no span. Os traces vão para as trace tables `atlas.observability.mcp_*` no UC, pelo mesmo mecanismo do agente (SPEC-005 §5) |
+| Auditoria de acesso a dados | **`system.query.history`:** as tools que consultam o warehouse (`query_metric`, `top_regions`, `compare_months`) prefixam o SQL com o comentário `/* atlas-mcp request_id=<uuid> */`, que liga cada query ao trace. `health` e `list_metrics` não geram SQL de dados. Com on-behalf-of-user, `executed_by` é o usuário real; no plano B (service principal), o usuário fica só no trace. A disponibilidade da system table na Free Edition é conferida no Spike S0.5 |
 | Rate limit por usuário | Limitador em memória de **30 chamadas por minuto por usuário** (o mesmo teto do agente), antes de qualquer query. Erro `RATE_LIMITED` (§4) |
-| Painel de uso | Página "Uso do MCP" no AI/BI Dashboard: chamadas, erros por código e latência p95 por tool e por dia, a partir dos traces |
+| Painel de uso | Página **"Uso do MCP"** no AI/BI Dashboard (separada da "Qualidade do agente"): chamadas, erros por código e latência p95 por tool e por dia, lidos de `atlas.observability.mcp_*` |
+
+**Identidade:** o service principal do App recebe `CAN_EDIT` só no experiment `/Shared/atlas/mcp` para gravar traces. É um objeto do workspace, não dado do UC; o critério 5 (nada fora de `atlas.semantic`) continua valendo para dados.
 
 Os logs JSON no stdout do App continuam (`tool`, `user`, `duration_ms`, `rows`, `sql_fingerprint`, `error_code`), para depuração.
 
@@ -64,9 +66,10 @@ Os logs JSON no stdout do App continuam (`tool`, `user`, `duration_ms`, `rows`, 
 - **Dado** um `filters` com um valor contendo aspas ou `;`, **então** o valor é passado como parâmetro vinculado, sem concatenação (teste de injeção).
 - **Dado** o service principal do App, **então** ele não tem permissão fora de `atlas.semantic`.
 - **Dado** o golden set, **quando** reformulado via `query_metric`, **então** os números são iguais aos do SQL de referência (reaproveita a SPEC-008).
-- **Dado** 31 chamadas de tool do mesmo usuário em 60s, **então** a 31ª recebe `RATE_LIMITED` e não aparece em `system.query.history`.
-- **Dado** qualquer chamada de tool, **então** existe um trace em `/Shared/atlas/mcp` com as tags do §6 e sem valores de resultado.
-- **Dado** o modo on-behalf-of-user, **então** a query da tool aparece em `system.query.history` com `executed_by` igual ao usuário do cliente MCP.
+- **Dado** 31 chamadas de `query_metric` do mesmo usuário em 60s, **então** a 31ª recebe `RATE_LIMITED` com o seu `request_id`, e nenhuma linha de `system.query.history` contém esse `request_id` (no teste de unidade: o cliente SQL mockado não é chamado).
+- **Dado** qualquer chamada de tool, **então** existe um trace em `/Shared/atlas/mcp` com os atributos do §6 e **sem outputs** (teste: o span não tem `outputs` nem valores das linhas).
+- **Dado** o modo on-behalf-of-user confirmado no S0.5, **então** a query da tool aparece em `system.query.history` com `executed_by` igual ao usuário do cliente MCP. **No plano B**, o critério passa a ser: o `user` do trace é o do cliente e `executed_by` é o service principal.
+- **Dado** a página "Uso do MCP", **então** ela mostra chamadas, erros por código e p95 por tool para o último dia com tráfego.
 
 ## 8. Fora de escopo
 Tools de escrita (nunca), registro como MCP Service no Unity Gateway (bloqueado pela plataforma hoje; revisar no ADR-0008), resources e prompts MCP (v2).
