@@ -1,4 +1,38 @@
+# OS / editors
 .DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Secrets — never commit (SPEC-009 §7)
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+.databricks/
+.databrickscfg
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node / web
+node_modules/
+apps/web/dist/
+
+# Generated data (SPEC-001) — reproducible from the CLI, never versioned
+data/generated/
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/hooks.log
