@@ -17,7 +17,14 @@ Plataforma de dados e IA no **Databricks Free Edition** para a rede de recarga p
 _Em breve (Fase 2, [SPEC-011](docs/specs/011-architecture/spec.md))._
 
 ## Como rodar
-_Em breve (Fase 4 em diante). Este README será completado na P13.3._
+_A plataforma em si vem a partir da Fase 4; este README será completado na P13.3._
+
+Checks locais (os mesmos do CI):
+```bash
+uv sync                      # Python 3.12 + ruff, mypy, pytest, pre-commit
+uv run pre-commit install    # ruff + gitleaks antes de cada commit
+uv run ruff check . && uv run mypy && uv run pytest
+```
 
 ## Estrutura do repositório
 ```
