@@ -52,7 +52,7 @@ Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-C
 
 ## S0.2 — Agent service (Beta)
 
-- **Data:** _(preencher)_
+- **Data:** 2026-11-11
 - **ADR:** [0007](../adr/0007-unity-gateway-llm-governance.md)
 - **Notebook:** `spikes/s0_2_agent_service.py` e App `spikes/s0_2_hello_agent/` (descartáveis)
 
@@ -61,15 +61,15 @@ Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-C
 - Tentativa 1: App `atlas-hello-agent` não apareceu na aba Agents. A UI agora se chama AI Gateway.
 - Hipótese (docs): só Apps com nome `agent-*` entram na lista; agent services registrados por REST são só de agentes externos e sem invocação em runtime (Beta).
 - Tentativa 2: App `agent-hello` **apareceu na aba Agents do AI Gateway** (o prefixo `agent-` é o que lista o App; o nome `atlas-hello-agent` não aparecia). Sem passo extra de registro.
-- Pendente: o agente mostra uso/métricas na aba Agents? _(anotar o que a UI exibe)_.
+- Na aba Agents, o agente leva à página do próprio App (Databricks Apps > Insights). As métricas são **do App** (viewers únicos, uptime, requests por minuto por status HTTP, latência, CPU, memória), não do agente nem do LLM; não há tokens, custo nem por chamada ao modelo.
 - `POST /invocations` pelo notebook devolve a tela de Sign In (status 200): Apps exige OAuth de usuário.
 - `databricks ai-gateway` (CLI v1.24.0) não tem operações de agent service.
 
 ### Execução
 
-- _(deploy do App: estado e erros)_
-- _(`POST /invocations`: status e corpo)_
-- _(registro como agent service: passos, erro exato se falhar)_
+- Deploy do App `agent-hello` funcionou (recriado com o prefixo `agent-`).
+- `POST /invocations` com token OAuth de usuário (terminal): resposta `{"output":"ok"}`.
+- Registro como agent service: não houve passo de registro; o App aparece na aba Agents pelo prefixo. O registro por REST (agent service externo, sem invocação em runtime) não foi tentado.
 
 ### Evidência na `system.ai_gateway.usage` (UTC)
 
@@ -81,9 +81,9 @@ Decisão do mantenedor (2026-11-11): manter o Unity Gateway com um modelo não-C
 
 | Verificação | Resultado | Evidência |
 |---|---|---|
-| O App hello responde 200 em `/invocations` | _(a preencher)_ | |
-| O agente pode ser registrado como agent service | _(a preencher)_ | |
-| O agente aparece no Unity Gateway com uso registrado | _(a preencher)_ | |
+| O App hello responde em `/invocations` (OAuth) | ✅ `{"output":"ok"}` | saída do curl |
+| O agente aparece no AI Gateway (aba Agents) | ✅ com o prefixo `agent-` | aba Agents |
+| Uso do agente registrado no gateway | ⚠️ só métricas do App (Insights); uso do LLM: _(pendente da query)_ | captura do Insights |
 
 ### Resultado
 
