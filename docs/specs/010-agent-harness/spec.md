@@ -1,6 +1,6 @@
 # SPEC-010 — Harness do agente de código (Claude Code)
 
-> Roadmap: Fase 1 · ADRs: [0012](../../adr/0012-claude-code-harness.md), [0014](../../adr/0014-branch-protection-solo-maintainer.md) · Status: rascunho (aprovado no merge do PR)
+> Roadmap: Fase 1 · ADRs: [0012](../../adr/0012-claude-code-harness.md), [0014](../../adr/0014-branch-protection-solo-maintainer.md) · Status: aprovado (#8); ajustado na implementação (P1.3–P1.6)
 
 ## 1. Objetivo
 Deixar explícito, e **aplicado pela ferramenta**, o que o agente de código pode fazer sozinho, o que precisa da sua confirmação, o que é proibido e como o trabalho dele é revisado antes de entrar na `main`. Um limite que depende de o modelo "lembrar" não é um limite (princípio 9 da [mission](../mission.md)).
@@ -36,7 +36,7 @@ Nenhuma camada sozinha basta; o desenho supõe que cada uma pode falhar.
 | Editar `commission/rules.py` e `commission/**/*.yaml` | hook | Faixas e taxas de comissão: a etapa irreversível (ADR-0010) |
 | Editar `semantic/**` | hook | Definição única das métricas (ADR-0005) |
 | Editar `.claude/**`, `.github/workflows/**`, `.github/CODEOWNERS` | hook | O agente não afrouxa os próprios limites nem o CI |
-| `databricks bundle deploy -t dev`, `databricks fs cp`, `uv run atlas-cli upload` | settings + hook | Efeito no workspace (mesmo que em `dev`) |
+| `databricks bundle deploy -t dev`, `databricks fs cp/rm/mv`, `databricks jobs run-now`, `databricks pipelines start-update`, `uv run atlas-cli upload` | settings + hook | Efeito no workspace (mesmo que em `dev`) |
 | Qualquer outro `databricks …`, `git push` não coberto em §3.1, `gh` não coberto | settings (fora do `allow` → prompt padrão) | Padrão seguro |
 
 ### 3.3 Proibido: `deny` (settings **e** hook)
@@ -45,10 +45,10 @@ Nenhuma camada sozinha basta; o desenho supõe que cada uma pode falhar.
 | Merge de PR | `gh pr merge`, `gh api … /merge` | "Merge é do mantenedor (ADR-0014). Peça a revisão no PR." |
 | Push para a `main` | `git push … main`, `git push … HEAD:main`, `git push` estando na `main` | "A main só muda por PR (SPEC-009 §5)." |
 | Force push e reescrita de histórico remoto | `--force`, `-f`, `--force-with-lease`, `+refs`, `git push --delete` | "Reescrita de histórico remoto é proibida." |
-| Mexer na proteção ou nas configurações do repo | `gh api … /protection`, `gh repo edit`, `gh secret`, `gh ruleset` | "Configuração do repositório é do mantenedor." |
+| Mexer na proteção ou nas configurações do repo | `gh api … /protection` ou `/rulesets`, `gh api -X PATCH/PUT/DELETE repos/<o>/<r>`, `gh repo edit/delete/rename/archive`, `gh secret`, `gh variable`, `gh ruleset` | "Configuração do repositório é do mantenedor." |
 | Deploy no ambiente de demo | `bundle deploy … -t demo`, `--target demo` | "Deploy em demo é manual (ADR-0012)." |
-| Executar a aprovação de comissão | `atlas_commission_review` em qualquer comando, `jobs run-now` com o id desse job | "Aprovar comissão é decisão humana (ADR-0010)." |
-| Ler segredos | `Read`/`Edit`/`Bash` com `.env`, `.env.*` (exceto `.env.example`), `.databrickscfg`, `*.pem`, `*.key`; `gh auth token`, `databricks auth token`; `printenv`/`env` sem argumento | "Segredos nunca passam pelo agente." |
+| Executar a aprovação de comissão | Comando `databricks …` ou `run-now` que cite `commission_review` (um `grep` ou `pytest` que cite o nome não é bloqueado; qualquer `databricks jobs run-now` já cai em `ask`) | "Aprovar comissão é decisão humana (ADR-0010)." |
+| Ler segredos | `Read`/`Edit`/`Bash` com `.env`, `.env.*` (exceto `.env.example`), `.databrickscfg`, `*.pem`, `*.key`; `gh auth token`, `databricks auth token`; `printenv`, `env`, `set` ou `export -p` sem argumento | "Segredos nunca passam pelo agente." |
 | Pular os hooks locais | `git commit … --no-verify`, `git push … --no-verify` | "Os hooks de pre-commit não podem ser pulados." |
 
 ## 4. O hook `guard.py`
@@ -65,6 +65,8 @@ Nenhuma camada sozinha basta; o desenho supõe que cada uma pode falhar.
 - **Normalização antes do regex:** colapsa espaços, resolve caminhos para relativos à raiz do repo e procura padrões **em qualquer posição** (cobre `sh -c`, `&&`, `;`, subshells).
 - **Branch atual:** para os pushes, o hook consulta `git rev-parse --abbrev-ref HEAD`.
 - **Log:** cada `deny`/`ask` é acrescentado a `.claude/hooks.log` (ignorado no git): timestamp, tool, decisão, regra e o comando ou path (segredos nunca aparecem no log, porque o hook só loga o nome da regra para casos de segredo).
+
+**Limitação aceita (falso positivo):** como o hook lê o comando inteiro, uma mensagem de commit ou o corpo de PR passados inline que *citem* um comando proibido são negados. A saída documentada no `CLAUDE.md` é escrever o texto num arquivo (`git commit -F`, `gh pr create --body-file`). Preferimos esse atrito a afrouxar o regex.
 
 **As regras são dados, não código espalhado:** uma tabela `RULES = [(id, tool, regex, decision, message), …]` no topo do arquivo, com um teste pytest para cada regra (um caso positivo e um negativo) em `tests/test_guard_hook.py`.
 
