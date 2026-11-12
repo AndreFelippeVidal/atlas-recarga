@@ -207,3 +207,13 @@ def test_format_mismatch_is_invalid_flag(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _base(out)
     assert _incremental(out, "--format", "csv").exit_code == ExitCode.INVALID_FLAG
+
+
+def test_only_proportional_scenarios_apply(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    _base(out)
+    assert _incremental(out, scenarios="all").exit_code == 0
+    day = json.loads((out / MANIFEST_NAME).read_text())["incremental"][DAY]
+    assert set(day["scenarios"]) == {"null_pos", "unknown_pos"}
+    assert day["scenarios_enabled"] == ["null_pos", "unknown_pos"]
+    assert runner.invoke(app, ["validate", "--out", str(out)], env=ENV).exit_code == 0

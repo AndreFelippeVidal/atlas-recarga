@@ -2,8 +2,9 @@
 
 Os PDVs vêm do `pos/pos` já gerado em `--out` (as FKs são reais) e o dia usa os mesmos
 streams de `generate_recharge_day`. O `_manifest.json` existente é atualizado, não recriado.
-Os cenários valem sobre uma janela de um dia: os que dependem de vários dias
-(`regional_drop`, `duplicates`, `late_arrival`) não se aplicam, então só há `part-0000`.
+Só os cenários proporcionais ao volume (`null_pos`, `unknown_pos`) se aplicam ao dia; os que
+dependem de vários dias (`regional_drop`, `duplicates`, `late_arrival`) ou sorteiam um dia da
+janela (`fractioning`, `negative_amount`) ficam de fora, então só há `part-0000`.
 """
 
 import shutil
@@ -31,6 +32,8 @@ from atlas_cli.reference import Municipalities
 from atlas_cli.scenarios.base import Context
 from atlas_cli.scenarios.inject import Injector
 from atlas_cli.validate import ValidateError, load_manifest
+
+INCREMENTAL_SCENARIOS = ("null_pos", "unknown_pos")
 
 
 class IncrementalError(ValueError):
@@ -94,6 +97,7 @@ def generate_incremental_day(
     if not pos_path.is_file():
         raise IncrementalError(f"{pos_path} não existe: rode `generate` completo antes.")
 
+    scenarios = tuple(s for s in scenarios if s in INCREMENTAL_SCENARIOS)
     pos = _read_pos(pos_path)
     window_days = list(iter_days(month_window(_end_month(flags), int(flags["months"]))))
     count = day_volume(rows, day, window_days)
