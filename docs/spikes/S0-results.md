@@ -272,3 +272,38 @@ ADR-0008 mantido como `aceito`, com a nota do S0.5. O ajuste do texto da SPEC-00
 
 O modo `ALLOW_SAME_APPROVER_DEMO` **não é necessário como padrão**: há dois usuários e grupos próprios criáveis e atribuíveis; a segregação de fato depende dos grupos `atlas_commission_*` (P5.2). Ele permanece só como contingência explícita, auditada e marcada no lote, nunca como padrão. ADR-0010 atualizado; na P3.8, atualizar os textos que ainda dizem "único usuário (a confirmar no S0.6)" (`docs/architecture.md`, SPEC-003).
 - O grupo `atlas_readers` criado manualmente deve ser reconciliado com o bundle na P5.2 (recriado ou importado).
+
+## S0.7 — Cotas práticas
+
+- **Data:** _a preencher_
+- **ADR:** [0001](../adr/0001-databricks-free-edition.md)
+- **Notebook:** `spikes/s0_7_quotas.py` (descartável)
+
+### Preparação (2026-11-12, local)
+
+- `uv run atlas-cli generate` com os padrões (2M linhas, 5.000 PDVs, 12 meses, `--scenarios all`, seed 42): **1.999.930 recargas em 365 partições, 122 MB em Parquet, 6,5 s** em máquina local.
+- Resta medir o lado do workspace (itens abaixo), que só o mantenedor executa.
+
+### Execução (a preencher pelo mantenedor)
+
+- Tempo do upload para o Volume: _
+- Tempo do bronze / silver / total (serverless): _
+- Contagens: bronze _ · silver _ (esperado: `counts` do `_manifest.json`)
+- Erro de cota (texto exato), se houve: _
+
+### Checklist
+
+| Verificação | Resultado | Evidência |
+|---|---|---|
+| CLI gera 2M de linhas | ✅ 1.999.930 em 6,5 s | execução local acima |
+| Upload de ~122 MB para o Volume sem erro de cota | _ | _ |
+| Bronze + silver terminam sem erro de cota | _ | _ |
+| Total (bronze + silver) < 30 min | _ | _ |
+
+### Resultado
+
+_a preencher_
+
+### Decisão
+
+_a preencher: se passou, ADR-0001 `aceito` com a nota do S0.7; se falhou, reduzir o `--rows` padrão e registrar no PRD._
