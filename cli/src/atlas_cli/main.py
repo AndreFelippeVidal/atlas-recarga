@@ -10,6 +10,7 @@ import typer
 from atlas_cli.exit_codes import ExitCode
 from atlas_cli.generate import generate_reference_entities
 from atlas_cli.generate_io import OutputFormat
+from atlas_cli.recharges import NoActivePosError
 from atlas_cli.reference import ReferenceError, load_municipalities
 from atlas_cli.scenarios import parse_scenarios
 
@@ -52,7 +53,9 @@ def generate(
     end_month: Annotated[
         str | None, typer.Option("--end-month", help="YYYY-MM; o último mês gerado é este - 1.")
     ] = None,
-    seed: Annotated[int, typer.Option("--seed", min=0, help="Mesma seed, mesmos arquivos.")] = 42,
+    seed: Annotated[
+        int, typer.Option("--seed", min=0, max=2**32 - 1, help="Mesma seed, mesmos arquivos.")
+    ] = 42,
     scenarios: Annotated[
         str,
         typer.Option(
@@ -76,17 +79,20 @@ def generate(
     except ReferenceError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(ExitCode.REFERENCE_DATA_INVALID) from exc
-    written, (partitions, total_rows) = generate_reference_entities(
-        out=out,
-        seed=seed,
-        n_distributors=distributors,
-        n_pos=pos,
-        months=months,
-        end_month=end,
-        fmt=fmt,
-        municipalities=municipalities,
-        rows=rows,
-    )
+    try:
+        written, (partitions, total_rows) = generate_reference_entities(
+            out=out,
+            seed=seed,
+            n_distributors=distributors,
+            n_pos=pos,
+            months=months,
+            end_month=end,
+            fmt=fmt,
+            municipalities=municipalities,
+            rows=rows,
+        )
+    except NoActivePosError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--pos") from exc
     for path in written:
         typer.echo(str(path))
     typer.echo(f"{out / 'recharges'}: {total_rows} recargas em {partitions} partições")

@@ -60,6 +60,11 @@ _HOUR_WEIGHTS = np.array(
 HOUR_CDF = np.cumsum(_HOUR_WEIGHTS / _HOUR_WEIGHTS.sum())
 FACE_CDF = np.cumsum(np.array(FACE_WEIGHTS) / np.sum(FACE_WEIGHTS))
 
+
+class NoActivePosError(ValueError):
+    """Nenhum PDV ativo num dia da janela (poucos PDVs ou todos fechados)."""
+
+
 _STREAM_POS_WEIGHT = 3
 _STREAM_RECHARGES = 4
 _NAMESPACE = uuid.UUID("6f0c1f7e-3b1d-5c52-9a2e-a71a5a2c0001")
@@ -152,7 +157,7 @@ def generate_recharge_day(
     active = (book.opened <= day64) & (book.closed >= day64)
     cdf = np.cumsum(np.where(active, book.weight, 0.0))
     if cdf[-1] <= 0:
-        raise ValueError(f"nenhum PDV ativo em {day}")
+        raise NoActivePosError(f"nenhum PDV ativo em {day}; aumente --pos")
     pos_idx = np.minimum(
         np.searchsorted(cdf, rng.random(count) * cdf[-1], side="right"), len(cdf) - 1
     )
