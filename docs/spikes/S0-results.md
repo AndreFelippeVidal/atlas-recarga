@@ -252,18 +252,17 @@ ADR-0008 mantido como `aceito`, com a nota do S0.5. O ajuste do texto da SPEC-00
 
 - Segundo usuário convidado para o workspace Free Edition. Ele aceitou o convite e entrou.
 - Ao entrar, o usuário já ficou **direto no grupo `users`** (grupo padrão do workspace), sem atribuição manual.
-- Criado o grupo `atlas_readers` e confirmado que o novo usuário pode ser adicionado a ele.
-- Não colar e-mail ou nome do segundo usuário nas evidências.
+- Criado o grupo `atlas_readers`; o mantenedor confirmou que o novo usuário pode ser adicionado a ele (a adição em si não foi feita).
 - Não criados ainda: `atlas_commission_*`. O mecanismo é o mesmo do `atlas_readers`; a criação por bundle fica na P5.2.
 
 ### Checklist
 
 | Verificação | Resultado | Evidência |
 |---|---|---|
-| O workspace aceita um segundo usuário | ✅ sim, ele entrou | captura da lista de usuários (não versionada) |
-| O usuário recebe um grupo | ✅ `users` (padrão) | captura do usuário/grupo (não versionada) |
-| É possível criar um grupo `atlas_*` e adicionar o usuário | ✅ `atlas_readers` | captura do grupo (não versionada) |
-| Existem 2 identidades distintas para as 2 aprovações da comissão | ✅ sim | idem |
+| O workspace aceita um segundo usuário | ✅ sim, ele entrou | confirmação do mantenedor na UI (sem captura) |
+| O usuário recebe um grupo | ✅ só o grupo padrão `users`; nenhum grupo `atlas_*` atribuído | confirmação do mantenedor na UI (sem captura) |
+| É possível criar um grupo `atlas_*` e adicionar o usuário | ✅ `atlas_readers` criado; adição do usuário confirmada como possível | confirmação do mantenedor na UI (sem captura) |
+| Existem 2 identidades distintas para as 2 aprovações da comissão | ⚠️ inferido (2 usuários); nenhuma aprovação foi exercida | — |
 
 ### Resultado
 
@@ -271,4 +270,5 @@ ADR-0008 mantido como `aceito`, com a nota do S0.5. O ajuste do texto da SPEC-00
 
 ### Decisão
 
-O modo `ALLOW_SAME_APPROVER_DEMO` **não é necessário como padrão**: há duas identidades distintas e grupos próprios atribuíveis. Ele permanece só como contingência explícita, auditada e marcada no lote, nunca como padrão. ADR-0010 atualizado; nenhum ajuste de spec por causa do S0.6 na P3.8.
+O modo `ALLOW_SAME_APPROVER_DEMO` **não é necessário como padrão**: há dois usuários e grupos próprios criáveis; a segregação de fato depende dos grupos `atlas_commission_*` (P5.2). Ele permanece só como contingência explícita, auditada e marcada no lote, nunca como padrão. ADR-0010 atualizado; nenhum ajuste de spec por causa do S0.6 na P3.8.
+- O grupo `atlas_readers` criado manualmente deve ser reconciliado com o bundle na P5.2 (recriado ou importado).
