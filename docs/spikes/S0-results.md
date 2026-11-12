@@ -289,7 +289,7 @@ O modo `ALLOW_SAME_APPROVER_DEMO` **não é necessário como padrão**: há dois
 - Upload de `data/generated` (122 MB, 365 partições) para o Volume `s0_7_landing` com `databricks fs cp -r`: **2 min 21 s** (141 s).
 - Bronze (leitura em lote do Parquet + `saveAsTable`): **24 s**.
 - Silver (dedup por `recharge_id`, `recharge_date` em America/Sao_Paulo, sem nulos e negativos): **7 s**.
-- Total das células (bronze + silver + preparação): **113 s**. Com o upload, cerca de 4 min 20 s.
+- Total das células (bronze + silver + preparação): **113 s**. Somando o upload (141 s), cerca de 4 min 14 s (254 s), ainda muito abaixo de 30 min.
 - Contagens: bronze **1.999.930** (igual a `counts.recharges` do `_manifest.json`); silver **1.995.920**.
 - Silver = bronze − 4.000 duplicados − 10 valores negativos = 4.010 linhas a menos, conforme o `_manifest.json` (`duplicates` e `negative_amount`). A query do spike não trata PDV nulo ou órfão (fica para as P6.2 e P6.3), por isso `null_pos` e `unknown_pos` não saem aqui.
 - Erro de cota: **nenhum**.
