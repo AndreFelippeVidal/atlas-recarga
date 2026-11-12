@@ -136,8 +136,13 @@ def _inv2_clean(manifest: dict[str, Any], tables: dict[str, pa.Table]) -> Check:
         if nulls:
             problems.append(f"{entity}: {nulls} nulos")
     recharges, pos = tables["recharges"], tables["pos"]
-    if len(pc.unique(recharges["recharge_id"])) != recharges.num_rows:
-        problems.append("recharge_id duplicado")
+    for table, key in (
+        (recharges, "recharge_id"),
+        (pos, "pos_id"),
+        (tables["distributors"], "distributor_id"),
+    ):
+        if len(pc.unique(table[key])) != table.num_rows:
+            problems.append(f"{key} duplicado")
     orphans = pc.sum(pc.invert(pc.is_in(recharges["pos_id"], value_set=pos["pos_id"]))).as_py() or 0
     if orphans:
         problems.append(f"{orphans} recargas com pos_id órfão")

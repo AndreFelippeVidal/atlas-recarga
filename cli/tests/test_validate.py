@@ -1,8 +1,10 @@
 import json
 import shutil
+from decimal import Decimal
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import pytest
 from atlas_cli.exit_codes import ExitCode
@@ -15,16 +17,21 @@ ENV = {"ATLAS_REFERENCE_PATH": str(REPO / "data" / "reference" / "municipalities
 runner = CliRunner()
 
 
-def _generate(out: Path, scenarios: str, seed: int = 42, fmt: str = "parquet") -> None:
-    result = runner.invoke(
-        app,
-        [
-            "generate", "--rows", "20000", "--pos", "800", "--months", "2",
-            "--end-month", "2026-11", "--scenarios", scenarios, "--seed", str(seed),
-            "--format", fmt, "--out", str(out),
-        ],
-        env=ENV,
-    )  # fmt: skip
+def _generate(
+    out: Path, scenarios: str, seed: int = 42, fmt: str = "parquet", pos: int = 800
+) -> None:
+    args = [
+        "generate",
+        *("--rows", "20000"),
+        *("--pos", str(pos)),
+        *("--months", "2"),
+        *("--end-month", "2026-11"),
+        *("--scenarios", scenarios),
+        *("--seed", str(seed)),
+        *("--format", fmt),
+        *("--out", str(out)),
+    ]
+    result = runner.invoke(app, args, env=ENV)
     assert result.exit_code == 0, result.output
 
 
@@ -56,17 +63,20 @@ def copy_of_clean(clean: Path, tmp_path: Path) -> Path:
     return out
 
 
-def test_same_seed_same_sha256_in_every_file(tmp_path: Path, clean: Path) -> None:
+@pytest.mark.parametrize(
+    ("scenarios", "fmt"), [("all", "parquet"), ("none", "parquet"), ("all", "csv")]
+)
+def test_same_seed_same_sha256_in_every_file(tmp_path: Path, scenarios: str, fmt: str) -> None:
     """SPEC-001 §6 invariante 1 e §7 critério 1."""
-    _generate(tmp_path / "again", "all")
-    _generate(tmp_path / "all", "all")
-    first = json.loads((tmp_path / "again" / MANIFEST_NAME).read_text(encoding="utf-8"))
-    second = json.loads((tmp_path / "all" / MANIFEST_NAME).read_text(encoding="utf-8"))
-    assert first["files"] == second["files"]
+    _generate(tmp_path / "a", scenarios, fmt=fmt)
+    _generate(tmp_path / "b", scenarios, fmt=fmt)
+    first = json.loads((tmp_path / "a" / MANIFEST_NAME).read_text(encoding="utf-8"))
+    second = json.loads((tmp_path / "b" / MANIFEST_NAME).read_text(encoding="utf-8"))
     assert first == second
+    assert first["files"]
     for rel, entry in first["files"].items():
-        assert sha256_file(tmp_path / "again" / rel) == entry["sha256"]
-        assert sha256_file(tmp_path / "all" / rel) == entry["sha256"]
+        assert sha256_file(tmp_path / "a" / rel) == entry["sha256"]
+        assert sha256_file(tmp_path / "b" / rel) == entry["sha256"]
 
 
 def test_different_seed_changes_sha256(tmp_path: Path) -> None:
@@ -152,8 +162,6 @@ def test_duplicate_id_fails_invariant_2(copy_of_clean: Path) -> None:
 
 
 def test_non_face_amount_fails_invariant_2(copy_of_clean: Path) -> None:
-    from decimal import Decimal
-
     _mutate_recharges(copy_of_clean, "amount_brl", Decimal("12.34"))
     code, output = _validate(copy_of_clean)
     assert code == ExitCode.VALIDATION_FAILED
@@ -216,3 +224,58 @@ def test_missing_reference_exits_3(clean: Path) -> None:
         app, ["validate", "--out", str(clean)], env={"ATLAS_REFERENCE_PATH": "/nao/existe.csv"}
     )
     assert result.exit_code == ExitCode.REFERENCE_DATA_INVALID
+
+
+def test_default_size_covers_all_ufs(tmp_path: Path) -> None:
+    _generate(tmp_path / "full", "none", pos=5_000)
+    code, output = _validate(tmp_path / "full")
+    assert code == 0, output
+    assert "[ok] invariante 4" in output
+
+
+def test_uf_without_pos_fails_invariant_4(tmp_path: Path) -> None:
+    out = tmp_path / "full"
+    _generate(out, "none", pos=5_000)
+    path = out / "pos" / "pos.parquet"
+    table = pq.read_table(path)
+    uf_prefix = table["municipality_ibge_code"][0].as_py()[:2]  # prefixo IBGE = UF
+    keep = pc.invert(pc.starts_with(table["municipality_ibge_code"], uf_prefix))
+    pq.write_table(table.filter(keep), path, compression="snappy")
+    _rewrite_manifest(out)
+    code, output = _validate(out)
+    assert code == ExitCode.VALIDATION_FAILED
+    assert "[FALHA] invariante 4" in output
+
+
+def test_orphan_distributor_fails_invariant_2(copy_of_clean: Path) -> None:
+    path = copy_of_clean / "pos" / "pos.parquet"
+    table = pq.read_table(path)
+    ids = table["distributor_id"].to_pylist()
+    ids[0] = "DST-9999"
+    idx = table.schema.get_field_index("distributor_id")
+    pq.write_table(
+        table.set_column(idx, "distributor_id", pa.array(ids, pa.string())),
+        path,
+        compression="snappy",
+    )
+    _rewrite_manifest(copy_of_clean)
+    code, output = _validate(copy_of_clean)
+    assert code == ExitCode.VALIDATION_FAILED
+    assert "distributor_id órfão" in output
+
+
+def test_invalid_status_fails_invariant_2(copy_of_clean: Path) -> None:
+    _mutate_recharges(copy_of_clean, "status", "chargeback")
+    code, output = _validate(copy_of_clean)
+    assert code == ExitCode.VALIDATION_FAILED
+    assert "status inválido" in output
+
+
+def test_unknown_scenario_in_manifest_fails(copy_of_clean: Path) -> None:
+    path = copy_of_clean / MANIFEST_NAME
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["scenarios"] = {"inventado": {"rows": 1}}
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    code, output = _validate(copy_of_clean)
+    assert code == ExitCode.VALIDATION_FAILED
+    assert "desconhecidos" in output
