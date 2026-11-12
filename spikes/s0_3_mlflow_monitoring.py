@@ -112,7 +112,7 @@ print("start() ok")
 traces = mlflow.search_traces(experiment_ids=[EXPERIMENT_ID], return_type="list")
 import datetime  # noqa: E402
 
-print("lido em (UTC):", datetime.datetime.now(datetime.timezone.utc).isoformat())
+print("lido em (UTC):", datetime.datetime.now(datetime.UTC).isoformat())
 print("traces:", len(traces))
 for t in traces:
     names = [(a.name, a.value, str(a.source)) for a in (t.info.assessments or [])]
