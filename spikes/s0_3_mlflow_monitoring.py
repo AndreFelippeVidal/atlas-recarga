@@ -25,7 +25,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -U "mlflow[databricks]>=3.1"
+# MAGIC %pip install -U "mlflow[databricks]==3.18.0"
 
 # COMMAND ----------
 

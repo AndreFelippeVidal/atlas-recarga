@@ -29,6 +29,6 @@ A H4 do discovery exige que o agente seja confiável **e continue confiável**. 
 ## Consequências
 - **Positivas:** a métrica de acurácia do PRD vira um **gate de merge**; as falhas de produção alimentam o golden set (ciclo de melhoria).
 - **Negativas aceitas:** o gate custa ~30 chamadas ao agente por PR relevante e precisa de um token do workspace como GitHub secret (escopo mínimo). O scorer `numeric_match` depende de extrair o número principal da resposta, por isso o formato do bloco `Fonte:` é contrato (SPEC-005 §4).
-- **Spike S0.3 (2026-11-12):** um scorer de código agendado (`start()`) anexou feedback `CODE` a traces novos, sem `evaluate`, e o plano B abaixo também foi validado. Ver `docs/spikes/S0-results.md`.
+- **Spike S0.3 (2026-11-12):** um scorer de código agendado (`start()`) anexou feedback `CODE` a traces novos, sem `evaluate`, e o plano B abaixo também foi validado. **Não validado no S0.3:** LLM judge em amostra de 20%, latência trace→feedback e persistência do scorer após `stop()`/redeploy; reconfirmar na P10.8. Ver `docs/spikes/S0-results.md`.
 - **Plano B (S0.3):** job diário com `mlflow.search_traces` + `mlflow.genai.evaluate` gravando em `atlas.observability.agent_quality_daily`.
 - **Revisitar se:** o production monitoring virar GA, ou o custo dos judges passar da cota (reduzir a amostra para 10%).

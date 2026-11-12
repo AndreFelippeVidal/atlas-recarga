@@ -116,7 +116,7 @@ Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec, em vers�
 
 ### Observações antes de rodar
 
-- Segundo a documentação do MLflow open source (consultada via ctx7, não verificada na Databricks), o production monitoring (automatic evaluation) suporta só LLM judges, e que `@scorer` de código exige servidor self-hosted com job containers. O spike testou se isso vale na Databricks Free Edition.
+- Segundo a documentação do MLflow open source (consultada via ctx7, não verificada na Databricks), o production monitoring (automatic evaluation) suporta só LLM judges, e que `@scorer` de código exige servidor self-hosted com job containers. O spike testou se isso vale na Databricks Free Edition: **a observação contradiz essa limitação** para um `@scorer` de código simples (mlflow 3.18.0). A afirmação da doc não traz versão ou link nesta nota.
 
 ### Execução (mlflow 3.18.0, experiment_id `2340593215239739`)
 
@@ -139,7 +139,7 @@ Os valores batem com o esperado (3 `True` e 2 `False`). Cada trace tem **duas** 
 ### 2ª rodada (2026-11-12, 12:04 UTC), mesmo experiment, etapa 4 antes da 5
 
 - `start()` de novo sem erro. O experiment passou a ter 10 traces (5 da 1ª rodada + 5 novos).
-- Leitura às 12:04:37 UTC, **antes** do `evaluate`: os 5 traces novos tinham **1** assessment `has_source` cada, com `source_type='CODE'` e `source_id='has_source'` (2 `False` e 3 `True`, como esperado). Como o `evaluate` ainda não tinha rodado, o feedback veio do scorer agendado.
+- Leitura às 12:04:37 UTC, **antes** do `evaluate`: os 5 traces novos tinham **1** assessment `has_source` cada, com `source_type='CODE'` e `source_id='has_source'` (2 `False` e 3 `True`, como esperado). Como o `evaluate` ainda não tinha rodado, o feedback veio do scorer agendado. Atenção: o campo `source` não distingue as duas origens (o `evaluate` também grava `CODE` com o nome do scorer); a prova é a **ordem** das leituras, reportada pelo mantenedor, e a saída das células não foi versionada.
 - Os 5 traces da 1ª rodada continuam com 2 assessments cada, o que bate com a explicação: uma do monitoring e outra do `evaluate` da etapa 5 daquela rodada.
 - Plano B: `evaluate` sobre os 10 traces, run `charming-pig-605`, `has_source/mean = 0.6` (3 de 5 nos novos; a média também bate com a rodada anterior).
 - Não medida: a latência entre a criação do trace e a assessment (só há o horário da leitura).
