@@ -31,6 +31,8 @@ Pacote Python `atlas_cli` (Typer), instalável com `uv`, e executável `atlas-cl
 | `--format` | `parquet`\|`csv` | `parquet` | |
 | `--incremental-day` | `YYYY-MM-DD` | — | Gera só as recargas desse dia (simula a carga D-1 diária) |
 
+**`--incremental-day`:** gera só `recharges/dt=<dia>/part-0000`, sobre os PDVs já gerados em `--out` (lê `pos/pos`; sem `_manifest.json` ou `pos`, sai com `2`). Exige a mesma `--seed` e o mesmo `--format` do lote. `--months`, `--end-month`, `--pos` e `--distributors` são ignorados (com aviso) e o dia pode estar fora do histórico. O volume do dia é `--rows` repartido pela sazonalidade da janela do manifest. `--scenarios` vale sobre uma janela de um dia: `regional_drop`, `duplicates` e `late_arrival` dependem de vários dias e não se aplicam. Se `dt=<dia>` já existe, a partição inteira é substituída (mesmos bytes para os mesmos parâmetros). O `_manifest.json` é atualizado (arquivos, contagens e a chave `incremental`); o `validate` então pula os invariantes 2 (se houve cenários no dia) e 5.
+
 ### `validate` — flags e comportamento
 
 | Flag | Tipo | Padrão | Regra |
