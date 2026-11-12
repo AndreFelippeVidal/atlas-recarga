@@ -9,7 +9,13 @@ import pyarrow.dataset as ds
 import pytest
 from atlas_cli.entities import month_window
 from atlas_cli.main import app
-from atlas_cli.recharges import FACE_VALUES, FACE_WEIGHTS, daily_counts, subscriber_pool
+from atlas_cli.recharges import (
+    FACE_VALUES,
+    FACE_WEIGHTS,
+    daily_counts,
+    seasonality_weight,
+    subscriber_pool,
+)
 from atlas_cli.reference import load_municipalities
 from typer.testing import CliRunner
 
@@ -40,10 +46,45 @@ def _recharges(out: Path):  # type: ignore[no-untyped-def]
     return ds.dataset(out / "recharges", format="parquet", partitioning="hive").to_table()
 
 
+def _days(start: date, end: date) -> list[date]:
+    return [start + timedelta(days=i) for i in range((end - start).days + 1)]
+
+
 def test_daily_counts_sum_exactly() -> None:
-    counts = daily_counts(1_001, 30)
+    days = _days(date(2026, 1, 1), date(2026, 3, 31))
+    counts = daily_counts(1_001, days)
     assert sum(counts) == 1_001
-    assert max(counts) - min(counts) <= 1
+    assert all(c >= 0 for c in counts)
+
+
+def test_seasonality_factors_multiply() -> None:
+    assert seasonality_weight(date(2026, 6, 15)) == 1.0  # segunda, sem fator
+    assert seasonality_weight(date(2026, 12, 7)) == pytest.approx(1.18 * 1.25)  # segunda, salário
+    assert seasonality_weight(date(2026, 12, 6)) == pytest.approx(1.18 * 1.25 * 0.70)  # domingo
+    assert seasonality_weight(date(2026, 2, 3)) == pytest.approx(0.92)
+
+
+def test_salary_days_have_above_average_volume(generated: Path) -> None:
+    t = _recharges(generated)
+    per_day = Counter(str(d) for d in t["dt"].to_pylist())
+    salary: list[int] = []
+    others: list[int] = []
+    for iso, n in per_day.items():
+        day = date.fromisoformat(iso)
+        if day.weekday() == 6:
+            continue  # domingo é outro efeito
+        (salary if day.day in range(5, 11) else others).append(n)
+    mean_salary = sum(salary) / len(salary)
+    mean_others = sum(others) / len(others)
+    assert mean_salary > mean_others * 1.10  # esperado ~ +18%
+
+
+def test_sunday_has_below_average_volume(generated: Path) -> None:
+    t = _recharges(generated)
+    per_day = Counter(str(d) for d in t["dt"].to_pylist())
+    sundays = [n for iso, n in per_day.items() if date.fromisoformat(iso).weekday() == 6]
+    others = [n for iso, n in per_day.items() if date.fromisoformat(iso).weekday() != 6]
+    assert sum(sundays) / len(sundays) < sum(others) / len(others) * 0.85
 
 
 def test_invariant_5_row_count_within_one_percent(generated: Path) -> None:

@@ -6,7 +6,7 @@ A curva intradiária é sorteada na hora local do município do PDV e convertida
 """
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -100,10 +100,37 @@ def subscriber_pool(seed: int) -> NDArray[np.object_]:
     return np.array([f"SUB-{int(v):010x}" for v in low40], dtype=object)
 
 
-def daily_counts(total: int, days: int) -> list[int]:
-    """Divide `total` entre os dias (uniforme na P4.4; a sazonalidade entra na P4.5)."""
-    base, extra = divmod(total, days)
-    return [base + (1 if i < extra else 0) for i in range(days)]
+SALARY_DAYS = range(5, 11)  # dia 5 a 10 (calendário de São Paulo)
+SALARY_FACTOR = 1.18
+DECEMBER_FACTOR = 1.25
+FEBRUARY_FACTOR = 0.92
+SUNDAY_FACTOR = 0.70
+
+
+def seasonality_weight(day: date) -> float:
+    """Fator de sazonalidade do dia (SPEC-001 §4); os fatores se multiplicam."""
+    weight = 1.0
+    if day.day in SALARY_DAYS:
+        weight *= SALARY_FACTOR
+    if day.month == 12:
+        weight *= DECEMBER_FACTOR
+    elif day.month == 2:
+        weight *= FEBRUARY_FACTOR
+    if day.weekday() == 6:
+        weight *= SUNDAY_FACTOR
+    return weight
+
+
+def daily_counts(total: int, days: Sequence[date]) -> list[int]:
+    """Divide `total` entre os dias, proporcional à sazonalidade; a soma é exata."""
+    weights = np.array([seasonality_weight(d) for d in days])
+    exact = weights / weights.sum() * total
+    counts = np.floor(exact).astype(np.int64)
+    # Maior resto: os dias com maior parte fracionária recebem as unidades que faltam.
+    missing = total - int(counts.sum())
+    order = np.argsort(-(exact - counts), kind="stable")
+    counts[order[:missing]] += 1
+    return [int(c) for c in counts]
 
 
 def _decimal_cents(cents: NDArray[np.int64]) -> pa.Array:
@@ -227,7 +254,7 @@ def write_recharges(
     book = build_pos_book(seed, pos, municipalities)
     subscribers = subscriber_pool(seed)
     total = 0
-    for day, count in zip(days, daily_counts(rows, len(days)), strict=True):
+    for day, count in zip(days, daily_counts(rows, days), strict=True):
         table = generate_recharge_day(seed, day, count, book, subscribers)
         write_table(table, out / "recharges" / f"dt={day.isoformat()}" / "part-0000", fmt)
         total += table.num_rows
