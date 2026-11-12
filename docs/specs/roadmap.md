@@ -78,7 +78,7 @@ _Confirmar na Free Edition os recursos em Beta antes de depender deles._
 _`atlas-cli` gera o dataset determinístico com cenários e o envia ao Volume._
 
 - [x] **P4.1** 🤖 Esqueleto do pacote `cli/` (uv, Typer, `atlas-cli --help`, testes rodando no CI) — _pronto quando:_ `atlas-cli --help` lista os comandos; CI verde (#21) · depende de P3.8
-- [ ] **P4.2** 🤖 Snapshot da referência IBGE (`data/reference/municipalities_ibge.csv`) com população e DDD — _pronto quando:_ 5.570 linhas; teste de unicidade e de 7 dígitos · depende de P4.1
+- [x] **P4.2** 🤖 Snapshot da referência IBGE (`data/reference/municipalities_ibge.csv`) com população e DDD aproximado por região imediata — _pronto quando:_ 5.570 linhas; teste de unicidade e de 7 dígitos (#22) · depende de P4.1
 - [ ] **P4.3** 🤖 `generate`: distributors + pos com pesos regionais — _pronto quando:_ Invariantes 3 e 4 da SPEC-001 passam · depende de P4.2
 - [ ] **P4.4** 🤖 `generate`: recharges com valores de face, curva intradiária e status — _pronto quando:_ Invariantes 2 e 5 passam com `--scenarios none` · depende de P4.3
 - [ ] **P4.5** 🤖 Sazonalidade (salário, dezembro, fevereiro, domingo) — _pronto quando:_ Teste estatístico simples de que os dias 5 a 10 têm volume > média · depende de P4.4
