@@ -19,7 +19,7 @@ def test_scenario_help_lists_list() -> None:
     assert "list" in result.output
 
 
-@pytest.mark.parametrize("args", [["upload"], ["validate"], ["scenario", "list"]])
+@pytest.mark.parametrize("args", [["upload"], ["validate"]])
 def test_stubs_exit_not_implemented(args: list[str]) -> None:
     result = runner.invoke(app, args)
     assert result.exit_code == NOT_IMPLEMENTED_EXIT

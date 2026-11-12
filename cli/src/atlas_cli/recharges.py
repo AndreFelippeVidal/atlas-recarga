@@ -19,6 +19,8 @@ from atlas_cli.entities import Window
 from atlas_cli.generate_io import OutputFormat, write_table
 from atlas_cli.geo import UF_UTC_OFFSET_HOURS
 from atlas_cli.reference import Municipalities
+from atlas_cli.scenarios.base import Context
+from atlas_cli.scenarios.inject import Injector
 
 FACE_VALUES = (10, 15, 20, 25, 30, 40, 50, 100)
 FACE_WEIGHTS = (0.22, 0.18, 0.20, 0.10, 0.12, 0.06, 0.09, 0.03)
@@ -253,6 +255,14 @@ def iter_days(window: Window) -> Iterator[date]:
         day += timedelta(days=1)
 
 
+@dataclass(frozen=True)
+class RechargesResult:
+    partitions: int
+    rows: int
+    files: list[Path]
+    scenarios: dict[str, dict[str, int | str]]
+
+
 def write_recharges(
     *,
     out: Path,
@@ -262,14 +272,37 @@ def write_recharges(
     pos: pa.Table,
     municipalities: Municipalities,
     fmt: OutputFormat,
-) -> tuple[int, int]:
-    """Escreve `recharges/dt=YYYY-MM-DD/part-0000.<fmt>`; devolve (partições, linhas)."""
+    scenarios: tuple[str, ...] = (),
+) -> RechargesResult:
+    """Escreve `recharges/dt=YYYY-MM-DD/part-0000.<fmt>` (e `part-0001` com `late_arrival`)."""
     days = list(iter_days(window))
+    counts = daily_counts(rows, days)
     book = build_pos_book(seed, pos, municipalities)
     subscribers = subscriber_pool(seed)
+    injector = Injector(
+        Context(
+            seed=seed,
+            rows=rows,
+            days=tuple(days),
+            day_counts=tuple(counts),
+            pos_ids=book.pos_id,
+            pos_municipality=np.array(pos["municipality_ibge_code"].to_pylist(), dtype=object),
+            pos_opened=book.opened,
+            pos_closed=book.closed,
+        ),
+        scenarios,
+    )
+    files: list[Path] = []
     total = 0
-    for day, count in zip(days, daily_counts(rows, days), strict=True):
-        table = generate_recharge_day(seed, day, count, book, subscribers)
-        write_table(table, out / "recharges" / f"dt={day.isoformat()}" / "part-0000", fmt)
-        total += table.num_rows
-    return len(days), total
+    carry: pa.Table | None = None  # `late_arrival` do dia anterior
+    for day, count in zip(days, counts, strict=True):
+        base = generate_recharge_day(seed, day, count, book, subscribers)
+        result = injector.process(day, base)
+        folder = out / "recharges" / f"dt={day.isoformat()}"
+        files.append(write_table(result.main, folder / "part-0000", fmt))
+        total += result.main.num_rows
+        if carry is not None:
+            files.append(write_table(carry, folder / "part-0001", fmt))
+            total += carry.num_rows
+        carry = result.late
+    return RechargesResult(len(days), total, files, injector.stats())
