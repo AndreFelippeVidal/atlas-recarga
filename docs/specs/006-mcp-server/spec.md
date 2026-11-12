@@ -39,8 +39,8 @@ O campo `source` de toda resposta repete o contrato de citação do agente (view
 | `RATE_LIMITED` | Mais de 30 chamadas de tool por minuto do mesmo usuário; a resposta traz `retry_after_s` e nenhuma query é executada |
 
 ## 5. Conexão (documentada no README)
-- **Claude Code:** `claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp`, com autenticação OAuth do Databricks App, a ser confirmada no Spike S0.5.
-- **Plano B (S0.5 falhar):** proxy local `mcp-remote` com o header `Authorization: Bearer $(databricks auth token ...)`. O token nunca vai para o repositório.
+- **Claude Code:** `claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp`, autenticado como o usuário. O Spike S0.5 confirmou que o Claude Code chamou o App FastMCP com o token de usuário no cabeçalho e que a query rodou como esse usuário (OBO). O fluxo OAuth interativo nativo do cliente **não** foi exercitado e fica para a P11.4/P11.5.
+- **Plano B (não acionado no S0.5; vale se o OAuth interativo falhar na P11.5):** proxy local `mcp-remote` com o header `Authorization: Bearer $(databricks auth token ...)`. O token nunca vai para o repositório.
 
 ## 6. Observabilidade e controle (no lugar do Unity Gateway)
 
@@ -49,7 +49,7 @@ O MCP não chama LLM, então os controles de tokens e de PII na saída do gatewa
 | O gateway daria | No `atlas-mcp` |
 |---|---|
 | Registro de uso em `system.ai_gateway.usage` | **MLflow traces:** cada chamada de tool abre um span **manual** (`mlflow.start_span`) no experiment `/Shared/atlas/mcp` e grava só atributos: `request_id`, `user`, `tool`, `app_version`, `sql_fingerprint`, `rows`, `error_code`, `duration_ms`. **Não** se usa `@mlflow.trace`, porque o decorator grava o retorno da função; os valores dos resultados nunca entram no span. Os traces vão para as trace tables `atlas.observability.mcp_*` no UC, pelo mesmo mecanismo do agente (SPEC-005 §5) |
-| Auditoria de acesso a dados | **`system.query.history`:** as tools que consultam o warehouse (`query_metric`, `top_regions`, `compare_months`) prefixam o SQL com o comentário `/* atlas-mcp request_id=<uuid> */`, que liga cada query ao trace. `health` e `list_metrics` não geram SQL de dados. Com on-behalf-of-user, `executed_by` é o usuário real; no plano B (service principal), o usuário fica só no trace. A disponibilidade da system table na Free Edition é conferida no Spike S0.5 |
+| Auditoria de acesso a dados | **`system.query.history`:** as tools que consultam o warehouse (`query_metric`, `top_regions`, `compare_months`) prefixam o SQL com o comentário `/* atlas-mcp request_id=<uuid> */`, que liga cada query ao trace. `health` e `list_metrics` não geram SQL de dados. Com on-behalf-of-user, `executed_by` é o usuário real; no plano B (service principal), o usuário fica só no trace. A `system.query.history` está disponível na Free Edition (S0.5). O App só recebe o token do usuário (`x-forwarded-access-token`) com a autorização do usuário (OBO) habilitada, com o escopo `sql` |
 | Rate limit por usuário | Limitador em memória de **30 chamadas por minuto por usuário** (o mesmo teto do agente), antes de qualquer query. Erro `RATE_LIMITED` (§4) |
 | Painel de uso | Página **"Uso do MCP"** no AI/BI Dashboard (separada da "Qualidade do agente"): chamadas, erros por código e latência p95 por tool e por dia, lidos de `atlas.observability.mcp_*` |
 
@@ -68,7 +68,7 @@ Os logs JSON no stdout do App continuam (`tool`, `user`, `duration_ms`, `rows`, 
 - **Dado** o golden set, **quando** reformulado via `query_metric`, **então** os números são iguais aos do SQL de referência (reaproveita a SPEC-008).
 - **Dado** 31 chamadas de `query_metric` do mesmo usuário em 60s, **então** a 31ª recebe `RATE_LIMITED` com o seu `request_id`, e nenhuma linha de `system.query.history` contém esse `request_id` (no teste de unidade: o cliente SQL mockado não é chamado).
 - **Dado** qualquer chamada de tool, **então** existe um trace em `/Shared/atlas/mcp` com os atributos do §6 e **sem outputs** (teste: o span não tem `outputs` nem valores das linhas).
-- **Dado** o modo on-behalf-of-user confirmado no S0.5, **então** a query da tool aparece em `system.query.history` com `executed_by` igual ao usuário do cliente MCP. **No plano B**, o critério passa a ser: o `user` do trace é o do cliente e `executed_by` é o service principal.
+- **Dado** o modo on-behalf-of-user (confirmado no S0.5), **então** a query da tool aparece em `system.query.history` com `executed_by` igual ao usuário do cliente MCP. **No plano B**, o critério passa a ser: o `user` do trace é o do cliente e `executed_by` é o service principal.
 - **Dado** a página "Uso do MCP", **então** ela mostra chamadas, erros por código e p95 por tool para o último dia com tráfego.
 
 ## 8. Fora de escopo
