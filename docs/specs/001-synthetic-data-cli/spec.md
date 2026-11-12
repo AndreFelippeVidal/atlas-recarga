@@ -47,7 +47,7 @@ Códigos de saída: `0` sucesso · `2` flag inválida · `3` arquivo de referên
 
 ## 4. Schemas
 
-**Referência (versionada no repo, dado público):** `data/reference/municipalities_ibge.csv`, com os 5.570 municípios do IBGE, população estimada e DDD. Colunas: `municipality_ibge_code, municipality_name, uf, region, population, ddd`.
+**Referência (versionada no repo, dado público):** `data/reference/municipalities_ibge.csv`, com os 5.570 municípios do Censo 2022 (Boa Esperança do Norte, MT, criado depois, fica de fora por não ter população), população do Censo 2022 e DDD. Colunas: `municipality_ibge_code, municipality_name, uf, region, population, ddd`. O `ddd` é **aproximado**: não há fonte pública por município, então cada município recebe o DDD da sua região imediata do IBGE (tabela mantida em `scripts/build_reference.py`). Serve para dados sintéticos e para separar o mapa por DDD, não como referência de telecom.
 
 **distributors**
 
