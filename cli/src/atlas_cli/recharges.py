@@ -123,6 +123,8 @@ def seasonality_weight(day: date) -> float:
 
 def daily_counts(total: int, days: Sequence[date]) -> list[int]:
     """Divide `total` entre os dias, proporcional à sazonalidade; a soma é exata."""
+    if not days:
+        raise ValueError("a janela precisa ter ao menos um dia")
     weights = np.array([seasonality_weight(d) for d in days])
     exact = weights / weights.sum() * total
     counts = np.floor(exact).astype(np.int64)

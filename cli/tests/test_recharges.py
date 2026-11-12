@@ -57,6 +57,24 @@ def test_daily_counts_sum_exactly() -> None:
     assert all(c >= 0 for c in counts)
 
 
+def test_daily_counts_ratios_match_factors() -> None:
+    days = _days(date(2026, 12, 1), date(2027, 2, 28))
+    counts = dict(zip(days, daily_counts(5_000_000, days), strict=True))
+    assert sum(counts.values()) == 5_000_000
+    # Terça sem salário: dezembro (1,25) contra fevereiro (0,92).
+    ratio_dec_feb = counts[date(2026, 12, 15)] / counts[date(2027, 2, 16)]
+    assert ratio_dec_feb == pytest.approx(1.25 / 0.92, rel=1e-3)
+    # Salário: terça dia 9 contra terça dia 16 no mesmo mês.
+    assert counts[date(2026, 12, 8)] / counts[date(2026, 12, 15)] == pytest.approx(1.18, rel=1e-3)
+    # Domingo contra segunda sem salário, em dezembro.
+    assert counts[date(2026, 12, 20)] / counts[date(2026, 12, 21)] == pytest.approx(0.70, rel=1e-3)
+
+
+def test_daily_counts_rejects_empty_window() -> None:
+    with pytest.raises(ValueError):
+        daily_counts(10, [])
+
+
 def test_seasonality_factors_multiply() -> None:
     assert seasonality_weight(date(2026, 6, 15)) == 1.0  # segunda, sem fator
     assert seasonality_weight(date(2026, 12, 7)) == pytest.approx(1.18 * 1.25)  # segunda, salário
