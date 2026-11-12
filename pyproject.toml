@@ -3,7 +3,7 @@ name = "atlas-recarga"
 version = "0.0.0"
 description = "Atlas Recarga — Databricks data & AI platform (workspace root)"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["atlas-cli"]
 
 [dependency-groups]
 dev = [
@@ -13,9 +13,12 @@ dev = [
     "ruff>=0.17.4",
 ]
 
-# Workspace members are added as packages are created (SPEC-009 §2, from P4.1).
-# [tool.uv.workspace]
-# members = ["cli"]
+# Workspace members are added as packages are created (SPEC-009 §2).
+[tool.uv.workspace]
+members = ["cli"]
+
+[tool.uv.sources]
+atlas-cli = { workspace = true }
 
 [tool.ruff]
 line-length = 100
@@ -25,13 +28,14 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # assert is the point of tests
+"tests/**" = ["S101"]
+"cli/tests/**" = ["S101"]  # assert is the point of tests
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", ".claude/hooks"]
+files = ["tests", ".claude/hooks", "cli/src", "cli/tests"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "cli/tests"]
 addopts = "-q"
