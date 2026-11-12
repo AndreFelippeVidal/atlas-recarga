@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from atlas_cli.exit_codes import ExitCode
 from atlas_cli.main import app
@@ -23,7 +25,7 @@ def test_upload_requires_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ATLAS_DATABRICKS_PROFILE", raising=False)
     result = runner.invoke(app, ["upload"])
     assert result.exit_code == 2
-    assert "--profile" in result.output
+    assert "profile" in re.sub(r"\x1b\[[0-9;]*m|[│╭╰╮─\n]", " ", result.output)
 
 
 def test_exit_codes_match_spec() -> None:
