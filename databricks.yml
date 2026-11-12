@@ -15,6 +15,7 @@ resources:
     atlas_medallion:
       name: atlas_medallion
       catalog: ${var.catalog}
+      schema: bronze  # default; os datasets das outras camadas virão qualificados (silver.x, gold.x)
       serverless: true
       channel: CURRENT
       libraries:
