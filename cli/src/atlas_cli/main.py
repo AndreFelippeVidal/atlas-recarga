@@ -1,4 +1,4 @@
-"""Entry point do `atlas-cli`: `generate` e `scenario list`; `validate` e `upload` são stubs."""
+"""Entry point do `atlas-cli`: `generate`, `validate` e `scenario list`; `upload` é stub."""
 
 import re
 from datetime import date
@@ -13,6 +13,7 @@ from atlas_cli.generate_io import OutputFormat
 from atlas_cli.recharges import NoActivePosError
 from atlas_cli.reference import ReferenceError, load_municipalities
 from atlas_cli.scenarios import catalog, parse_scenarios
+from atlas_cli.validate import ValidateError, validate_directory
 
 app = typer.Typer(
     name="atlas-cli",
@@ -107,9 +108,26 @@ def upload() -> None:
 
 
 @app.command()
-def validate() -> None:
+def validate(
+    out: Annotated[Path, typer.Option("--out", help="Diretório gerado por `generate`.")] = Path(
+        "./data/generated"
+    ),
+) -> None:
     """Confere os invariantes da SPEC-001 §6 sobre um diretório gerado."""
-    _not_implemented("validate")
+    try:
+        municipalities = load_municipalities()
+    except ReferenceError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(ExitCode.REFERENCE_DATA_INVALID) from exc
+    try:
+        checks = validate_directory(out, municipalities)
+    except ValidateError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--out") from exc
+    for check in checks:
+        suffix = f": {check.detail}" if check.detail else ""
+        typer.echo(f"[{check.status}] {check.name}{suffix}")
+    if any(check.failed for check in checks):
+        raise typer.Exit(ExitCode.VALIDATION_FAILED)
 
 
 @scenario_app.command("list")

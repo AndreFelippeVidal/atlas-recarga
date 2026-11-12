@@ -5,6 +5,7 @@ from enum import IntEnum
 
 class ExitCode(IntEnum):
     OK = 0
+    VALIDATION_FAILED = 1  # `validate` achou um invariante violado
     INVALID_FLAG = 2
     REFERENCE_DATA_INVALID = 3  # referência IBGE ausente ou inválida
     UPLOAD_FAILED = 4
