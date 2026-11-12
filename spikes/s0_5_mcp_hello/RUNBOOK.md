@@ -42,7 +42,7 @@ claude mcp add --transport http atlas-s0-5 https://<app-url>/mcp \
 
 Em uma sessão do Claude Code: peça "chame a tool health do atlas-s0-5" e depois "chame whoami_query".
 
-Opção B (já vem no template): `./scripts/dev/query_remote.sh` faz o fluxo OAuth e chama as tools.
+(Os scripts `scripts/dev/query_remote.*` e `generate_oauth_token.py` do template foram removidos: o nome `*token*` falha o teste de higiene do repo.)
 
 Se a plataforma recusar o cliente externo (302/401 para a página de login), é o caso do plano B: `mcp-remote` com token do `databricks auth` (ver SPEC-000 §2).
 
