@@ -47,3 +47,9 @@ GROUP BY order_status;
 -- Consistência com SQL direto
 SELECT o_orderstatus, SUM(o_totalprice), COUNT(1), SUM(o_totalprice)/COUNT(1)
 FROM samples.tpch.orders GROUP BY o_orderstatus;
+
+-- Comparação das 3 maiores receitas mensais de 1995 (pergunta feita ao Genie)
+SELECT DATE_TRUNC('MONTH', o_orderdate) AS m, SUM(o_totalprice) AS r
+FROM samples.tpch.orders
+WHERE o_orderdate >= '1995-01-01' AND o_orderdate < '1996-01-01'
+GROUP BY 1 ORDER BY 2 DESC LIMIT 3;

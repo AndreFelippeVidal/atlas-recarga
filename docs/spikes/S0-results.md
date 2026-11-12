@@ -178,8 +178,8 @@ Manter o production monitoring com scorer de código como caminho preferencial (
 | O | 548923692869.55 | 3654310 | 150212.678417963993 |
 | P | 35333603011.43 | 191189 | 184809.811293693675 |
 
-- Genie Space criado por `databricks genie create-space` (`serialized_space` v2) com **só a metric view** como fonte. O space guarda a view em `data_sources.tables`.
-- Conversation API (`start-conversation`), 2 perguntas em PT-BR, ambas `COMPLETED`:
+- Genie Space criado por `databricks genie create-space` (`serialized_space` v2) com **só a metric view** como fonte. O JSON enviado declara a view em `data_sources.metric_views`, mas o `serialized_space` devolvido pelo `create-space` a lista em `data_sources.tables` (a API normaliza); a P7.5 deve reler o space com `get-space --include-serialized-space` antes de versionar o JSON.
+- Conversation API (`start-conversation`), 2 perguntas em PT-BR, ambas `COMPLETED` (as outras 2 perguntas de exemplo do JSON não foram testadas; os `conversation_id` não foram guardados, então a evidência é o texto abaixo e a query de comparação em `spikes/s0_4_metric_view.sql`):
   - "Qual o ticket médio por status do pedido?" → `MEASURE(avg_ticket) … GROUP BY ALL` sobre `mv_orders`; valores iguais aos da tabela acima. O Genie mapeou "ticket médio" pelo `synonyms`.
   - "Qual a receita bruta total por mês em 1995, os 3 maiores?" → `MEASURE(gross_revenue)` com `RANK()`; jan/1995 14.690.432.880,22, jul 14.581.176.323,30 e mar 14.574.503.669,87, iguais ao SQL direto.
 
