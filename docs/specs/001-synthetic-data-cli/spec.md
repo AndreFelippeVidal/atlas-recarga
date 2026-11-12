@@ -80,7 +80,7 @@ Códigos de saída: `0` sucesso · `2` flag inválida · `3` arquivo de referên
 | `subscriber_id` | STRING | Hash sintético (`SUB-` + 10 hex). **Nunca** um número de telefone com formato real |
 | `amount_brl` | DECIMAL(10,2) | Valores de face {10, 15, 20, 25, 30, 40, 50, 100} com pesos {22, 18, 20, 10, 12, 6, 9, 3}% |
 | `status` | STRING | `approved` 98,5% · `reversed` 1,5% |
-| `ingested_at_utc` | TIMESTAMP | Instante da geração do arquivo |
+| `ingested_at_utc` | TIMESTAMP | Determinístico (invariante 1): 06:00 de `America/Sao_Paulo` do dia seguinte ao `dt=` da partição (09:00 UTC), o horário do job `atlas_daily`. Não é o relógio da máquina |
 
 **Fuso e hora local.** `recharge_ts_utc` é o instante real em UTC. A curva intradiária é aplicada na **hora local do município do PDV**, e o fuso vem da UF (mapa fixo em código, sem exceções por município no MVP): AC em UTC−5; AM, RO, RR, MT e MS em UTC−4; as demais UFs em UTC−3 (horário de Brasília). A partição `dt=YYYY-MM-DD` usa o dia em `America/Sao_Paulo`, igual ao `recharge_date` do silver. Assim, uma recarga das 22h no AC (03h UTC do dia seguinte, 00h em São Paulo) cai na partição do dia seguinte. A hora local alimenta a análise de horários de pico (SPEC-002 e SPEC-004).
 
