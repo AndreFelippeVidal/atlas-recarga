@@ -53,3 +53,7 @@ SELECT DATE_TRUNC('MONTH', o_orderdate) AS m, SUM(o_totalprice) AS r
 FROM samples.tpch.orders
 WHERE o_orderdate >= '1995-01-01' AND o_orderdate < '1996-01-01'
 GROUP BY 1 ORDER BY 2 DESC LIMIT 3;
+
+-- Limpeza (mantenedor, depois da revisão do PR):
+-- DROP SCHEMA workspace.atlas_spike_s0_4 CASCADE;
+-- databricks genie trash-space 01f1dea09d7d1c7ebd204024f1350b36

@@ -31,4 +31,4 @@ A dor central da Helena: "cada área calcula a receita de um jeito". Cinco consu
 - **Plano B (S0.4 falhar):** views SQL por granularidade com `COMMENT` detalhado, Genie sobre o gold e o golden set ampliado.
 
 ## Validação (Spike S0.4, 2026-11-12)
-Metric view com `MEASURE()` e Genie sobre ela funcionam na Free Edition, e as respostas batem com o SQL direto, inclusive a medida composta `avg_ticket`. O plano B não foi acionado. Cuidado ao automatizar: o `aitools query` remove a indentação do YAML, então o deploy usa a SQL Statement API ou um `sql_task`. Detalhes em [S0-results](../spikes/S0-results.md).
+Metric view com `MEASURE()` e Genie sobre ela funcionam na Free Edition, e as respostas batem com o SQL direto, inclusive a medida composta `avg_ticket`. O plano B não foi acionado. Cuidado ao automatizar: o `aitools query` remove a indentação do YAML, então o deploy usa a SQL Statement API ou um `sql_task`. Detalhes em [S0-results](../spikes/S0-results.md). Escopo: o spike usou uma tabela de exemplo (`samples.tpch.orders`); grants por schema (P7.3), recusa fora do escopo e o space com 10 exemplos (P7.5) seguem como validação dessas tasks.
