@@ -3,7 +3,12 @@ name = "atlas-cli"
 version = "0.1.0"
 description = "Atlas Recarga: gerador de dados sintéticos (SPEC-001)"
 requires-python = ">=3.12"
-dependencies = ["typer>=0.15"]
+dependencies = [
+    "typer>=0.15",
+    "numpy>=2.0",
+    "pyarrow>=18.0",
+    "faker>=30.0",
+]
 
 [project.scripts]
 atlas-cli = "atlas_cli.main:app"

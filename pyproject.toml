@@ -36,6 +36,10 @@ python_version = "3.12"
 strict = true
 files = ["tests", ".claude/hooks", "cli/src", "cli/tests"]
 
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*"]
+ignore_missing_imports = true  # pyarrow não publica stubs
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "cli/tests"]
 addopts = "-q"
