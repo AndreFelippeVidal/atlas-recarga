@@ -69,7 +69,7 @@ _Confirmar na Free Edition os recursos em Beta antes de depender deles._
 - [x] **P3.3** 🤝 S0.3 Production monitoring MLflow 3 — _pronto quando:_ Idem; ADR-0013 (#16) — passou: scorer de código agendado anexou feedback aos traces; plano B validado · depende de P2.2
 - [x] **P3.4** 🤝 S0.4 Metric views + Genie — _pronto quando:_ Idem; ADR-0005 (#17) — passou: `MEASURE()` e Genie sobre a metric view funcionam; plano B não acionado · depende de P2.2
 - [x] **P3.5** 🤝 S0.5 OAuth de cliente externo num App MCP — _pronto quando:_ Idem; ADR-0008 (#18) — passou com ressalva: token de usuário no cabeçalho, OAuth interativo nativo não testado; Claude Code chamou o App FastMCP e a query rodou como o usuário (OBO) · depende de P2.2
-- [ ] **P3.6** 👤 S0.6 Múltiplos usuários — _pronto quando:_ Idem; ADR-0010 · depende de P2.2
+- [x] **P3.6** 👤 S0.6 Múltiplos usuários — _pronto quando:_ Idem; ADR-0010 (#19) — passou: segundo usuário entrou no grupo `users` e pode ser adicionado a `atlas_readers`; `ALLOW_SAME_APPROVER_DEMO` só como contingência · depende de P2.2
 - [ ] **P3.7** 🤝 S0.7 Cotas práticas (rodar depois de P4.6) — _pronto quando:_ Idem; ADR-0001 · depende de P4.6
 - [ ] **P3.8** 🤖 Ajustar as specs afetadas pelos planos B — _pronto quando:_ PR único com os ajustes; a Fase 3 é fechada · depende de P3.1, P3.2, P3.3, P3.4, P3.5, P3.6
 

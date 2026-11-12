@@ -29,6 +29,6 @@ O pagamento de comissão é **a etapa irreversível do produto**. Pagamento feit
 ## Consequências
 - **Positivas:** a métrica "100% dos lotes com 2 aprovadores distintos" é auditável por SQL.
 - **Negativas aceitas:** o fechamento leva até 1h (e não minutos) por causa da revisão humana; é o custo da segurança. As faixas ficam **hardcoded e versionadas no código**, e mudança de faixa exige PR com revisão obrigatória (CODEOWNERS).
-- **Na Free Edition:** se houver só um usuário (S0.6), o modo `ALLOW_SAME_APPROVER_DEMO` é explícito, auditado e marcado no lote. Nunca é o padrão.
+- **Na Free Edition:** o S0.6 (2026-11-12) confirmou que há um segundo usuário e grupos `atlas_*` atribuíveis, então as 2 aprovações usam identidades distintas. `ALLOW_SAME_APPROVER_DEMO` fica só como contingência explícita, auditada e marcada no lote. Nunca é o padrão.
 - **Fronteira para agentes:** nenhum agente (de produto ou de código) executa `atlas_commission_review`. Ver ADR-0012.
 - **Revisitar se:** surgir uma UI de aprovação (v2) ou o volume de lotes justificar aprovação por amostragem.

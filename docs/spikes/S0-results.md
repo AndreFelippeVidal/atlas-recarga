@@ -241,3 +241,34 @@ ADR-0005 mantido como `aceito`, com a nota do S0.4. Os objetos do spike (`worksp
 ### Decisão
 
 ADR-0008 mantido como `aceito`, com a nota do S0.5. O ajuste do texto da SPEC-006 §5/§6/§7 (de "a ser confirmado" para "confirmado") fica para a P3.8. O App `atlas-s0-5-mcp` deve ser removido pelo mantenedor depois da revisão (libera o slot para as P10.2, P11.1 e P12.8).
+
+## S0.6 — Múltiplos usuários
+
+- **Data:** 2026-11-12
+- **ADR:** [0010](../adr/0010-commission-human-in-the-loop.md)
+- **Notebook:** nenhum (verificação na UI do workspace)
+
+### Execução (2026-11-12)
+
+- Segundo usuário convidado para o workspace Free Edition. Ele aceitou o convite e entrou.
+- Ao entrar, o usuário já ficou **direto no grupo `users`** (grupo padrão do workspace), sem atribuição manual.
+- Criado o grupo `atlas_readers` e confirmado que o novo usuário pode ser adicionado a ele.
+- Não colar e-mail ou nome do segundo usuário nas evidências.
+- Não criados ainda: `atlas_commission_*`. O mecanismo é o mesmo do `atlas_readers`; a criação por bundle fica na P5.2.
+
+### Checklist
+
+| Verificação | Resultado | Evidência |
+|---|---|---|
+| O workspace aceita um segundo usuário | ✅ sim, ele entrou | captura da lista de usuários (não versionada) |
+| O usuário recebe um grupo | ✅ `users` (padrão) | captura do usuário/grupo (não versionada) |
+| É possível criar um grupo `atlas_*` e adicionar o usuário | ✅ `atlas_readers` | captura do grupo (não versionada) |
+| Existem 2 identidades distintas para as 2 aprovações da comissão | ✅ sim | idem |
+
+### Resultado
+
+**Passou:** a Free Edition aceita um segundo usuário, que entra, recebe um grupo e pode ser adicionado a um grupo `atlas_*` criado por nós.
+
+### Decisão
+
+O modo `ALLOW_SAME_APPROVER_DEMO` **não é necessário como padrão**: há duas identidades distintas e grupos próprios atribuíveis. Ele permanece só como contingência explícita, auditada e marcada no lote, nunca como padrão. ADR-0010 atualizado; nenhum ajuste de spec por causa do S0.6 na P3.8.
