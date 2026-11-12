@@ -85,7 +85,7 @@ _`atlas-cli` gera o dataset determinístico com cenários e o envia ao Volume._
 - [x] **P4.6** 🤖 Cenários da SPEC-001 §5 + `_manifest.json` com contagens e sha256 — _pronto quando:_ Os testes leem o manifest e conferem cada contagem (#26) · depende de P4.5
 - [x] **P4.7** 🤖 `validate` + teste de determinismo (seed igual = sha igual) — _pronto quando:_ Critério 1 da SPEC-001 §7 (#28) · depende de P4.6
 - [x] **P4.8** 🤖 `--incremental-day` — _pronto quando:_ Critério 3 da SPEC-001 §7 (#29) · depende de P4.7
-- [ ] **P4.9** 🤝 `upload` idempotente para `/Volumes/atlas/raw/landing/` — _pronto quando:_ Critério 5 da SPEC-001 §7 (o agente implementa; você roda contra o workspace) · depende de P4.8, P5.2
+- [x] **P4.9** 🤝 `upload` idempotente para `/Volumes/atlas/raw/landing/` — _pronto quando:_ Critério 5 da SPEC-001 §7 (o agente implementa; você roda contra o workspace) (#32) · depende de P4.8, P5.2
 
 ## Fase 5 — Bundle e catálogo como código → [002-medallion-pipeline](002-medallion-pipeline/spec.md)
 
