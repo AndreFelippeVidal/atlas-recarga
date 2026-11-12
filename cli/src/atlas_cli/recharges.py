@@ -6,7 +6,7 @@ A curva intradiária é sorteada na hora local do município do PDV e convertida
 """
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -100,10 +100,51 @@ def subscriber_pool(seed: int) -> NDArray[np.object_]:
     return np.array([f"SUB-{int(v):010x}" for v in low40], dtype=object)
 
 
-def daily_counts(total: int, days: int) -> list[int]:
-    """Divide `total` entre os dias (uniforme na P4.4; a sazonalidade entra na P4.5)."""
-    base, extra = divmod(total, days)
-    return [base + (1 if i < extra else 0) for i in range(days)]
+SALARY_DAYS = range(5, 11)  # dia 5 a 10 (calendário de São Paulo)
+# Fatores em centésimos (inteiros): a divisão dos dias não depende de ponto flutuante.
+SALARY_FACTOR_PCT = 118
+DECEMBER_FACTOR_PCT = 125
+FEBRUARY_FACTOR_PCT = 92
+SUNDAY_FACTOR_PCT = 70
+_PCT_SCALE = 100**3  # no máximo 3 fatores por dia (salário, mês, domingo)
+
+
+def _seasonality_int(day: date) -> int:
+    """Peso inteiro do dia, na escala `_PCT_SCALE`; os fatores se multiplicam."""
+    weight, factors = 1, 0
+    for applies, pct in (
+        (day.day in SALARY_DAYS, SALARY_FACTOR_PCT),
+        (day.month == 12, DECEMBER_FACTOR_PCT),
+        (day.month == 2, FEBRUARY_FACTOR_PCT),
+        (day.weekday() == 6, SUNDAY_FACTOR_PCT),
+    ):
+        if applies:
+            weight *= pct
+            factors += 1
+    return weight * int(100 ** (3 - factors))
+
+
+def seasonality_weight(day: date) -> float:
+    """Fator de sazonalidade do dia (SPEC-001 §4), relativo a um dia comum."""
+    return _seasonality_int(day) / _PCT_SCALE
+
+
+def daily_counts(total: int, days: Sequence[date]) -> list[int]:
+    """Divide `total` entre os dias, proporcional à sazonalidade; a soma é exata.
+
+    Aritmética inteira (maior resto, desempate pelo dia mais cedo): o resultado é idêntico
+    em qualquer plataforma, requisito do invariante 1.
+    """
+    if not days:
+        raise ValueError("a janela precisa ter ao menos um dia")
+    weights = [_seasonality_int(d) for d in days]
+    whole = sum(weights)
+    counts = [total * w // whole for w in weights]
+    remainders = [total * w % whole for w in weights]
+    missing = total - sum(counts)
+    for i in sorted(range(len(days)), key=lambda i: (-remainders[i], i))[:missing]:
+        counts[i] += 1
+    return counts
 
 
 def _decimal_cents(cents: NDArray[np.int64]) -> pa.Array:
@@ -227,7 +268,7 @@ def write_recharges(
     book = build_pos_book(seed, pos, municipalities)
     subscribers = subscriber_pool(seed)
     total = 0
-    for day, count in zip(days, daily_counts(rows, len(days)), strict=True):
+    for day, count in zip(days, daily_counts(rows, days), strict=True):
         table = generate_recharge_day(seed, day, count, book, subscribers)
         write_table(table, out / "recharges" / f"dt={day.isoformat()}" / "part-0000", fmt)
         total += table.num_rows
