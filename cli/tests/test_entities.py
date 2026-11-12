@@ -132,12 +132,23 @@ def _sha_tree(root: Path) -> dict[str, str]:
 
 def test_generate_same_seed_same_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(REFERENCE_ENV, str(REFERENCE))
-    args = ["generate", "--end-month", "2026-11", "--pos", "500", "--distributors", "30"]
+    args = [
+        "generate",
+        "--rows",
+        "1000",
+        "--end-month",
+        "2026-11",
+        "--pos",
+        "500",
+        "--distributors",
+        "30",
+    ]
     a, b = tmp_path / "a", tmp_path / "b"
     assert runner.invoke(app, [*args, "--out", str(a)]).exit_code == 0
     assert runner.invoke(app, [*args, "--out", str(b)]).exit_code == 0
     assert _sha_tree(a) == _sha_tree(b)
-    assert set(_sha_tree(a)) == {"distributors/distributors.parquet", "pos/pos.parquet"}
+    entity_files = {"distributors/distributors.parquet", "pos/pos.parquet"}
+    assert entity_files <= set(_sha_tree(a))
     c = tmp_path / "c"
     assert runner.invoke(app, [*args, "--seed", "7", "--out", str(c)]).exit_code == 0
     assert _sha_tree(a) != _sha_tree(c)
@@ -146,7 +157,18 @@ def test_generate_same_seed_same_bytes(tmp_path: Path, monkeypatch: pytest.Monke
 def test_generate_csv_format(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(REFERENCE_ENV, str(REFERENCE))
     result = runner.invoke(
-        app, ["generate", "--end-month", "2026-11", "--format", "csv", "--out", str(tmp_path)]
+        app,
+        [
+            "generate",
+            "--rows",
+            "1000",
+            "--end-month",
+            "2026-11",
+            "--format",
+            "csv",
+            "--out",
+            str(tmp_path),
+        ],
     )
     assert result.exit_code == 0
     assert (tmp_path / "pos" / "pos.csv").is_file()

@@ -45,3 +45,11 @@ UF_NEIGHBORS: dict[str, tuple[str, ...]] = _symmetrize(_BORDERS)
 
 # Peso de pré-pago por região (SPEC-001 §4, coluna `municipality_ibge_code`).
 REGION_PREPAID_WEIGHT: dict[str, float] = {"N": 1.4, "NE": 1.3, "CO": 1.0, "SE": 0.9, "S": 0.8}
+
+# Fuso local por UF, em horas em relação ao UTC (SPEC-001 §4, "Fuso e hora local").
+# Sem exceções por município no MVP: AC UTC-5; AM, RO, RR, MT e MS UTC-4; o resto UTC-3.
+_UTC_MINUS_5 = ("AC",)
+_UTC_MINUS_4 = ("AM", "RO", "RR", "MT", "MS")
+UF_UTC_OFFSET_HOURS: dict[str, int] = {
+    uf: -5 if uf in _UTC_MINUS_5 else -4 if uf in _UTC_MINUS_4 else -3 for uf in UF_NEIGHBORS
+}
