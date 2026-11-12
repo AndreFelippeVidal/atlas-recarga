@@ -14,10 +14,20 @@ No workspace, em **Compute → Apps → atlas-s0-5-mcp → Edit**:
 - **User authorization (OBO):** habilite com o escopo `sql`.
 
 ```bash
+# IMPORTANTE: o sync tem de partir da pasta do spike, senão sobe o repo inteiro
+# e o App não acha o app.yaml (erro "No command to run").
+cd spikes/s0_5_mcp_hello
 databricks sync . /Workspace/Users/<seu-email>/atlas-s0-5-mcp --profile andrevidal
+databricks workspace list /Workspace/Users/<seu-email>/atlas-s0-5-mcp --profile andrevidal  # deve listar app.yaml e server/
 databricks apps deploy atlas-s0-5-mcp --profile andrevidal \
   --source-code-path /Workspace/Users/<seu-email>/atlas-s0-5-mcp
 databricks apps get atlas-s0-5-mcp --profile andrevidal   # anote a url
+```
+
+Se você já sincronizou a partir da raiz do repo, apague a pasta errada antes (o `sync` não remove o que ficou de fora):
+
+```bash
+databricks workspace delete /Workspace/Users/<seu-email>/atlas-s0-5-mcp --recursive --profile andrevidal
 ```
 
 ## 2. Teste do cliente externo
