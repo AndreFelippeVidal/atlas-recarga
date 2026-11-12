@@ -12,6 +12,7 @@ from atlas_cli.main import app
 from atlas_cli.recharges import (
     FACE_VALUES,
     FACE_WEIGHTS,
+    SALARY_DAYS,
     daily_counts,
     seasonality_weight,
     subscriber_pool,
@@ -91,7 +92,7 @@ def test_salary_days_have_above_average_volume(generated: Path) -> None:
         day = date.fromisoformat(iso)
         if day.weekday() == 6:
             continue  # domingo é outro efeito
-        (salary if day.day in range(5, 11) else others).append(n)
+        (salary if day.day in SALARY_DAYS else others).append(n)
     mean_salary = sum(salary) / len(salary)
     mean_others = sum(others) / len(others)
     assert mean_salary > mean_others * 1.10  # esperado ~ +18%

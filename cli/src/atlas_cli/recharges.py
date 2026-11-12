@@ -101,38 +101,50 @@ def subscriber_pool(seed: int) -> NDArray[np.object_]:
 
 
 SALARY_DAYS = range(5, 11)  # dia 5 a 10 (calendário de São Paulo)
-SALARY_FACTOR = 1.18
-DECEMBER_FACTOR = 1.25
-FEBRUARY_FACTOR = 0.92
-SUNDAY_FACTOR = 0.70
+# Fatores em centésimos (inteiros): a divisão dos dias não depende de ponto flutuante.
+SALARY_FACTOR_PCT = 118
+DECEMBER_FACTOR_PCT = 125
+FEBRUARY_FACTOR_PCT = 92
+SUNDAY_FACTOR_PCT = 70
+_PCT_SCALE = 100**3  # no máximo 3 fatores por dia (salário, mês, domingo)
+
+
+def _seasonality_int(day: date) -> int:
+    """Peso inteiro do dia, na escala `_PCT_SCALE`; os fatores se multiplicam."""
+    weight, factors = 1, 0
+    for applies, pct in (
+        (day.day in SALARY_DAYS, SALARY_FACTOR_PCT),
+        (day.month == 12, DECEMBER_FACTOR_PCT),
+        (day.month == 2, FEBRUARY_FACTOR_PCT),
+        (day.weekday() == 6, SUNDAY_FACTOR_PCT),
+    ):
+        if applies:
+            weight *= pct
+            factors += 1
+    return weight * int(100 ** (3 - factors))
 
 
 def seasonality_weight(day: date) -> float:
-    """Fator de sazonalidade do dia (SPEC-001 §4); os fatores se multiplicam."""
-    weight = 1.0
-    if day.day in SALARY_DAYS:
-        weight *= SALARY_FACTOR
-    if day.month == 12:
-        weight *= DECEMBER_FACTOR
-    elif day.month == 2:
-        weight *= FEBRUARY_FACTOR
-    if day.weekday() == 6:
-        weight *= SUNDAY_FACTOR
-    return weight
+    """Fator de sazonalidade do dia (SPEC-001 §4), relativo a um dia comum."""
+    return _seasonality_int(day) / _PCT_SCALE
 
 
 def daily_counts(total: int, days: Sequence[date]) -> list[int]:
-    """Divide `total` entre os dias, proporcional à sazonalidade; a soma é exata."""
+    """Divide `total` entre os dias, proporcional à sazonalidade; a soma é exata.
+
+    Aritmética inteira (maior resto, desempate pelo dia mais cedo): o resultado é idêntico
+    em qualquer plataforma, requisito do invariante 1.
+    """
     if not days:
         raise ValueError("a janela precisa ter ao menos um dia")
-    weights = np.array([seasonality_weight(d) for d in days])
-    exact = weights / weights.sum() * total
-    counts = np.floor(exact).astype(np.int64)
-    # Maior resto: os dias com maior parte fracionária recebem as unidades que faltam.
-    missing = total - int(counts.sum())
-    order = np.argsort(-(exact - counts), kind="stable")
-    counts[order[:missing]] += 1
-    return [int(c) for c in counts]
+    weights = [_seasonality_int(d) for d in days]
+    whole = sum(weights)
+    counts = [total * w // whole for w in weights]
+    remainders = [total * w % whole for w in weights]
+    missing = total - sum(counts)
+    for i in sorted(range(len(days)), key=lambda i: (-remainders[i], i))[:missing]:
+        counts[i] += 1
+    return counts
 
 
 def _decimal_cents(cents: NDArray[np.int64]) -> pa.Array:
