@@ -207,8 +207,10 @@ def test_manifest_sha256_matches_files(all_run: tuple[Path, dict[str, Any]]) -> 
     files = manifest["files"]
     assert "distributors/distributors.parquet" in files
     assert "pos/pos.parquet" in files
-    on_disk = {p.relative_to(out).as_posix() for p in out.rglob("*.parquet")}
-    assert set(files) == on_disk
+    assert "municipalities/municipalities.csv" in files
+    assert manifest["counts"]["municipalities"] == 5570
+    on_disk = {p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file()}
+    assert set(files) == on_disk - {"_manifest.json"}
     for name, entry in files.items():
         assert entry["sha256"] == sha256_file(out / name)
 
