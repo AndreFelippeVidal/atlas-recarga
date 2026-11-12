@@ -126,7 +126,9 @@ def _check_counts(
 
 def _inv2_clean(manifest: dict[str, Any], tables: dict[str, pa.Table]) -> Check:
     name = "invariante 2: sem nulos, duplicados, FKs órfãs nem valores fora da face"
-    if manifest["flags"].get("scenarios"):
+    if manifest["flags"].get("scenarios") or any(
+        day.get("scenarios_enabled") for day in manifest.get("incremental", {}).values()
+    ):
         return _skip(name, "só vale com --scenarios none")
     problems: list[str] = []
     for entity, table in tables.items():
@@ -188,6 +190,9 @@ def _inv4_ufs(manifest: dict[str, Any], pos: pa.Table, municipalities: Municipal
 
 def _inv5_total(manifest: dict[str, Any], recharges: pa.Table) -> Check:
     name = "invariante 5: total de recargas dentro de ±1% de --rows"
+    if manifest.get("incremental"):
+        days = ", ".join(sorted(manifest["incremental"]))
+        return _skip(name, f"há partição incremental ({days}); o total deixa de seguir --rows")
     wanted = manifest["flags"]["rows"]
     gap = abs(recharges.num_rows - wanted) / wanted
     detail = f"{recharges.num_rows} de {wanted} ({gap:.2%})"

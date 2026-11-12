@@ -57,6 +57,10 @@
 
 - **Depende de:** P4.7
 - **Pronto quando:** Critério 3 da SPEC-001 §7
+- **Passos:**
+  - ler `pos/pos` e o manifest do `--out`; exigir mesma seed e formato (código `2` se faltar)
+  - volume do dia = `--rows` pela sazonalidade da janela do manifest; gravar só `dt=<dia>/part-0000`
+  - atualizar o manifest e fazer o `validate` pular os invariantes 2 e 5 quando couber
 
 ### P4.9 🤝 `upload` idempotente para `/Volumes/atlas/raw/landing/`
 

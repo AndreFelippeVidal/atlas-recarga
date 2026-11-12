@@ -10,8 +10,9 @@ import typer
 from atlas_cli.exit_codes import ExitCode
 from atlas_cli.generate import generate_reference_entities
 from atlas_cli.generate_io import OutputFormat
+from atlas_cli.incremental import IncrementalError, generate_incremental_day
 from atlas_cli.recharges import NoActivePosError
-from atlas_cli.reference import ReferenceError, load_municipalities
+from atlas_cli.reference import Municipalities, ReferenceError, load_municipalities
 from atlas_cli.scenarios import catalog, parse_scenarios
 from atlas_cli.validate import ValidateError, validate_directory
 
@@ -40,8 +41,20 @@ def _parse_end_month(value: str | None) -> date:
     return date(int(value[:4]), int(value[5:]), 1)
 
 
+def _parse_incremental_day(value: str) -> date:
+    try:
+        return date.fromisoformat(value) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) else _bad()
+    except ValueError:
+        return _bad()
+
+
+def _bad() -> NoReturn:
+    raise typer.BadParameter("use uma data válida YYYY-MM-DD", param_hint="--incremental-day")
+
+
 @app.command()
 def generate(
+    ctx: typer.Context,
     rows: Annotated[
         int,
         typer.Option("--rows", min=1_000, max=10_000_000, help="Total aproximado de recargas."),
@@ -68,6 +81,13 @@ def generate(
         "./data/generated"
     ),
     fmt: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.PARQUET,
+    incremental_day: Annotated[
+        str | None,
+        typer.Option(
+            "--incremental-day",
+            help="YYYY-MM-DD; gera só as recargas desse dia, sobre os PDVs já gerados em --out.",
+        ),
+    ] = None,
 ) -> None:
     """Gera as entidades em arquivos locais (distributors, pos e recharges)."""
     end = _parse_end_month(end_month)
@@ -80,6 +100,9 @@ def generate(
     except ReferenceError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(ExitCode.REFERENCE_DATA_INVALID) from exc
+    if incremental_day is not None:
+        _run_incremental(ctx, incremental_day, out, seed, rows, fmt, municipalities, chosen)
+        return
     try:
         result = generate_reference_entities(
             out=out,
@@ -98,6 +121,42 @@ def generate(
     for path in result.entity_files:
         typer.echo(str(path))
     typer.echo(f"{out / 'recharges'}: {result.rows} recargas em {result.partitions} partições")
+    typer.echo(str(result.manifest))
+
+
+def _run_incremental(
+    ctx: typer.Context,
+    value: str,
+    out: Path,
+    seed: int,
+    rows: int,
+    fmt: OutputFormat,
+    municipalities: Municipalities,
+    scenarios: tuple[str, ...],
+) -> None:
+    day = _parse_incremental_day(value)
+    ignored = [
+        f"--{name.replace('_', '-')}"
+        for name in ("months", "end_month", "pos", "distributors")
+        if (source := ctx.get_parameter_source(name)) is not None and source.name == "COMMANDLINE"
+    ]
+    if ignored:
+        typer.echo(f"aviso: {', '.join(ignored)} ignorado(s) com --incremental-day.", err=True)
+    try:
+        result = generate_incremental_day(
+            out=out,
+            day=day,
+            seed=seed,
+            rows=rows,
+            fmt=fmt,
+            municipalities=municipalities,
+            scenarios=scenarios,
+        )
+    except (IncrementalError, NoActivePosError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(ExitCode.INVALID_FLAG) from exc
+    verb = "substituída" if result.replaced else "criada"
+    typer.echo(f"{out / 'recharges'}: partição dt={day.isoformat()} {verb}, {result.rows} recargas")
     typer.echo(str(result.manifest))
 
 
