@@ -9,8 +9,8 @@ grupos `atlas_readers`, `atlas_commission_analysts` e `atlas_commission_director
 é o mantenedor; use `--dry-run` primeiro:
 
 ```bash
-uv run python scripts/setup_workspace.py --target dev --profile andrevidal --dry-run
-uv run python scripts/setup_workspace.py --target dev --profile andrevidal
+uv run python scripts/setup_workspace.py --target dev --profile <perfil> --dry-run
+uv run python scripts/setup_workspace.py --target dev --profile <perfil>
 ```
 
 `dev` usa o catálogo `atlas_dev` e `demo` usa `atlas`, como no `databricks.yml`. Os grants ficam

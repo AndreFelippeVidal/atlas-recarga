@@ -37,6 +37,7 @@ SCHEMAS = (
 VOLUME_SCHEMA = "raw"
 VOLUME_NAME = "landing"
 GROUPS = ("atlas_readers", "atlas_commission_analysts", "atlas_commission_directors")
+MAX_POLLS = 90  # ~3 min at 2 s; a stuck statement fails instead of hanging
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -76,10 +77,12 @@ def _pick_warehouse(profile: str, warehouse_id: str | None) -> str:
 def _run_sql(profile: str, warehouse_id: str, statement: str) -> None:
     body = {"warehouse_id": warehouse_id, "statement": statement, "wait_timeout": "50s"}
     response = _cli(profile, ["api", "post", "/api/2.0/sql/statements"], body)
-    while isinstance(response, dict) and response.get("status", {}).get("state") in (
-        "PENDING",
-        "RUNNING",
-    ):
+    for _ in range(MAX_POLLS):
+        if not (
+            isinstance(response, dict)
+            and response.get("status", {}).get("state") in ("PENDING", "RUNNING")
+        ):
+            break
         time.sleep(2)
         response = _cli(
             profile, ["api", "get", f"/api/2.0/sql/statements/{response['statement_id']}"]
@@ -95,7 +98,12 @@ def _ensure_groups(profile: str) -> list[str]:
     created = []
     for group in GROUPS:
         if group not in names:
-            _cli(profile, ["groups", "create"], {"displayName": group})
+            try:
+                _cli(profile, ["groups", "create"], {"displayName": group})
+            except RuntimeError as error:
+                if "already exists" not in str(error).lower():  # list is paginated: tolerate it
+                    raise
+                continue
             created.append(group)
     return created
 

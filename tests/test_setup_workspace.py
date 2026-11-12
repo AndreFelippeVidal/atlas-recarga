@@ -68,3 +68,31 @@ def test_dry_run_changes_nothing(capsys: pytest.CaptureFixture[str]) -> None:
     out = capsys.readouterr().out
     assert "CREATE CATALOG IF NOT EXISTS atlas_dev;" in out
     assert "atlas_readers" in out
+
+
+def test_ensure_groups_creates_only_missing_and_tolerates_already_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_cli(profile: str, args: list[str], body: object = None) -> object:
+        if args[:2] == ["groups", "list"]:
+            return [{"displayName": "atlas_readers"}]
+        assert isinstance(body, dict)
+        name = str(body["displayName"])
+        calls.append(name)
+        if name == "atlas_commission_directors":
+            raise RuntimeError("Group with name atlas_commission_directors already exists")
+        return {}
+
+    monkeypatch.setattr(setup, "_cli", fake_cli)
+    assert setup._ensure_groups("p") == ["atlas_commission_analysts"]
+    assert "atlas_readers" not in calls
+
+
+def test_run_sql_gives_up_on_a_stuck_statement(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(setup, "_cli", lambda *a, **k: {"status": {"state": "RUNNING"},
+                                                        "statement_id": "s"})  # fmt: skip
+    monkeypatch.setattr(setup.time, "sleep", lambda _s: None)
+    with pytest.raises(RuntimeError):
+        setup._run_sql("p", "w", "SELECT 1")
