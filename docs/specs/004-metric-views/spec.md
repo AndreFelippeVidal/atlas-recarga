@@ -18,6 +18,7 @@ Metric views via `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML AS $$ ..
 |---|---|---|
 | `recharge_date` | `recharge_date` | data, dia |
 | `recharge_month` | `DATE_TRUNC('MONTH', recharge_date)` | mês |
+| `recharge_hour_local` | `recharge_hour_local` | hora, horário, horário de pico (hora local do PDV, 0 a 23) |
 | `region` | `pos.municipality.region` | região |
 | `uf` | `pos.municipality.uf` | estado, UF |
 | `municipality_ibge_code` | `pos.municipality.municipality_ibge_code` | código IBGE |

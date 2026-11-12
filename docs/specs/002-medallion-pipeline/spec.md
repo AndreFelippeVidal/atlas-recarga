@@ -27,7 +27,7 @@ Transformar os arquivos de landing em tabelas **bronze → silver → gold** no 
 ### Silver: limpa, tipada, deduplicada
 | Tabela | Tipo | Regras e expectations |
 |---|---|---|
-| `silver.recharges` | streaming table | Dedup por `recharge_id` (mantém o menor `_ingested_at_utc`); `recharge_date` derivado de `recharge_ts_utc` em America/Sao_Paulo. Expectations: `expect_or_drop("pos_not_null", "pos_id IS NOT NULL")`, `expect_or_drop("positive_amount", "amount_brl > 0")`, `expect_or_drop("valid_status", "status IN ('approved','reversed')")`, `expect("face_value", "amount_brl IN (10,15,20,25,30,40,50,100)")` (warn) |
+| `silver.recharges` | streaming table | Dedup por `recharge_id` (mantém o menor `_ingested_at_utc`); `recharge_date` derivado de `recharge_ts_utc` em America/Sao_Paulo; `recharge_hour_local` (INT, 0 a 23) derivado de `recharge_ts_utc` no fuso da UF do PDV (AC UTC−5; AM, RO, RR, MT, MS UTC−4; demais UTC−3). Expectations: `expect_or_drop("pos_not_null", "pos_id IS NOT NULL")`, `expect_or_drop("positive_amount", "amount_brl > 0")`, `expect_or_drop("valid_status", "status IN ('approved','reversed')")`, `expect("face_value", "amount_brl IN (10,15,20,25,30,40,50,100)")` (warn) |
 | `silver.recharges_quarantine` | streaming table | Linhas com `pos_id` inexistente em `silver.pos`. Ficam retidas, não somem |
 | `silver.pos` | materialized view | `expect_or_fail("pos_municipality_known", "municipality_ibge_code IN referência")`, `expect_or_fail("pos_has_distributor", ...)` |
 | `silver.distributors`, `silver.municipalities` | materialized view | `expect_or_fail` em PK não nula e única |
@@ -40,7 +40,7 @@ Transformar os arquivos de landing em tabelas **bronze → silver → gold** no 
 | `gold.dim_municipality` | município | `municipality_ibge_code`, `municipality_name`, `uf`, `region`, `ddd`, `population` |
 | `gold.dim_pos` | PDV | `pos_id`, `pos_type`, `distributor_id`, `municipality_ibge_code`, `opened_date`, `closed_date` |
 | `gold.dim_distributor` | distribuidor | `distributor_id`, `distributor_name`, `hq_uf` |
-| `gold.fct_recharges` | recarga | `recharge_id`, `recharge_date`, `recharge_month` (DATE, 1º dia), `pos_id`, `amount_brl`, `status`, `subscriber_id` |
+| `gold.fct_recharges` | recarga | `recharge_id`, `recharge_date`, `recharge_month` (DATE, 1º dia), `recharge_hour_local`, `pos_id`, `amount_brl`, `status`, `subscriber_id` |
 | `gold.agg_pos_month` | PDV × mês | `approved_amount_brl`, `approved_count`, `reversed_count`, `distinct_subscribers`. Base da comissão (SPEC-003) |
 
 Todas as gold têm `COMMENT` na tabela e em cada coluna, porque o Genie e o agente leem essas descrições.
