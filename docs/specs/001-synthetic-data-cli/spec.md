@@ -40,6 +40,7 @@ Códigos de saída: `0` sucesso · `2` flag inválida · `3` arquivo de referên
 ├── distributors/distributors.parquet
 ├── pos/pos.parquet
 ├── recharges/dt=YYYY-MM-DD/part-0000.parquet   # uma partição por dia
+│   └── part-0001.parquet                        # só com late_arrival ou duplicates (§5)
 └── _manifest.json                               # seed, flags, contagens, sha256 por arquivo, versão do CLI
 ```
 
@@ -82,7 +83,7 @@ Códigos de saída: `0` sucesso · `2` flag inválida · `3` arquivo de referên
 | `status` | STRING | `approved` 98,5% · `reversed` 1,5% |
 | `ingested_at_utc` | TIMESTAMP | Determinístico (invariante 1): 06:00 de `America/Sao_Paulo` do dia seguinte ao `dt=` da partição (09:00 UTC), o horário do job `atlas_daily`. Não é o relógio da máquina |
 
-**Escolha do PDV e volume.** Só PDVs ativos no dia recebem recarga (`opened_date <= dia` e `closed_date` nula ou `>= dia`). O peso de cada PDV é sorteado com a seed, lognormal (σ = 0,8) × raiz quadrada da população do município, o que dá cauda longa (top PDVs e outliers para a comissão). O volume diário segue a sazonalidade abaixo: os fatores se **multiplicam** (um domingo em dezembro vale 1,25 × 0,70), o dia e o mês são os de `America/Sao_Paulo` (o mesmo critério da partição `dt=`) e os pesos são **normalizados**, então o total continua igual a `--rows` (invariante 5). A flag `--scenarios` é validada desde já, mas a injeção só existe a partir da P4.6.
+**Escolha do PDV e volume.** Só PDVs ativos no dia recebem recarga (`opened_date <= dia` e `closed_date` nula ou `>= dia`). O peso de cada PDV é sorteado com a seed, lognormal (σ = 0,8) × raiz quadrada da população do município, o que dá cauda longa (top PDVs e outliers para a comissão). O volume diário segue a sazonalidade abaixo: os fatores se **multiplicam** (um domingo em dezembro vale 1,25 × 0,70), o dia e o mês são os de `America/Sao_Paulo` (o mesmo critério da partição `dt=`) e os pesos são **normalizados**, então o total continua igual a `--rows` (invariante 5).
 
 **Fuso e hora local.** `recharge_ts_utc` é o instante real em UTC. A curva intradiária é aplicada na **hora local do município do PDV**, e o fuso vem da UF (mapa fixo em código, sem exceções por município no MVP): AC em UTC−5; AM, RO, RR, MT e MS em UTC−4; as demais UFs em UTC−3 (horário de Brasília). A partição `dt=YYYY-MM-DD` usa o dia em `America/Sao_Paulo`, igual ao `recharge_date` do silver. Assim, uma recarga das 22h no AC (03h UTC do dia seguinte, 00h em São Paulo) cai na partição do dia seguinte. A hora local alimenta a análise de horários de pico (SPEC-002 e SPEC-004).
 
@@ -104,10 +105,10 @@ O `_manifest.json` lista as contagens exatas injetadas por cenário. Essa é a v
 
 **Como cada cenário é injetado (P4.6).** As linhas injetadas **substituem** linhas normais do mesmo dia, então o total continua igual a `--rows` (invariante 5); as exceções são `regional_drop`, que remove linhas por definição, e `duplicates`, que também substitui (a cópia ocupa o lugar de uma linha do dia).
 - `regional_drop`: cada recarga de PDV dos 13 municípios do Baixo Amazonas (Alenquer, Almeirim, Belterra, Curuá, Faro, Juruti, Mojuí dos Campos, Monte Alegre, Óbidos, Oriximiná, Prainha, Santarém e Terra Santa) é removida com probabilidade 14% no penúltimo mês da janela. A lista é uma constante no módulo do cenário, porque a referência IBGE não tem mesorregião.
-- `late_arrival`: as linhas atrasadas mantêm o `recharge_ts_utc` do dia D e vão para `recharges/dt=D+1/part-0001.<fmt>`, com o `ingested_at_utc` da partição D+1. Só nessas linhas a partição `dt=` difere do dia em `America/Sao_Paulo` de `recharge_ts_utc`.
+- `late_arrival`: as linhas atrasadas mantêm o `recharge_ts_utc` do dia D e vão para `recharges/dt=D+1/part-0001.<fmt>`, com o `ingested_at_utc` da partição D+1. Nessas linhas, e nas cópias de `duplicates` (que também chegam na partição do dia seguinte), a partição `dt=` difere do dia em `America/Sao_Paulo` de `recharge_ts_utc`; o silver deve usar `recharge_ts_utc`, não a partição.
 - `duplicates`: a cópia (mesmo `recharge_id`, mesmos valores) fica na partição do dia seguinte ao original, com o `ingested_at_utc` dessa partição.
 - `fractioning`: 3 PDVs, uma rajada de 30 recargas de R$ 10 ao mesmo assinante em menos de 2 min, cada uma num dia diferente.
-- `_manifest.json`: `atlas_cli_version`, `seed`, `flags`, `counts` (entidades), `scenarios` (contagens injetadas) e `files` (sha256 por arquivo). Sem timestamps, para ser determinístico.
+- `_manifest.json`: `manifest_version`, `atlas_cli_version`, `seed`, `flags`, `counts` (entidades), `scenarios` (contagens injetadas) e `files` (sha256 por arquivo). Sem timestamps, para ser determinístico.
 
 ## 6. Invariantes (verificados por `validate` e pelos testes)
 1. A mesma seed e as mesmas flags produzem o mesmo sha256 em todos os arquivos.
