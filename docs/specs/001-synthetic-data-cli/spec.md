@@ -56,6 +56,18 @@ Códigos de saída: `0` sucesso · `1` `validate` encontrou invariante violado �
 
 `upload` replica o mesmo layout em `/Volumes/atlas/raw/landing/`. É idempotente: arquivo com o mesmo sha256 não é reenviado.
 
+### `upload` — flags e comportamento
+
+| Flag | Tipo | Padrão | Regra |
+|---|---|---|---|
+| `--out` | path | `./data/generated` | Diretório gerado por `generate` (precisa do `_manifest.json`) |
+| `--profile` | str | — (env `ATLAS_DATABRICKS_PROFILE`) | Profile do Databricks CLI. **Obrigatório**: o CLI não escolhe um profile sozinho |
+| `--dest` | path | `/Volumes/atlas/raw/landing/` | Pasta de destino; precisa começar com `/Volumes/` e não ter `..` |
+
+Usa a Files API do `databricks-sdk`. Ela não devolve sha256, então o `_manifest.json` enviado ao Volume é a fonte do hash remoto: o `upload` lê o manifest remoto e envia só os arquivos que ele não cita ou cujo sha256 difere do local. O `_manifest.json` sobe **por último** (uma execução interrompida nunca declara arquivo que não chegou) e é reenviado sempre que seus bytes diferem do remoto. O `upload` **nunca apaga** nada no Volume. Antes de enviar, confere cada arquivo local contra o manifest local; arquivo ausente ou divergente é flag inválida (`2`, rode `generate` ou `validate`). Falha de rede, de autenticação ou da Files API sai com `4`. Manifest remoto ilegível é tratado como ausente (tudo pendente), com aviso.
+
+Limite conhecido: se alguém apagar um arquivo do Volume e o manifest remoto continuar citando-o, o `upload` não o reenvia; apague o manifest remoto para forçar o reenvio completo.
+
 ## 4. Schemas
 
 **Referência (versionada no repo, dado público):** `data/reference/municipalities_ibge.csv`, com os 5.570 municípios do Censo 2022 (Boa Esperança do Norte, MT, criado depois, fica de fora por não ter população), população do Censo 2022 e DDD. Colunas: `municipality_ibge_code, municipality_name, uf, region, population, ddd`. O `ddd` é **aproximado**: não há fonte pública por município, então cada município recebe o DDD da sua região imediata do IBGE (tabela mantida em `scripts/build_reference.py`). Serve para dados sintéticos e para separar o mapa por DDD, não como referência de telecom.
