@@ -31,7 +31,15 @@ Pacote Python `atlas_cli` (Typer), instalável com `uv`, e executável `atlas-cl
 | `--format` | `parquet`\|`csv` | `parquet` | |
 | `--incremental-day` | `YYYY-MM-DD` | — | Gera só as recargas desse dia (simula a carga D-1 diária) |
 
-Códigos de saída: `0` sucesso · `2` flag inválida · `3` arquivo de referência IBGE ausente ou inválido · `4` falha de upload.
+### `validate` — flags e comportamento
+
+| Flag | Tipo | Padrão | Regra |
+|---|---|---|---|
+| `--out` | path | `./data/generated` | Diretório gerado por `generate` (o mesmo `--out`) |
+
+Lê o `_manifest.json` e confere: o sha256 de cada arquivo contra o manifest (e que não sobra nem falta arquivo) e os invariantes 2 a 6 da seção 6. O invariante 2 só é conferido quando o manifest indica `--scenarios none`; o 4 só com `pos` ≥ 5.000 (o tamanho padrão). Os demais são pulados com aviso. Também confere que as contagens do manifest batem com os arquivos e que o manifest só cita cenários do catálogo. No invariante 6, o `validate` varre CPF, e-mail e telefone; endereço não existe no schema (§4) e CEP/endereço estão fora do escopo (§8). O invariante 1 (determinismo) exige duas gerações e é coberto pelo teste, não pelo `validate`. Imprime uma linha por verificação (`ok`, `FALHA` ou `pulado`). `--out` sem manifest é flag inválida (`2`).
+
+Códigos de saída: `0` sucesso · `1` `validate` encontrou invariante violado · `2` flag inválida · `3` arquivo de referência IBGE ausente ou inválido · `4` falha de upload.
 
 ## 3. Saída (layout)
 
