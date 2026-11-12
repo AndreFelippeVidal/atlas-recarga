@@ -91,8 +91,8 @@ _`atlas-cli` gera o dataset determinístico com cenários e o envia ao Volume._
 
 _`databricks.yml` cria o catálogo, os schemas, o Volume e os grupos, de forma reproduzível._
 
-- [ ] **P5.1** 🤖 `databricks.yml` com targets `dev`/`demo` e `bundle validate` no CI — _pronto quando:_ `databricks bundle validate -t dev` passa no CI · depende de P3.8
-- [ ] **P5.2** 🤝 Catálogo `atlas`, schemas, Volume `raw.landing` e grupos `atlas_readers`, `atlas_commission_*` — _pronto quando:_ Deploy em `dev` feito por você; os objetos aparecem no Catalog Explorer · depende de P5.1
+- [x] **P5.1** 🤖 `databricks.yml` com targets `dev`/`demo` e `bundle validate` no CI — _pronto quando:_ `databricks bundle validate -t dev` passa no CI (#30) · depende de P3.8
+- [ ] **P5.2** 🤝 Catálogo `atlas`, schemas, Volume `raw.landing` e grupos `atlas_readers`, `atlas_commission_*` — _pronto quando:_ Deploy em `dev` feito por você; os objetos aparecem no Catalog Explorer; o CI valida também `-t demo` · depende de P5.1
 
 ## Fase 6 — Pipeline medalhão → [002-medallion-pipeline](002-medallion-pipeline/spec.md)
 
