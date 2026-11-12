@@ -50,3 +50,6 @@ A Helena quer perguntar sobre os dados direto do Claude. Um requisito do projeto
 - **Só a plataforma:** 👍 zero código. 👎 Sem rate limit; sem o usuário real no plano B (service principal); sem painel por tool.
 
 **Revisitar se:** o App tiver mais de uma instância, ou o gateway aceitar Apps como MCP Service (aí migrar e remover a opção 1).
+
+## Validação (Spike S0.5, 2026-11-12)
+Um cliente externo (Claude Code, `claude mcp add --transport http`) chamou um App FastMCP com sucesso, e uma query disparada pela tool apareceu em `system.query.history` com `executed_by` igual ao usuário (on-behalf-of-user). O plano B (proxy `mcp-remote`, auditoria só no trace) não foi acionado. Detalhes em [S0-results](../spikes/S0-results.md). Escopo: o spike usou o template com a identidade do usuário; o fluxo OAuth interativo nativo do cliente, a renovação da credencial e vários usuários seguem como validação da P11.4/P11.5 e do S0.6.
