@@ -1,4 +1,4 @@
-"""Entry point do `atlas-cli`. `generate` cobre as três entidades; o resto é stub até a P4.9."""
+"""Entry point do `atlas-cli`: `generate` e `scenario list`; `validate` e `upload` são stubs."""
 
 import re
 from datetime import date
@@ -12,7 +12,7 @@ from atlas_cli.generate import generate_reference_entities
 from atlas_cli.generate_io import OutputFormat
 from atlas_cli.recharges import NoActivePosError
 from atlas_cli.reference import ReferenceError, load_municipalities
-from atlas_cli.scenarios import parse_scenarios
+from atlas_cli.scenarios import catalog, parse_scenarios
 
 app = typer.Typer(
     name="atlas-cli",
@@ -60,7 +60,7 @@ def generate(
         str,
         typer.Option(
             "--scenarios",
-            help="Anomalias (CSV), `all` ou `none`. Validada; a injeção entra na P4.6.",
+            help="Anomalias a injetar (CSV), `all` ou `none`. Veja `atlas-cli scenario list`.",
         ),
     ] = "all",
     out: Annotated[Path, typer.Option("--out", help="Diretório de saída.")] = Path(
@@ -71,7 +71,7 @@ def generate(
     """Gera as entidades em arquivos locais (distributors, pos e recharges)."""
     end = _parse_end_month(end_month)
     try:
-        parse_scenarios(scenarios)
+        chosen = parse_scenarios(scenarios)
     except ValueError as exc:
         raise typer.BadParameter(str(exc), param_hint="--scenarios") from exc
     try:
@@ -80,7 +80,7 @@ def generate(
         typer.echo(str(exc), err=True)
         raise typer.Exit(ExitCode.REFERENCE_DATA_INVALID) from exc
     try:
-        written, (partitions, total_rows) = generate_reference_entities(
+        result = generate_reference_entities(
             out=out,
             seed=seed,
             n_distributors=distributors,
@@ -90,12 +90,14 @@ def generate(
             fmt=fmt,
             municipalities=municipalities,
             rows=rows,
+            scenarios=chosen,
         )
     except NoActivePosError as exc:
         raise typer.BadParameter(str(exc), param_hint="--pos") from exc
-    for path in written:
+    for path in result.entity_files:
         typer.echo(str(path))
-    typer.echo(f"{out / 'recharges'}: {total_rows} recargas em {partitions} partições")
+    typer.echo(f"{out / 'recharges'}: {result.rows} recargas em {result.partitions} partições")
+    typer.echo(str(result.manifest))
 
 
 @app.command()
@@ -113,7 +115,10 @@ def validate() -> None:
 @scenario_app.command("list")
 def scenario_list() -> None:
     """Lista as anomalias disponíveis e seus parâmetros."""
-    _not_implemented("scenario list")
+    for scenario_id, description, parameters in catalog():
+        typer.echo(f"{scenario_id}\t{description}")
+        for key, value in parameters.items():
+            typer.echo(f"  {key}: {value}")
 
 
 if __name__ == "__main__":

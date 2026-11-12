@@ -1,12 +1,22 @@
 """Orquestra a geração e a escrita das entidades (SPEC-001 §3)."""
 
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 from atlas_cli.entities import generate_distributors, generate_pos, month_window
 from atlas_cli.generate_io import OutputFormat, write_table
+from atlas_cli.manifest import build_manifest, write_manifest
 from atlas_cli.recharges import write_recharges
 from atlas_cli.reference import Municipalities
+
+
+@dataclass(frozen=True)
+class GenerateResult:
+    entity_files: list[Path]
+    partitions: int
+    rows: int
+    manifest: Path
 
 
 def generate_reference_entities(
@@ -20,7 +30,8 @@ def generate_reference_entities(
     fmt: OutputFormat,
     municipalities: Municipalities,
     rows: int,
-) -> tuple[list[Path], tuple[int, int]]:
+    scenarios: tuple[str, ...] = (),
+) -> GenerateResult:
     window = month_window(end_month, months)
     distributors = generate_distributors(seed, n_distributors, municipalities, window)
     pos = generate_pos(seed, n_pos, municipalities, distributors, window)
@@ -28,7 +39,7 @@ def generate_reference_entities(
         write_table(distributors.table, out / "distributors" / "distributors", fmt),
         write_table(pos, out / "pos" / "pos", fmt),
     ]
-    recharges = write_recharges(
+    result = write_recharges(
         out=out,
         seed=seed,
         rows=rows,
@@ -36,5 +47,27 @@ def generate_reference_entities(
         pos=pos,
         municipalities=municipalities,
         fmt=fmt,
+        scenarios=scenarios,
     )
-    return written, recharges
+    manifest = build_manifest(
+        out=out,
+        files=[*written, *result.files],
+        seed=seed,
+        flags={
+            "rows": rows,
+            "months": months,
+            "end_month": end_month.strftime("%Y-%m"),
+            "pos": n_pos,
+            "distributors": n_distributors,
+            "scenarios": list(scenarios),
+            "format": fmt.value,
+        },
+        counts={
+            "distributors": distributors.table.num_rows,
+            "pos": pos.num_rows,
+            "recharges": result.rows,
+            "partitions": result.partitions,
+        },
+        scenarios=result.scenarios,
+    )
+    return GenerateResult(written, result.partitions, result.rows, write_manifest(out, manifest))
