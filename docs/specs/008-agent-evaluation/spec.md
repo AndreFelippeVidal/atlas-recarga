@@ -57,8 +57,8 @@ Medir se o agente (SPEC-005) **acerta, cita a fonte e recusa o que deve recusar*
 - Custo: cerca de 30 chamadas ao agente por execução. Por isso o gate roda só nos paths relevantes e nunca em PRs só de docs.
 
 ## 6. Produção
-- **Preferencial:** production monitoring do MLflow 3 (Beta) no experiment do agente. Scorers de código em **100%** dos traces e LLM judges em **20%** de amostra.
-- **Plano B (S0.3):** job diário `atlas_agent_monitoring` às 07:00 que lê os traces das últimas 24h via `mlflow.search_traces`, roda os mesmos scorers com a mesma amostragem e grava em `atlas.observability.agent_quality_daily`.
+- **Preferencial:** production monitoring do MLflow 3 (Beta) no experiment do agente. Scorers de código em **100%** dos traces e LLM judges em **20%** de amostra. O S0.3 validou o scorer de código agendado (`start()` anexou feedback aos traces); o LLM judge em amostra **não foi testado**. O `evaluate` sobre traces já avaliados gera assessments duplicadas com o mesmo nome; o painel deve deduplicar.
+- **Plano B (validado no S0.3, mas não é o caminho preferencial):** job diário `atlas_agent_monitoring` às 07:00 que lê os traces das últimas 24h via `mlflow.search_traces`, roda os mesmos scorers com a mesma amostragem e grava em `atlas.observability.agent_quality_daily`.
 - **Painel:** página "Qualidade do agente" no AI/BI Dashboard com o % de pass por scorer por dia, a média móvel de 7 dias, a latência p95 e o volume.
 - **MCP:** fica fora deste painel. Ele tem a página própria "Uso do MCP" (SPEC-006 §6), só com métricas operacionais. Os scorers de resposta não se aplicam, porque o MCP não gera texto; a qualidade dele é medida pela paridade com o golden set (SPEC-006 §7).
 - **Alerta:** média de 7 dias de `cites_metric_view` ou `read_only_tools` abaixo de 90% → SQL alert por e-mail para o dono.

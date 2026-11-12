@@ -9,7 +9,7 @@ Confirmar **no workspace real** os recursos que a documentação mostra existir 
 
 | # | Validar | Como (passo mínimo) | Passou se | Se falhar | ADR |
 |---|---|---|---|---|---|
-| S0.1 | Unity Gateway beta e model service Claude `system.ai.*` | Habilitar em *Previews*; chamar o model service com `ChatDatabricks(use_ai_gateway=True)` num notebook | Resposta 200 e linha em `system.ai_gateway.usage` | AI Gateway clássico num endpoint pay-per-token | 0007 |
+| S0.1 | Unity Gateway beta e model service (Claude, se existir) `system.ai.*` | Habilitar em *Previews*; chamar o model service com `ChatDatabricks(use_ai_gateway=True)` num notebook | Resposta 200 e linha em `system.ai_gateway.usage` | AI Gateway clássico num endpoint pay-per-token | 0007 |
 | S0.2 | Agent service (Beta) | Registrar um agente "hello" deployado como App | O agente aparece no Unity Gateway com uso registrado | Governar só o LLM; o agente fica como App direto | 0007 |
 | S0.3 | Production monitoring MLflow 3 (Beta) | Agendar um scorer de código num experiment com 5 traces sintéticos | Feedback anexado aos traces | Job diário com `search_traces` + `evaluate` | 0013 |
 | S0.4 | Metric views + Genie | Criar uma metric view mínima sobre `samples` e um Genie Space em cima dela | `MEASURE()` funciona e o Genie responde usando a view | Views SQL + Genie sobre o gold | 0005 |

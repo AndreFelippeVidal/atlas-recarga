@@ -89,7 +89,7 @@ Um lote `locked` nunca é alterado. Um erro descoberto depois gera um **lote de 
 - **Dado** todos os lotes `locked`, **então** 100% têm 2 eventos de aprovação com atores distintos (métrica do PRD).
 
 ## 9. Modo demo (Free Edition)
-Se o workspace tiver um único usuário (Spike S0.6), a variável de job `ALLOW_SAME_APPROVER_DEMO=true` permite o mesmo ator nas duas etapas. Cada uso grava `role = 'demo_override'` em `batch_events` e o lote fica marcado `demo_mode = true`. Isso nunca é o comportamento padrão.
+O Spike S0.6 mostrou que a Free Edition aceita um segundo usuário e grupos `atlas_*` criados por nós; portanto a segregação de funções (dois atores distintos) é o padrão. Ainda **não exercida**: o S0.6 só inferiu as duas identidades, e a segregação depende dos grupos `atlas_commission_*`, criados na P5.2. Como **contingência explícita** (por exemplo, o segundo usuário indisponível), a variável de job `ALLOW_SAME_APPROVER_DEMO=true` permite o mesmo ator nas duas etapas. Cada uso grava `role = 'demo_override'` em `batch_events` e o lote fica marcado `demo_mode = true`. Isso nunca é o comportamento padrão.
 
 ## 10. Fora de escopo
 IA no cálculo ou na aprovação (nunca), UI de aprovação no React (v2), pagamento real (nunca), metas e bônus (v2, junto com o forecast).

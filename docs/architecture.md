@@ -51,7 +51,7 @@ flowchart TB
             agent["<b>atlas-agent</b><br/>[Container: Databricks App · Agent Framework + LangGraph] · F6"]
             mcp["<b>atlas-mcp</b><br/>[Container: Databricks App · FastMCP, Streamable HTTP] · F7"]
             genie["<b>Genie Space Atlas Recarga</b><br/>[Container: Genie] · F5"]
-            gateway["<b>Unity Gateway</b><br/>[Container: model service Claude · só o agente passa por ele]"]
+            gateway["<b>Unity Gateway</b><br/>[Container: model service não-Claude (provisório gpt-oss-120b) · só o agente passa por ele]"]
         end
 
         web["<b>atlas-web</b><br/>[Container: Databricks App · FastAPI + React + d3-geo] · F8"]
@@ -151,7 +151,7 @@ A trava não depende de um só controle:
 | **Quem dispara** | `atlas_commission_review` é disparado manualmente por uma pessoa, e cada transição exige que o ator seja membro de `atlas_commission_analysts` ou `atlas_commission_directors`; nenhum agente, MCP ou app executa o job (SPEC-003 §4) |
 | **Agente de código** | O hook do harness nega qualquer execução de `atlas_commission_review` ([SPEC-010](specs/010-agent-harness/spec.md) §3.3) |
 
-**Concessão da Free Edition:** com um usuário só, `ALLOW_SAME_APPROVER_DEMO=true` permite o mesmo ator nas duas etapas, mas marca cada uso com `role = 'demo_override'` e o lote com `demo_mode = true` (SPEC-003 §9, Spike S0.6).
+**Concessão da Free Edition:** a Free Edition aceita um segundo usuário e grupos `atlas_*` (Spike S0.6), então a segregação é o padrão. Só como contingência explícita, `ALLOW_SAME_APPROVER_DEMO=true` permite o mesmo ator nas duas etapas, mas marca cada uso com `role = 'demo_override'` e o lote com `demo_mode = true` (SPEC-003 §9, Spike S0.6).
 
 ## 5. Fronteira da IA: só leitura
 
@@ -165,7 +165,7 @@ Há duas IAs no projeto, e as duas têm limites escritos.
 | Parâmetros | Medidas e dimensões validadas contra listas; valores como parâmetros vinculados | Teste de injeção (SPEC-006 §7) |
 | Permissão UC | Nada fora de `atlas.semantic`: `SELECT` nas metric views, `EXECUTE` nas `fn_*` e `CAN RUN` no Genie Space (agente); o MCP usa o token do próprio usuário (on-behalf-of-user) ou, no plano B, um service principal só com `SELECT`. `PERMISSION_DENIED` em `gold` | Critério de aceite SPEC-004 §8 |
 | Comportamento | Citação `Fonte:` obrigatória, nenhum número sem tool, recusa de ação e PII | Scorers `cites_metric_view`, `no_tool_on_refusal`, `refusal_quality` |
-| Gateway (só agente) | Rate limit 30 req/min por usuário, teto de gasto, guardrail de PII ([ADR-0007](adr/0007-unity-gateway-llm-governance.md)) | `system.ai_gateway.usage` |
+| Gateway (só agente) | Rate limit 30 req/min por usuário, teto de gasto, guardrail de PII, a validar na P10.5 (o S0.1 só confirmou que `rate_limits` e `service_policies` existem) ([ADR-0007](adr/0007-unity-gateway-llm-governance.md)) | `system.ai_gateway.usage`, com atraso de minutos a cerca de 1 h (S0.2); alertas quase em tempo real vêm do trace |
 | Equivalente no MCP | O App não pode ser registrado no Unity Gateway, então faz o controle sozinho: 30 chamadas/min por usuário (`RATE_LIMITED`), span MLflow por tool só com atributos e auditoria por `system.query.history` ligada ao trace por `request_id`. Os controles de LLM não se aplicam: o MCP não chama LLM ([SPEC-006](specs/006-mcp-server/spec.md) §6) | Página "Uso do MCP" no AI/BI |
 | Regressão | Gate de PR: acurácia ≥ 90% e 100% das recusas ([SPEC-008](specs/008-agent-evaluation/spec.md)) | `agent-eval.yml` |
 
@@ -197,10 +197,10 @@ Todos os recursos do workspace são declarados num Databricks Asset Bundle (`dat
 | 1 pipeline ativo por tipo | Um único `atlas_medallion` cobre bronze, silver e gold |
 | 5 tasks de job concorrentes | Teto que os jobs do projeto respeitam: `atlas_daily` tem 3 tasks ([SPEC-002](specs/002-medallion-pipeline/spec.md) §2). Se o Spike S0.3 cair no plano B, entra o job `atlas_agent_monitoring` às 07:00 ([SPEC-008](specs/008-agent-evaluation/spec.md) §6) |
 | Até 3 Apps, parados após 24h | Os 3 slots vão para agente, MCP e web, sem slot livre; runbook de start antes da demo ([ADR-0009](adr/0009-three-apps-allocation.md)) |
-| Serving sem GPU, alguns modelos indisponíveis | O LLM é um model service Claude do Unity Gateway, com o nome exato confirmado no Spike S0.1 ([SPEC-005](specs/005-business-agent/spec.md) §2) |
-| Possivelmente um único usuário (a confirmar no Spike S0.6) | Se confirmado, o modo demo de aprovação da comissão (seção 4) |
+| Serving sem GPU, alguns modelos indisponíveis | Não há model service Claude em `system.ai` (Spike S0.1); o LLM é um model service não-Claude do Unity Gateway, provisório `system.ai.gpt-oss-120b` ([SPEC-005](specs/005-business-agent/spec.md) §2) |
+| Usuários: o S0.6 mostrou que um segundo usuário e grupos `atlas_*` são possíveis | A segregação é o padrão; o modo demo de aprovação (seção 4) é só contingência |
 
-Os recursos em Beta (Unity Gateway como agent service, production monitoring do MLflow, OAuth de cliente MCP) são confirmados no Spike S0 (Fase 3) antes de qualquer código depender deles; cada um tem plano B escrito: Unity Gateway no ADR-0007, monitoramento no ADR-0013 e OAuth do MCP na SPEC-006 §5 (proxy `mcp-remote`).
+Os recursos em Beta (Unity Gateway como agent service, production monitoring do MLflow, OAuth de cliente MCP) foram verificados no Spike S0 (Fase 3): o agent service passou em versão parcial (S0.2), o monitoring passou (S0.3) e o MCP passou com ressalva (S0.5, OAuth interativo não testado). Cada um mantém o plano B escrito: Unity Gateway no ADR-0007, monitoramento no ADR-0013 e OAuth do MCP na SPEC-006 §5 (proxy `mcp-remote`).
 
 ## 8. Modos de falha
 
@@ -237,7 +237,7 @@ Os recursos em Beta (Unity Gateway como agent service, production monitoring do 
 | SQL warehouse (compartilhado) | Parado (cold start) ou em timeout | Todos os consumidores esperam | Agente e MCP: falha na 1ª tentativa; web: espera > 3s | Agente e MCP tentam de novo após 20s e depois avisam (`WAREHOUSE_UNAVAILABLE` no MCP); web mostra "Aquecendo o banco de dados…" | [SPEC-005](specs/005-business-agent/spec.md) §6, [SPEC-006](specs/006-mcp-server/spec.md) §4, [SPEC-007](specs/007-react-geo-dashboard/spec.md) §4 |
 | `atlas-agent` | Genie indisponível ou com timeout > 30s | Sem a tool principal | Timeout da tool | Usa a UC function equivalente; sem ela, "não consegui consultar agora", **nunca estima** | [SPEC-005](specs/005-business-agent/spec.md) §6 |
 | `atlas-agent` | Rate limit (429) do Unity Gateway | Pergunta não respondida | Trace com `error_type = rate_limited` | "Limite de uso atingido, tente em 1 minuto" | [SPEC-005](specs/005-business-agent/spec.md) §6 |
-| `atlas-mcp` | OAuth de cliente externo não funciona (Spike S0.5) | Claude não conecta direto | Spike S0.5 | Plano B: proxy local `mcp-remote` com token do `databricks auth`, nunca versionado | [SPEC-006](specs/006-mcp-server/spec.md) §5 |
+| `atlas-mcp` | OAuth interativo nativo do cliente não funciona (o S0.5 validou só o token de usuário no cabeçalho) | Claude não conecta direto | Spike S0.5 | Plano B: proxy local `mcp-remote` com token do `databricks auth`, nunca versionado | [SPEC-006](specs/006-mcp-server/spec.md) §5 |
 | `atlas-mcp` | Medida, dimensão ou filtro fora da lista; `limit` acima do máximo; mês inválido | Nenhuma query executada | `INVALID_ARGUMENT` | O cliente corrige a chamada | [SPEC-006](specs/006-mcp-server/spec.md) §4 |
 | `atlas-mcp` | Usuário sem `SELECT` na metric view | Sem dados | `PERMISSION_DENIED` | Conceder acesso ao grupo `atlas_readers` | [SPEC-006](specs/006-mcp-server/spec.md) §4 |
 | `atlas-mcp` | Resultado com mais de 500 linhas | Sem dados | `RESULT_TOO_LARGE` | Agregar mais ou filtrar | [SPEC-006](specs/006-mcp-server/spec.md) §4 |
