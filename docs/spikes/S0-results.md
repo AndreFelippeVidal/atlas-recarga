@@ -204,3 +204,40 @@ Manter o production monitoring com scorer de código como caminho preferencial (
 ### Decisão
 
 ADR-0005 mantido como `aceito`, com a nota do S0.4. Os objetos do spike (`workspace.atlas_spike_s0_4` e o Genie Space `01f1dea09d7d1c7ebd204024f1350b36`) devem ser removidos pelo mantenedor depois da revisão.
+
+## S0.5 — OAuth de cliente externo num App MCP
+
+- **Data:** 2026-11-12
+- **ADR:** [0008](../adr/0008-fastmcp-on-databricks-apps.md)
+- **Artefatos:** `spikes/s0_5_mcp_hello/` (template oficial `databricks/app-templates/mcp-server-hello-world`, FastMCP, mais a tool `whoami_query`; descartável) e o `RUNBOOK.md` da pasta
+
+### Execução
+
+- App `atlas-s0-5-mcp` criado e implantado com o recurso SQL warehouse (`sql-warehouse`) e a autorização do usuário (OBO) com o escopo `sql`. O primeiro deploy falhou ("No command to run") porque o `databricks sync` partiu da raiz do repo e o `app.yaml` não ficou na raiz do source path; o runbook foi corrigido.
+- Cliente: Claude Code, via `claude mcp add --transport http atlas-s0-5 https://<app-url>/mcp`, autenticado como o usuário (Opção A do runbook). Nenhuma credencial foi versionada nem registrada aqui.
+- `health` respondeu: `{"status":"healthy","message":"Custom MCP Server is healthy and connected to Databricks Apps."}`.
+- `whoami_query` (`SELECT current_user() AS u /* atlas-s0.5 */`, executada com a identidade do usuário) retornou o usuário do mantenedor (e-mail omitido); `statement_id` `01f1dea7-a747-184d-a93c-12978cbf0892`.
+- `system.query.history` (consulta às 14:45 UTC): a linha do `SELECT current_user() … /* atlas-s0.5 */` (14:45:07 UTC) tem `executed_by` = o usuário do mantenedor (e-mail omitido), o usuário e não o service principal do App.
+
+### Achados práticos para a P11.1 / P11.4
+
+- No template, `get_user_authenticated_workspace_client()` lê o header `x-forwarded-access-token`; o App só o recebe com a autorização do usuário habilitada.
+- `system.query.history` está disponível na Free Edition e permite a auditoria por `request_id` em comentário do SQL (SPEC-006 §6).
+- O `app.yaml` do template é só `command`; `env` com `valueFrom` liga o warehouse ao App.
+- Não testado: o fluxo OAuth interativo nativo do Claude Code, a expiração e a renovação da credencial, mais de um usuário (S0.6), rate limit e traces MLflow no App.
+
+### Checklist
+
+| Verificação | Resultado | Evidência |
+|---|---|---|
+| App MCP FastMCP implantado na Free Edition | ✅ | deploy `atlas-s0-5-mcp` |
+| `health` responde a partir do Claude Code | ✅ | saída do Claude Code |
+| Query do App em `system.query.history` com `executed_by` = usuário (OBO) | ✅ | `statement_id` acima e consulta à system table |
+
+### Resultado
+
+**Passou com ressalva.** Um cliente externo (Claude Code) conectou ao App MCP e a query rodou como o usuário (OBO), com a auditoria por usuário disponível. Ressalva: a autenticação foi um token de usuário enviado no cabeçalho; o fluxo OAuth interativo nativo do cliente não foi exercitado (fica para a P11.4/P11.5). O plano B (proxy `mcp-remote`, auditoria só no trace) não é acionado.
+
+### Decisão
+
+ADR-0008 mantido como `aceito`, com a nota do S0.5. O ajuste do texto da SPEC-006 §5/§6/§7 (de "a ser confirmado" para "confirmado") fica para a P3.8. O App `atlas-s0-5-mcp` deve ser removido pelo mantenedor depois da revisão (libera o slot para as P10.2, P11.1 e P12.8).
