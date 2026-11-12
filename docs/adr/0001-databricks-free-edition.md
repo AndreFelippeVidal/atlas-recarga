@@ -27,4 +27,5 @@ O produto precisa de ingestão, transformação com linhagem, camada semântica,
 ## Consequências
 - **Positivas:** uma só fronteira de segurança; linhagem visível do landing até a metric view.
 - **Negativas aceitas:** o design é moldado pelas cotas (ADR-0009). Os recursos Beta exigem o Spike S0 e um plano B registrado. Não há escala real para testar desempenho.
+- **Cotas na prática:** o S0.7 (2026-11-12) rodou 2M de recargas (bronze + silver, serverless) em 113 s, sem erro de cota. O `--rows` padrão de 2M se mantém. A concorrência do pipeline completo fica para a P6.7.
 - **Revisitar se:** a Free Edition remover algum recurso essencial (Apps, metric views, Unity Gateway) ou o projeto migrar para um workspace pago.

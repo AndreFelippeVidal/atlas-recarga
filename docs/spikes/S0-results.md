@@ -275,7 +275,7 @@ O modo `ALLOW_SAME_APPROVER_DEMO` **não é necessário como padrão**: há dois
 
 ## S0.7 — Cotas práticas
 
-- **Data:** _a preencher_
+- **Data:** 2026-11-12
 - **ADR:** [0001](../adr/0001-databricks-free-edition.md)
 - **Notebook:** `spikes/s0_7_quotas.py` (descartável)
 
@@ -284,26 +284,30 @@ O modo `ALLOW_SAME_APPROVER_DEMO` **não é necessário como padrão**: há dois
 - `uv run atlas-cli generate` com os padrões (2M linhas, 5.000 PDVs, 12 meses, `--scenarios all`, seed 42): **1.999.930 recargas em 365 partições, 122 MB em Parquet, 6,5 s** em máquina local.
 - Resta medir o lado do workspace (itens abaixo), que só o mantenedor executa.
 
-### Execução (a preencher pelo mantenedor)
+### Execução (2026-11-12, workspace Free Edition, compute serverless)
 
-- Tempo do upload para o Volume: _
-- Tempo do bronze / silver / total (serverless): _
-- Contagens: bronze _ · silver _ (esperado: `counts` do `_manifest.json`)
-- Erro de cota (texto exato), se houve: _
+- Upload de `data/generated` (122 MB, 365 partições) para o Volume `s0_7_landing` com `databricks fs cp -r`: **2 min 21 s** (141 s).
+- Bronze (leitura em lote do Parquet + `saveAsTable`): **24 s**.
+- Silver (dedup por `recharge_id`, `recharge_date` em America/Sao_Paulo, sem nulos e negativos): **7 s**.
+- Total das células (bronze + silver + preparação): **113 s**. Com o upload, cerca de 4 min 20 s.
+- Contagens: bronze **1.999.930** (igual a `counts.recharges` do `_manifest.json`); silver **1.995.920**.
+- Silver = bronze − 4.000 duplicados − 10 valores negativos = 4.010 linhas a menos, conforme o `_manifest.json` (`duplicates` e `negative_amount`). A query do spike não trata PDV nulo ou órfão (fica para as P6.2 e P6.3), por isso `null_pos` e `unknown_pos` não saem aqui.
+- Erro de cota: **nenhum**.
 
 ### Checklist
 
 | Verificação | Resultado | Evidência |
 |---|---|---|
-| CLI gera 2M de linhas | ✅ 1.999.930 em 6,5 s | execução local acima |
-| Upload de ~122 MB para o Volume sem erro de cota | _ | _ |
-| Bronze + silver terminam sem erro de cota | _ | _ |
-| Total (bronze + silver) < 30 min | _ | _ |
+| CLI gera 2M de linhas | ✅ 1.999.930 em 6,5 s | execução local |
+| Upload de ~122 MB para o Volume sem erro de cota | ✅ 2 min 21 s | saída do `time` do mantenedor |
+| Bronze + silver terminam sem erro de cota | ✅ 24 s + 7 s, sem erro | saída do notebook |
+| Total (bronze + silver) < 30 min | ✅ 113 s (< 1800 s) | saída do notebook (`PASSOU`) |
+| Contagens batem com o `_manifest.json` | ✅ bronze 1.999.930; silver = bronze − 4.010 | saída do notebook e manifest |
 
 ### Resultado
 
-_a preencher_
+**Passou.** O CLI com 2M de linhas e um pipeline mínimo (bronze + silver) terminaram sem erro de cota em 113 s, bem abaixo dos 30 min.
 
 ### Decisão
 
-_a preencher: se passou, ADR-0001 `aceito` com a nota do S0.7; se falhou, reduzir o `--rows` padrão e registrar no PRD._
+O `--rows` padrão de 2M **não muda** e o plano B (reduzir `--rows` e registrar no PRD) não é acionado. ADR-0001 mantido como `aceito`, com a nota do S0.7. Ressalvas: o teste foi em lote, sem Auto Loader e sem a concorrência do pipeline completo (as cotas de 1 pipeline ativo e de jobs concorrentes seguem valendo); o job `atlas_daily` real (P6.7) mede o tempo ponta a ponta. O Volume e as tabelas `s0_7_*` devem ser removidos pelo mantenedor.
