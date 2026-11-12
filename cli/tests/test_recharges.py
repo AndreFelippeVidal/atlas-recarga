@@ -1,0 +1,155 @@
+from collections import Counter
+from datetime import UTC, date, datetime, time, timedelta
+from decimal import Decimal
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import pyarrow.compute as pc
+import pyarrow.dataset as ds
+import pytest
+from atlas_cli.entities import month_window
+from atlas_cli.main import app
+from atlas_cli.recharges import FACE_VALUES, FACE_WEIGHTS, daily_counts, subscriber_pool
+from atlas_cli.reference import load_municipalities
+from typer.testing import CliRunner
+
+REPO = Path(__file__).resolve().parents[2]
+REFERENCE = REPO / "data" / "reference" / "municipalities_ibge.csv"
+SP = ZoneInfo("America/Sao_Paulo")
+ROWS = 60_000
+runner = CliRunner()
+
+
+@pytest.fixture(scope="module")
+def generated(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    out = tmp_path_factory.mktemp("gen")
+    result = runner.invoke(
+        app,
+        [
+            "generate", "--rows", str(ROWS), "--pos", "1500", "--distributors", "40",
+            "--months", "2", "--end-month", "2026-11", "--scenarios", "none",
+            "--out", str(out),
+        ],
+        env={"ATLAS_REFERENCE_PATH": str(REFERENCE)},
+    )  # fmt: skip
+    assert result.exit_code == 0, result.output
+    return out
+
+
+def _recharges(out: Path):  # type: ignore[no-untyped-def]
+    return ds.dataset(out / "recharges", format="parquet", partitioning="hive").to_table()
+
+
+def test_daily_counts_sum_exactly() -> None:
+    counts = daily_counts(1_001, 30)
+    assert sum(counts) == 1_001
+    assert max(counts) - min(counts) <= 1
+
+
+def test_invariant_5_row_count_within_one_percent(generated: Path) -> None:
+    assert abs(_recharges(generated).num_rows - ROWS) <= ROWS * 0.01
+
+
+def test_invariant_2_clean_data_without_scenarios(generated: Path) -> None:
+    t = _recharges(generated)
+    pos_ids = set(ds.dataset(generated / "pos", format="parquet").to_table()["pos_id"].to_pylist())
+    for col in t.column_names:
+        assert t[col].null_count == 0, col
+    assert pc.count_distinct(t["recharge_id"]).as_py() == t.num_rows
+    assert set(t["pos_id"].to_pylist()) <= pos_ids
+    faces = {Decimal(v) for v in FACE_VALUES}
+    assert set(t["amount_brl"].to_pylist()) <= faces
+    assert set(t["status"].to_pylist()) == {"approved", "reversed"}
+
+
+def test_partition_is_sao_paulo_day(generated: Path) -> None:
+    t = _recharges(generated)
+    for ts, dt in zip(t["recharge_ts_utc"].to_pylist(), t["dt"].to_pylist(), strict=True):
+        assert ts.astimezone(SP).date().isoformat() == str(dt)
+
+
+def test_status_and_face_value_proportions(generated: Path) -> None:
+    t = _recharges(generated)
+    n = t.num_rows
+    reversed_share = t["status"].to_pylist().count("reversed") / n
+    assert 0.010 < reversed_share < 0.020
+    faces = Counter(int(v) for v in t["amount_brl"].to_pylist())
+    for face, weight in zip(FACE_VALUES, FACE_WEIGHTS, strict=True):
+        assert abs(faces[face] / n - weight) < 0.01, face
+
+
+def test_intraday_curve_peaks_in_local_time(generated: Path) -> None:
+    t = _recharges(generated)
+    hours = Counter(ts.astimezone(SP).hour for ts in t["recharge_ts_utc"].to_pylist())
+    peak = hours[12] + hours[19]
+    assert peak > 2 * (hours[3] + hours[4])
+    assert hours[12] > hours[8] and hours[19] > hours[15]
+
+
+def test_acre_uses_local_hour_not_sao_paulo(generated: Path) -> None:
+    municipalities = load_municipalities(REFERENCE)
+    pos = ds.dataset(generated / "pos", format="parquet").to_table().to_pylist()
+    index = dict(zip(municipalities.code, municipalities.uf, strict=True))
+    acre = {p["pos_id"] for p in pos if index[p["municipality_ibge_code"]] == "AC"}
+    t = _recharges(generated)
+    rows = [r for r in t.select(["pos_id", "recharge_ts_utc"]).to_pylist() if r["pos_id"] in acre]
+    assert rows
+    hours = Counter(
+        r["recharge_ts_utc"].astimezone(ZoneInfo("America/Rio_Branco")).hour for r in rows
+    )
+    assert hours[12] > hours[4]  # o pico segue o relógio do Acre
+
+
+def test_only_active_pos_recharge(generated: Path) -> None:
+    pos = {
+        p["pos_id"]: p
+        for p in ds.dataset(generated / "pos", format="parquet").to_table().to_pylist()
+    }
+    for r in _recharges(generated).select(["pos_id", "dt"]).to_pylist():
+        p = pos[r["pos_id"]]
+        day = date.fromisoformat(str(r["dt"]))
+        assert p["opened_date"] <= day
+        assert p["closed_date"] is None or p["closed_date"] >= day
+
+
+def test_ingested_at_is_0900_utc_of_next_day(generated: Path) -> None:
+    t = _recharges(generated)
+    for ing, dt in zip(t["ingested_at_utc"].to_pylist(), t["dt"].to_pylist(), strict=True):
+        expected = datetime.combine(date.fromisoformat(str(dt)) + timedelta(days=1), time(9), UTC)
+        assert ing == expected
+
+
+def test_same_seed_same_bytes(tmp_path: Path) -> None:
+    def run(out: Path) -> dict[str, bytes]:
+        result = runner.invoke(
+            app,
+            ["generate", "--rows", "2000", "--pos", "100", "--distributors", "5",
+             "--months", "1", "--end-month", "2026-11", "--out", str(out)],
+            env={"ATLAS_REFERENCE_PATH": str(REFERENCE)},
+        )  # fmt: skip
+        assert result.exit_code == 0, result.output
+        return {str(p.relative_to(out)): p.read_bytes() for p in out.rglob("*.parquet")}
+
+    assert run(tmp_path / "a") == run(tmp_path / "b")
+
+
+@pytest.mark.parametrize("rows", ["999", "10000001"])
+def test_rows_out_of_range_exits_2(rows: str) -> None:
+    assert runner.invoke(app, ["generate", "--rows", rows]).exit_code == 2
+
+
+def test_unknown_scenario_exits_2() -> None:
+    assert runner.invoke(app, ["generate", "--scenarios", "bogus"]).exit_code == 2
+
+
+def test_window_matches_month_window(generated: Path) -> None:
+    window = month_window(date(2026, 11, 1), 2)
+    dts = sorted({str(d) for d in _recharges(generated)["dt"].to_pylist()})
+    assert dts[0] == window.start.isoformat() and dts[-1] == window.end.isoformat()
+
+
+def test_subscriber_pool_is_unique_and_seed_dependent() -> None:
+    pool = subscriber_pool(42)
+    assert len(set(pool)) == len(pool)
+    assert all(v.startswith("SUB-") and len(v) == 14 for v in pool[:100])
+    assert not set(pool) & set(subscriber_pool(43))

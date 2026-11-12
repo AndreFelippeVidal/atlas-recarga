@@ -1,4 +1,4 @@
-"""Entry point do `atlas-cli`. `generate` cobre distributors e pos; o resto é stub até a P4.9."""
+"""Entry point do `atlas-cli`. `generate` cobre as três entidades; o resto é stub até a P4.9."""
 
 import re
 from datetime import date
@@ -8,8 +8,10 @@ from typing import Annotated, NoReturn
 import typer
 
 from atlas_cli.exit_codes import ExitCode
-from atlas_cli.generate import OutputFormat, generate_reference_entities
+from atlas_cli.generate import generate_reference_entities
+from atlas_cli.generate_io import OutputFormat
 from atlas_cli.reference import ReferenceError, load_municipalities
+from atlas_cli.scenarios import parse_scenarios
 
 app = typer.Typer(
     name="atlas-cli",
@@ -38,6 +40,10 @@ def _parse_end_month(value: str | None) -> date:
 
 @app.command()
 def generate(
+    rows: Annotated[
+        int,
+        typer.Option("--rows", min=1_000, max=10_000_000, help="Total aproximado de recargas."),
+    ] = 2_000_000,
     pos: Annotated[int, typer.Option("--pos", min=1, help="Quantidade de PDVs.")] = 5_000,
     distributors: Annotated[
         int, typer.Option("--distributors", min=1, help="Quantidade de distribuidores.")
@@ -47,19 +53,30 @@ def generate(
         str | None, typer.Option("--end-month", help="YYYY-MM; o último mês gerado é este - 1.")
     ] = None,
     seed: Annotated[int, typer.Option("--seed", min=0, help="Mesma seed, mesmos arquivos.")] = 42,
+    scenarios: Annotated[
+        str,
+        typer.Option(
+            "--scenarios",
+            help="Anomalias (CSV), `all` ou `none`. Validada; a injeção entra na P4.6.",
+        ),
+    ] = "all",
     out: Annotated[Path, typer.Option("--out", help="Diretório de saída.")] = Path(
         "./data/generated"
     ),
     fmt: Annotated[OutputFormat, typer.Option("--format")] = OutputFormat.PARQUET,
 ) -> None:
-    """Gera as entidades em arquivos locais (distributors e pos; recharges nas P4.4+)."""
+    """Gera as entidades em arquivos locais (distributors, pos e recharges)."""
     end = _parse_end_month(end_month)
+    try:
+        parse_scenarios(scenarios)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--scenarios") from exc
     try:
         municipalities = load_municipalities()
     except ReferenceError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(ExitCode.REFERENCE_DATA_INVALID) from exc
-    written = generate_reference_entities(
+    written, (partitions, total_rows) = generate_reference_entities(
         out=out,
         seed=seed,
         n_distributors=distributors,
@@ -68,9 +85,11 @@ def generate(
         end_month=end,
         fmt=fmt,
         municipalities=municipalities,
+        rows=rows,
     )
     for path in written:
         typer.echo(str(path))
+    typer.echo(f"{out / 'recharges'}: {total_rows} recargas em {partitions} partições")
 
 
 @app.command()
