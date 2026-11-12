@@ -48,6 +48,7 @@ Códigos de saída: `0` sucesso · `1` `validate` encontrou invariante violado �
 ```
 <out>/
 ├── distributors/distributors.parquet
+├── municipalities/municipalities.csv            # cópia da referência IBGE (a SPEC-002 lê do Volume)
 ├── pos/pos.parquet
 ├── recharges/dt=YYYY-MM-DD/part-0000.parquet   # uma partição por dia
 │   └── part-0001.parquet                        # só com late_arrival ou duplicates (§5)
@@ -130,7 +131,7 @@ O `_manifest.json` lista as contagens exatas injetadas por cenário. Essa é a v
 - `late_arrival`: as linhas atrasadas mantêm o `recharge_ts_utc` do dia D e vão para `recharges/dt=D+1/part-0001.<fmt>`, com o `ingested_at_utc` da partição D+1. Nessas linhas, e nas cópias de `duplicates` (que também chegam na partição do dia seguinte), a partição `dt=` difere do dia em `America/Sao_Paulo` de `recharge_ts_utc`; o silver deve usar `recharge_ts_utc`, não a partição.
 - `duplicates`: a cópia (mesmo `recharge_id`, mesmos valores) fica na partição do dia seguinte ao original, com o `ingested_at_utc` dessa partição.
 - `fractioning`: 3 PDVs, uma rajada de 30 recargas de R$ 10 ao mesmo assinante em menos de 2 min, cada uma num dia diferente.
-- `_manifest.json`: `manifest_version`, `atlas_cli_version`, `seed`, `flags`, `counts` (entidades), `scenarios` (contagens injetadas) e `files` (sha256 por arquivo). Sem timestamps, para ser determinístico.
+- `_manifest.json`: `manifest_version`, `atlas_cli_version`, `seed`, `flags`, `counts` (entidades, inclui `municipalities`), `scenarios` (contagens injetadas) e `files` (sha256 por arquivo). Sem timestamps, para ser determinístico.
 
 ## 6. Invariantes (verificados por `validate` e pelos testes)
 1. A mesma seed e as mesmas flags produzem o mesmo sha256 em todos os arquivos.
