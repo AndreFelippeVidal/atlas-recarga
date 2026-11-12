@@ -16,6 +16,7 @@
 - **Pronto quando:** Deploy em `dev` feito por você; os objetos aparecem no Catalog Explorer
 - **Passos:**
   - SQL de setup idempotente (`CREATE … IF NOT EXISTS`)
+  - Incluir `databricks bundle validate -t demo` no job `bundle-validate` do CI (a P5.1 valida só `dev`)
 
 ## Fase 6 — Pipeline medalhão
 
