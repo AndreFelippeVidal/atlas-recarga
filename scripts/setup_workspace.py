@@ -37,6 +37,7 @@ SCHEMAS = (
 VOLUME_SCHEMA = "raw"
 VOLUME_NAME = "landing"
 GROUPS = ("atlas_readers", "atlas_commission_analysts", "atlas_commission_directors")
+ALREADY_EXISTS = ("already exists", "already in use", "conflict")
 MAX_POLLS = 90  # ~3 min at 2 s; a stuck statement fails instead of hanging
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -84,10 +85,16 @@ def _run_sql(profile: str, warehouse_id: str, statement: str) -> None:
         ):
             break
         time.sleep(2)
-        response = _cli(
-            profile, ["api", "get", f"/api/2.0/sql/statements/{response['statement_id']}"]
-        )
+        statement_id = response.get("statement_id")
+        if not statement_id:
+            raise RuntimeError(f"no statement_id in the response for {statement!r}")
+        response = _cli(profile, ["api", "get", f"/api/2.0/sql/statements/{statement_id}"])
     state = response.get("status", {}) if isinstance(response, dict) else {}
+    if state.get("state") in ("PENDING", "RUNNING"):
+        raise RuntimeError(
+            f"timed out waiting for {statement!r}; it may still finish on the warehouse. "
+            "Check the query history, then run the script again (it is idempotent)."
+        )
     if state.get("state") != "SUCCEEDED":
         raise RuntimeError(f"statement failed: {statement!r} -> {state}")
 
@@ -101,7 +108,8 @@ def _ensure_groups(profile: str) -> list[str]:
             try:
                 _cli(profile, ["groups", "create"], {"displayName": group})
             except RuntimeError as error:
-                if "already exists" not in str(error).lower():  # list is paginated: tolerate it
+                # `groups list` is paginated, so the group may exist without being listed
+                if not any(marker in str(error).lower() for marker in ALREADY_EXISTS):
                     raise
                 continue
             created.append(group)

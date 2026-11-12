@@ -96,3 +96,68 @@ def test_run_sql_gives_up_on_a_stuck_statement(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(setup.time, "sleep", lambda _s: None)
     with pytest.raises(RuntimeError):
         setup._run_sql("p", "w", "SELECT 1")
+
+
+@pytest.mark.parametrize("message", ["already in use", "Conflict: group exists"])
+def test_ensure_groups_tolerates_other_conflict_messages(
+    monkeypatch: pytest.MonkeyPatch, message: str
+) -> None:
+    def fake_cli(profile: str, args: list[str], body: object = None) -> object:
+        if args[:2] == ["groups", "list"]:
+            return []
+        raise RuntimeError(message)
+
+    monkeypatch.setattr(setup, "_cli", fake_cli)
+    assert setup._ensure_groups("p") == []
+
+
+def test_ensure_groups_reraises_other_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_cli(profile: str, args: list[str], body: object = None) -> object:
+        if args[:2] == ["groups", "list"]:
+            return []
+        raise RuntimeError("permission denied")
+
+    monkeypatch.setattr(setup, "_cli", fake_cli)
+    with pytest.raises(RuntimeError, match="permission denied"):
+        setup._ensure_groups("p")
+
+
+def test_run_sql_succeeds_after_polling(monkeypatch: pytest.MonkeyPatch) -> None:
+    responses = iter(
+        [
+            {"statement_id": "s", "status": {"state": "RUNNING"}},
+            {"statement_id": "s", "status": {"state": "SUCCEEDED"}},
+        ]
+    )
+    monkeypatch.setattr(setup, "_cli", lambda *a, **k: next(responses))
+    monkeypatch.setattr(setup.time, "sleep", lambda _s: None)
+    setup._run_sql("p", "w", "SELECT 1")
+
+
+def test_run_sql_timeout_message_says_it_may_still_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        setup, "_cli", lambda *a, **k: {"statement_id": "s", "status": {"state": "RUNNING"}}
+    )
+    monkeypatch.setattr(setup.time, "sleep", lambda _s: None)
+    with pytest.raises(RuntimeError, match="may still finish"):
+        setup._run_sql("p", "w", "SELECT 1")
+
+
+def test_pick_warehouse(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert setup._pick_warehouse("p", "given") == "given"
+    monkeypatch.setattr(setup, "_cli", lambda *a, **k: [{"id": "w1"}])
+    assert setup._pick_warehouse("p", None) == "w1"
+    monkeypatch.setattr(setup, "_cli", lambda *a, **k: [{"id": "w1"}, {"id": "w2"}])
+    with pytest.raises(RuntimeError, match="--warehouse-id"):
+        setup._pick_warehouse("p", None)
+
+
+def test_main_runs_every_statement_then_groups(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    ran: list[str] = []
+    monkeypatch.setattr(setup, "_run_sql", lambda _p, _w, statement: ran.append(statement))
+    monkeypatch.setattr(setup, "_ensure_groups", lambda _p: ["atlas_readers"])
+    assert setup.main(["--target", "demo", "--profile", "x", "--warehouse-id", "w"]) == 0
+    assert ran == setup.build_statements("atlas")
+    assert "groups created: atlas_readers" in capsys.readouterr().out
