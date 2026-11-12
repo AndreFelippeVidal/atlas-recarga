@@ -116,13 +116,12 @@ Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec, em vers�
 
 ### Observações antes de rodar
 
-- A documentação do MLflow open source diz que o production monitoring (automatic evaluation) suporta só LLM judges, e que `@scorer` de código exige servidor self-hosted com job containers. O spike testou se isso vale na Databricks Free Edition.
+- Segundo a documentação do MLflow open source (consultada via ctx7, não verificada na Databricks), o production monitoring (automatic evaluation) suporta só LLM judges, e que `@scorer` de código exige servidor self-hosted com job containers. O spike testou se isso vale na Databricks Free Edition.
 
 ### Execução (mlflow 3.18.0, experiment_id `2340593215239739`)
 
-- 5 traces sintéticos criados (3 com bloco `Fonte:`, 2 sem).
+- 5 traces sintéticos criados (o notebook define 3 com bloco `Fonte:` e 2 sem).
 - `has_source.register(...)` devolveu `name='has_source'` e `start(sampling_config=ScorerSamplingConfig(sample_rate=1.0))` terminou com `start() ok`, sem erro. Um scorer de código foi aceito.
-- Os traces já existiam antes do `start()`, e mesmo assim receberam feedback.
 - Plano B (`search_traces` + `evaluate`): rodou e registrou o run `languid-stork-757` com `has_source/mean = 0.6` (3 de 5), igual ao esperado.
 
 ### Evidência: assessments nos traces
@@ -142,13 +141,13 @@ Os valores batem com o esperado (3 `True` e 2 `False`). Cada trace tem **duas** 
 | Verificação | Resultado | Evidência |
 |---|---|---|
 | Scorer de código registrado e iniciado no experiment | ✅ | saída da etapa 3 |
-| Feedback anexado aos 5 traces | ✅ (com 2 assessments por trace) | saída da etapa 4 |
+| Feedback anexado aos 5 traces **pelo scorer agendado** | ❓ não conclusivo: há 2 assessments por trace e a origem de cada uma (monitoring ou `evaluate` da etapa 5) não foi identificada | saída da etapa 4 |
 | Plano B (`search_traces` + `evaluate`) funciona | ✅ `has_source/mean = 0.6` | captura do run `languid-stork-757` |
 
 ### Resultado
 
-**Passou:** o scorer de código agendado no experiment anexou feedback aos traces na Free Edition (Beta).
+**Passou com ressalva (não conclusivo):** o `start()` de um scorer de código foi aceito sem erro e o plano B funciona. Não está provado que o monitoring agendado anexou feedback sozinho, porque o `evaluate` da etapa 5 também grava assessments nos traces e não se sabe se a etapa 4 rodou antes dela. Para fechar: rodar de novo em experiment novo, com a etapa 4 antes da 5, imprimindo a origem (`source`) de cada assessment.
 
 ### Decisão
 
-Manter o production monitoring como caminho preferencial (ADR-0013). O job diário `atlas_agent_monitoring` continua documentado como plano B, já validado. Pendências para a P10.8: tempo de latência entre trace e assessment (não medido), a causa da duplicata, e o comportamento com LLM judge em amostra de 20% (não testado).
+Tratar o plano B (job diário `atlas_agent_monitoring`, já validado) como o caminho garantido; o production monitoring com scorer de código fica como tentativa a reconfirmar na P10.8. Pendências para a P3.8/P10.8: repetir o teste na ordem acima, tempo de latência entre trace e assessment (não medido), a causa da duplicata, e o comportamento com LLM judge em amostra de 20% (não testado).

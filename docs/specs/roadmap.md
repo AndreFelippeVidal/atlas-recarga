@@ -66,7 +66,7 @@ _Confirmar na Free Edition os recursos em Beta antes de depender deles._
 
 - [x] **P3.1** 🤝 S0.1 Unity Gateway + model service Claude — _pronto quando:_ Resultado em `docs/spikes/S0-results.md`; ADR-0007 atualizado (#13) — passou com ressalva: sem Claude em `system.ai`; ver ADR-0007 · depende de P2.2
 - [x] **P3.2** 🤝 S0.2 Agent service (Beta) — _pronto quando:_ Idem; ADR-0007 (#15) — passou com ressalva: App `agent-*` listado em Agents; sem uso nativo por agente; ver ADR-0007 · depende de P3.1
-- [x] **P3.3** 🤝 S0.3 Production monitoring MLflow 3 — _pronto quando:_ Idem; ADR-0013 (#16) — passou: scorer de código anexou feedback aos traces; plano B validado · depende de P2.2
+- [x] **P3.3** 🤝 S0.3 Production monitoring MLflow 3 — _pronto quando:_ Idem; ADR-0013 (#16) — passou com ressalva: monitoring com scorer de código não conclusivo; plano B validado · depende de P2.2
 - [ ] **P3.4** 🤝 S0.4 Metric views + Genie — _pronto quando:_ Idem; ADR-0005 · depende de P2.2
 - [ ] **P3.5** 🤝 S0.5 OAuth de cliente externo num App MCP — _pronto quando:_ Idem; ADR-0008 · depende de P2.2
 - [ ] **P3.6** 👤 S0.6 Múltiplos usuários — _pronto quando:_ Idem; ADR-0010 · depende de P2.2
