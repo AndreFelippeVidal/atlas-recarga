@@ -90,7 +90,15 @@ def test_manifest_updated_and_validate_passes(tmp_path: Path) -> None:
     manifest = json.loads((out / MANIFEST_NAME).read_text())
     rel = f"recharges/dt={DAY}/part-0000.parquet"
     assert manifest["files"][rel]["sha256"] == sha256_file(out / rel)
-    assert manifest["incremental"][DAY]["rows"] == manifest["incremental"][DAY]["rows"] > 0
+    on_disk = pq.read_metadata(out / rel).num_rows
+    assert manifest["incremental"][DAY]["rows"] == on_disk > 0
+    historical = sum(
+        pq.read_metadata(p).num_rows
+        for p in (out / "recharges").glob("dt=*/part-*.parquet")
+        if f"dt={DAY}" not in str(p)
+    )
+    assert manifest["counts"]["recharges"] == historical + on_disk
+    assert manifest["counts"]["partitions"] == len(list((out / "recharges").glob("dt=*")))
     validated = runner.invoke(app, ["validate", "--out", str(out)], env=ENV)
     assert validated.exit_code == 0, validated.output
     assert "[pulado] invariante 5" in validated.output
@@ -193,3 +201,9 @@ def test_day_volume_follows_seasonality() -> None:
     salary, sunday = date(2026, 10, 7), date(2026, 10, 18)
     assert day_volume(20_000, salary, days) > day_volume(20_000, sunday, days)
     assert sum(day_volume(20_000, d, days) for d in days) == pytest.approx(20_000, rel=0.01)
+
+
+def test_format_mismatch_is_invalid_flag(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    _base(out)
+    assert _incremental(out, "--format", "csv").exit_code == ExitCode.INVALID_FLAG

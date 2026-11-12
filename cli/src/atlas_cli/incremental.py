@@ -21,10 +21,10 @@ from atlas_cli.entities import POS_SCHEMA, month_window
 from atlas_cli.generate_io import OutputFormat, write_table
 from atlas_cli.manifest import sha256_file, write_manifest
 from atlas_cli.recharges import (
-    _seasonality_int,
     build_pos_book,
     generate_recharge_day,
     iter_days,
+    seasonality_int,
     subscriber_pool,
 )
 from atlas_cli.reference import Municipalities
@@ -48,8 +48,8 @@ class IncrementalResult:
 
 def day_volume(rows: int, day: date, window_days: list[date]) -> int:
     """Volume esperado de `day`: `rows` repartido pela sazonalidade da janela histórica."""
-    whole = sum(_seasonality_int(d) for d in window_days)
-    return max(1, rows * _seasonality_int(day) // whole)
+    whole = sum(seasonality_int(d) for d in window_days)
+    return max(1, rows * seasonality_int(day) // whole)
 
 
 def _count_rows(path: Path) -> int:

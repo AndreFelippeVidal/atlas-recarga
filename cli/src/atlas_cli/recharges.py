@@ -111,7 +111,7 @@ SUNDAY_FACTOR_PCT = 70
 _PCT_SCALE = 100**3  # no máximo 3 fatores por dia (salário, mês, domingo)
 
 
-def _seasonality_int(day: date) -> int:
+def seasonality_int(day: date) -> int:
     """Peso inteiro do dia, na escala `_PCT_SCALE`; os fatores se multiplicam."""
     weight, factors = 1, 0
     for applies, pct in (
@@ -128,7 +128,7 @@ def _seasonality_int(day: date) -> int:
 
 def seasonality_weight(day: date) -> float:
     """Fator de sazonalidade do dia (SPEC-001 §4), relativo a um dia comum."""
-    return _seasonality_int(day) / _PCT_SCALE
+    return seasonality_int(day) / _PCT_SCALE
 
 
 def daily_counts(total: int, days: Sequence[date]) -> list[int]:
@@ -139,7 +139,7 @@ def daily_counts(total: int, days: Sequence[date]) -> list[int]:
     """
     if not days:
         raise ValueError("a janela precisa ter ao menos um dia")
-    weights = [_seasonality_int(d) for d in days]
+    weights = [seasonality_int(d) for d in days]
     whole = sum(weights)
     counts = [total * w // whole for w in weights]
     remainders = [total * w % whole for w in weights]
