@@ -8,6 +8,7 @@ dependencies = [
     "numpy>=2.0",
     "pyarrow>=18.0",
     "faker>=30.0",
+    "databricks-sdk>=0.40",
 ]
 
 [project.scripts]

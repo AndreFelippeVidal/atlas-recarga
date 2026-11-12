@@ -1,4 +1,4 @@
-"""Entry point do `atlas-cli`: `generate`, `validate` e `scenario list`; `upload` é stub."""
+"""Entry point do `atlas-cli`: `generate`, `upload`, `validate` e `scenario list`."""
 
 import re
 from datetime import date
@@ -14,6 +14,7 @@ from atlas_cli.incremental import IncrementalError, generate_incremental_day
 from atlas_cli.recharges import NoActivePosError
 from atlas_cli.reference import Municipalities, ReferenceError, load_municipalities
 from atlas_cli.scenarios import catalog, parse_scenarios
+from atlas_cli.upload import DEFAULT_DEST, DatabricksVolume, upload_directory
 from atlas_cli.validate import ValidateError, validate_directory
 
 app = typer.Typer(
@@ -23,13 +24,6 @@ app = typer.Typer(
 )
 scenario_app = typer.Typer(help="Anomalias injetadas nos dados.", no_args_is_help=True)
 app.add_typer(scenario_app, name="scenario")
-
-NOT_IMPLEMENTED_EXIT = 1
-
-
-def _not_implemented(command: str) -> NoReturn:
-    typer.echo(f"atlas-cli {command}: não implementado ainda.", err=True)
-    raise typer.Exit(NOT_IMPLEMENTED_EXIT)
 
 
 def _parse_end_month(value: str | None) -> date:
@@ -161,9 +155,33 @@ def _run_incremental(
 
 
 @app.command()
-def upload() -> None:
+def upload(
+    out: Annotated[Path, typer.Option("--out", help="Diretório gerado por `generate`.")] = Path(
+        "./data/generated"
+    ),
+    profile: Annotated[
+        str | None,
+        typer.Option(
+            "--profile", envvar="ATLAS_DATABRICKS_PROFILE", help="Profile do Databricks CLI."
+        ),
+    ] = None,
+    dest: Annotated[str, typer.Option("--dest", help="Pasta de destino no Volume.")] = DEFAULT_DEST,
+) -> None:
     """Envia os arquivos gerados para o Volume UC /Volumes/atlas/raw/landing/."""
-    _not_implemented("upload")
+    if not profile:
+        raise typer.BadParameter(
+            "informe o profile (não escolho um sozinho)", param_hint="--profile"
+        )
+    if not dest.startswith("/Volumes/") or ".." in dest.split("/"):
+        raise typer.BadParameter("use um caminho /Volumes/... sem `..`", param_hint="--dest")
+    try:
+        result = upload_directory(out, dest, DatabricksVolume(profile))
+    except ValidateError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--out") from exc
+    except Exception as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(ExitCode.UPLOAD_FAILED) from exc
+    typer.echo(f"{dest}: {len(result.uploaded)} enviado(s), {result.skipped} inalterado(s)")
 
 
 @app.command()

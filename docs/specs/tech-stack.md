@@ -10,7 +10,7 @@
 | Plataforma | Databricks Free Edition (serverless) | — | 0001 | Cotas: 1 SQL warehouse 2X-Small · 1 pipeline ativo por tipo · 5 job tasks concorrentes · 3 Apps (auto-stop de 24h) |
 | Governança | Unity Catalog, catálogo `atlas` | — | 0003 | Schemas: `raw, bronze, silver, gold, semantic, commission, eval, observability` |
 | Deploy | Databricks Asset Bundles + Databricks CLI | CLI ≥ 0.260 | 0001 | Targets `dev` (catálogo `atlas_dev`) e `demo` (`atlas`) |
-| Dados sintéticos | `atlas-cli`: Python + Typer + NumPy + PyArrow | Python 3.12 | 0011 | Seed determinística; Faker `pt_BR` só para nomes fictícios |
+| Dados sintéticos | `atlas-cli`: Python + Typer + NumPy + PyArrow; `databricks-sdk` (Files API) só no `upload` | Python 3.12 | 0011 | Seed determinística; Faker `pt_BR` só para nomes fictícios |
 | Ingestão e transformação | Lakeflow Spark Declarative Pipelines (`from pyspark import pipelines as dp`) + Auto Loader | Canal current do pipeline serverless | 0002 | Um único pipeline `atlas_medallion` |
 | Orquestração | Lakeflow Jobs | — | 0002 | `atlas_daily`, `atlas_commission_review`, `atlas_agent_monitoring` |
 | Camada semântica | UC metric views (`WITH METRICS LANGUAGE YAML`) | YAML `version: 1.1` | 0005 | Fonte de verdade em `semantic/*.yaml` |
