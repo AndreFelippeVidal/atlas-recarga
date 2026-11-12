@@ -216,8 +216,8 @@ ADR-0005 mantido como `aceito`, com a nota do S0.4. Os objetos do spike (`worksp
 - App `atlas-s0-5-mcp` criado e implantado com o recurso SQL warehouse (`sql-warehouse`) e a autorização do usuário (OBO) com o escopo `sql`. O primeiro deploy falhou ("No command to run") porque o `databricks sync` partiu da raiz do repo e o `app.yaml` não ficou na raiz do source path; o runbook foi corrigido.
 - Cliente: Claude Code, via `claude mcp add --transport http atlas-s0-5 https://<app-url>/mcp`, autenticado como o usuário (Opção A do runbook). Nenhuma credencial foi versionada nem registrada aqui.
 - `health` respondeu: `{"status":"healthy","message":"Custom MCP Server is healthy and connected to Databricks Apps."}`.
-- `whoami_query` (`SELECT current_user() AS u /* atlas-s0.5 */`, executada com a identidade do usuário) retornou `andrefelippevidal@gmail.com`; `statement_id` `01f1dea7-a747-184d-a93c-12978cbf0892`.
-- `system.query.history` (consulta às 14:45 UTC): a linha do `SELECT current_user() … /* atlas-s0.5 */` (14:45:07 UTC) tem `executed_by` = `andrefelippevidal@gmail.com`, o usuário e não o service principal do App.
+- `whoami_query` (`SELECT current_user() AS u /* atlas-s0.5 */`, executada com a identidade do usuário) retornou o usuário do mantenedor (e-mail omitido); `statement_id` `01f1dea7-a747-184d-a93c-12978cbf0892`.
+- `system.query.history` (consulta às 14:45 UTC): a linha do `SELECT current_user() … /* atlas-s0.5 */` (14:45:07 UTC) tem `executed_by` = o usuário do mantenedor (e-mail omitido), o usuário e não o service principal do App.
 
 ### Achados práticos para a P11.1 / P11.4
 
@@ -236,7 +236,7 @@ ADR-0005 mantido como `aceito`, com a nota do S0.4. Os objetos do spike (`worksp
 
 ### Resultado
 
-**Passou.** Um cliente externo (Claude Code) conecta ao App MCP, e a query roda como o usuário (OBO), com a auditoria por usuário disponível. O plano B (proxy `mcp-remote`, auditoria só no trace) não é acionado.
+**Passou com ressalva.** Um cliente externo (Claude Code) conectou ao App MCP e a query rodou como o usuário (OBO), com a auditoria por usuário disponível. Ressalva: a autenticação foi um token de usuário enviado no cabeçalho; o fluxo OAuth interativo nativo do cliente não foi exercitado (fica para a P11.4/P11.5). O plano B (proxy `mcp-remote`, auditoria só no trace) não é acionado.
 
 ### Decisão
 
