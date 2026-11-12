@@ -910,7 +910,7 @@ municipality_ibge_code,municipality_name,uf,region,population,ddd
 2301505,Arneiroz,CE,NE,7429,88
 2301604,Assaré,CE,NE,21697,88
 2301703,Aurora,CE,NE,23714,88
-2301802,Baixio,CE,NE,5704,85
+2301802,Baixio,CE,NE,5704,88
 2301851,Banabuiú,CE,NE,17195,88
 2301901,Barbalha,CE,NE,75033,88
 2301950,Barreira,CE,NE,22392,85
@@ -965,11 +965,11 @@ municipality_ibge_code,municipality_name,uf,region,population,ddd
 2305308,Ibiapina,CE,NE,23965,88
 2305332,Ibicuitinga,CE,NE,11611,88
 2305357,Icapuí,CE,NE,21433,88
-2305407,Icó,CE,NE,62642,85
+2305407,Icó,CE,NE,62642,88
 2305506,Iguatu,CE,NE,98064,88
 2305605,Independência,CE,NE,24024,88
 2305654,Ipaporanga,CE,NE,11575,88
-2305704,Ipaumirim,CE,NE,12083,85
+2305704,Ipaumirim,CE,NE,12083,88
 2305803,Ipu,CE,NE,41081,88
 2305902,Ipueiras,CE,NE,36798,88
 2306009,Iracema,CE,NE,14001,88
@@ -1015,7 +1015,7 @@ municipality_ibge_code,municipality_name,uf,region,population,ddd
 2309300,Nova Russas,CE,NE,30699,88
 2309409,Novo Oriente,CE,NE,27545,88
 2309458,Ocara,CE,NE,24493,85
-2309508,Orós,CE,NE,19675,85
+2309508,Orós,CE,NE,19675,88
 2309607,Pacajus,CE,NE,70983,85
 2309706,Pacatuba,CE,NE,81524,85
 2309805,Pacoti,CE,NE,11186,85
@@ -1067,7 +1067,7 @@ municipality_ibge_code,municipality_name,uf,region,population,ddd
 2313500,Trairi,CE,NE,58415,88
 2313559,Tururu,CE,NE,15412,88
 2313609,Ubajara,CE,NE,32767,88
-2313708,Umari,CE,NE,6871,85
+2313708,Umari,CE,NE,6871,88
 2313757,Umirim,CE,NE,17470,88
 2313807,Uruburetama,CE,NE,20189,88
 2313906,Uruoca,CE,NE,13746,88

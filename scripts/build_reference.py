@@ -103,7 +103,7 @@ DDD_BY_REGION: dict[str, dict[str, list[str]]] = {
             "Brejo Santo",
             "Camocim",
             "Crateus",
-            "Ica",
+            "Ico",
             "Iguatu",
             "Itapage",
             "Itapipoca",
@@ -444,14 +444,28 @@ def _region_index() -> dict[str, list[tuple[str, str]]]:
     return index
 
 
+_MATCHED: set[tuple[str, str]] = set()  # (uf, normalized key) entries that matched a region
+
+
 def ddd_for(uf: str, region_name: str, index: dict[str, list[tuple[str, str]]]) -> str:
     """DDD of an immediate region: first table entry that matches, else the UF default."""
     normalized = _normalize(region_name)
     for key, ddd in index.get(uf, []):
         # IBGE joins neighbouring cities in one region ("Ilhéus - Itabuna"): match tokens.
         if normalized == key or normalized.startswith(key + " "):
+            _MATCHED.add((uf, key))
             return ddd
     return DEFAULT_DDD[uf]
+
+
+def unmatched_entries() -> list[str]:
+    """Table entries that matched no região imediata (typo or outdated IBGE name)."""
+    return [
+        f"{uf}:{key}"
+        for uf, entries in _region_index().items()
+        for key, _ in entries
+        if (uf, key) not in _MATCHED
+    ]
 
 
 def _fetch_json(url: str) -> list[dict[str, object]]:
@@ -499,6 +513,9 @@ def main() -> int:
         writer.writeheader()
         writer.writerows(rows)
     print(f"{len(rows)} municipalities written to {OUTPUT}")
+    unmatched = unmatched_entries()
+    if unmatched:
+        print(f"WARNING: DDD_BY_REGION entries that matched nothing: {unmatched}")
     return 0
 
 

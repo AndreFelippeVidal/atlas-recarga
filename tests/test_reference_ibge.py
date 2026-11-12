@@ -76,3 +76,12 @@ def test_known_municipalities(rows: list[dict[str, str]]) -> None:
     assert by_code["1302603"]["ddd"] == "92"  # Manaus
     assert by_code["4106902"]["ddd"] == "41"  # Curitiba
     assert by_code["2927408"]["ddd"] == "71"  # Salvador
+
+
+def test_ddd_follows_immediate_region_table(rows: list[dict[str, str]]) -> None:
+    """Cities where the DDD differs from the UF default exercise the region table."""
+    by_code = {r["municipality_ibge_code"]: r for r in rows}
+    assert by_code["3136702"]["ddd"] == "32"  # Juiz de Fora (MG default 31)
+    assert by_code["3548500"]["ddd"] == "13"  # Santos (SP default 11)
+    assert by_code["2611101"]["ddd"] == "87"  # Petrolina (PE default 81)
+    assert by_code["4108304"]["ddd"] == "45"  # Foz do Iguaçu (PR default 41)
