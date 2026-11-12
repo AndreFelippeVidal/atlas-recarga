@@ -23,6 +23,7 @@ jobs:
     outputs:
       python: ${{ steps.filter.outputs.python }}
       docs: ${{ steps.filter.outputs.docs }}
+      bundle: ${{ steps.filter.outputs.bundle }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -37,6 +38,12 @@ jobs:
               - '.github/workflows/ci.yml'
             docs:
               - '**/*.md'
+              - '.github/workflows/ci.yml'
+            bundle:
+              - 'databricks.yml'
+              - 'resources/**'
+              - 'pipeline/**'
+              - 'semantic/**'
               - '.github/workflows/ci.yml'
 
   lint:
@@ -91,8 +98,33 @@ jobs:
           args: --offline --no-progress --exclude-path .venv '**/*.md'
           fail: true
 
+  # ADR-0015: valida o bundle contra o workspace. Os secrets vivem só no Environment
+  # `ci-databricks`. PRs de fork e do Dependabot não recebem secrets: o job é pulado, não falha.
+  bundle-validate:
+    needs: changes
+    if: >-
+      needs.changes.outputs.bundle == 'true' &&
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    environment: ci-databricks
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: databricks/setup-cli@483500c487a296b26b5875a07decbd6e7b1b58c5 # v1.24.0
+        with:
+          version: 1.24.0
+      - run: databricks bundle validate -t dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
   ci-ok:
-    needs: [changes, lint, types, test, secrets, docs]
+    needs: [changes, lint, types, test, secrets, docs, bundle-validate]
     if: always()
     runs-on: ubuntu-latest
     steps:
