@@ -107,3 +107,48 @@ Duas chamadas do agente ao modelo, feitas via `/invocations` com token OAuth no 
 ### Decisão
 
 Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec, em versão parcial (o agente é listado em Agents, mas sem uso nativo por agente). A governança e a medição ficam na **camada do LLM**; o agente é um App com prefixo `agent-` e a atribuição de uso é por `requester` (service principal do App) e `invocation_metadata.source`. O agente deve enviar `request_tags` se quisermos dimensionar por agente (não validado). Ajustes na SPEC-005 na P3.8.
+
+## S0.3 — Production monitoring MLflow 3 (Beta)
+
+- **Data:** 2026-11-12
+- **ADR:** [0013](../adr/0013-mlflow-genai-evaluation-monitoring.md)
+- **Notebook:** `spikes/s0_3_mlflow_monitoring.py` (descartável)
+
+### Observações antes de rodar
+
+- A documentação do MLflow open source diz que o production monitoring (automatic evaluation) suporta só LLM judges, e que `@scorer` de código exige servidor self-hosted com job containers. O spike testou se isso vale na Databricks Free Edition.
+
+### Execução (mlflow 3.18.0, experiment_id `2340593215239739`)
+
+- 5 traces sintéticos criados (3 com bloco `Fonte:`, 2 sem).
+- `has_source.register(...)` devolveu `name='has_source'` e `start(sampling_config=ScorerSamplingConfig(sample_rate=1.0))` terminou com `start() ok`, sem erro. Um scorer de código foi aceito.
+- Os traces já existiam antes do `start()`, e mesmo assim receberam feedback.
+- Plano B (`search_traces` + `evaluate`): rodou e registrou o run `languid-stork-757` com `has_source/mean = 0.6` (3 de 5), igual ao esperado.
+
+### Evidência: assessments nos traces
+
+| trace_id | assessments `has_source` |
+|---|---|
+| `tr-c947d887…` | False, False |
+| `tr-eeea31a2…` | False, False |
+| `tr-1951af80…` | True, True |
+| `tr-e5982a2f…` | True, True |
+| `tr-047042cd…` | True, True |
+
+Os valores batem com o esperado (3 `True` e 2 `False`). Cada trace tem **duas** assessments com o mesmo nome; a causa não foi apurada (hipótese: uma do monitoring e outra do `evaluate` da etapa 5, ou execução em duplicidade). Não afeta o resultado, mas o consumidor do feedback deve tolerar duplicatas.
+
+### Checklist
+
+| Verificação | Resultado | Evidência |
+|---|---|---|
+| Scorer de código registrado e iniciado no experiment | ✅ | saída da etapa 3 |
+| Feedback anexado aos 5 traces | ✅ (com 2 assessments por trace) | saída da etapa 4 |
+| Plano B (`search_traces` + `evaluate`) funciona | ✅ `has_source/mean = 0.6` | captura do run `languid-stork-757` |
+
+### Resultado
+
+**Passou:** o scorer de código agendado no experiment anexou feedback aos traces na Free Edition (Beta).
+
+### Decisão
+
+Manter o production monitoring como caminho preferencial (ADR-0013). O job diário `atlas_agent_monitoring` continua documentado como plano B, já validado. Pendências para a P10.8: tempo de latência entre trace e assessment (não medido), a causa da duplicata, e o comportamento com LLM judge em amostra de 20% (não testado).
