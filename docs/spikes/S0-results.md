@@ -124,7 +124,7 @@ Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec, em vers�
 - `has_source.register(...)` devolveu `name='has_source'` e `start(sampling_config=ScorerSamplingConfig(sample_rate=1.0))` terminou com `start() ok`, sem erro. Um scorer de código foi aceito.
 - Plano B (`search_traces` + `evaluate`): rodou e registrou o run `languid-stork-757` com `has_source/mean = 0.6` (3 de 5), igual ao esperado.
 
-### Evidência: assessments nos traces
+### Evidência da 1ª rodada: assessments nos traces
 
 | trace_id | assessments `has_source` |
 |---|---|
@@ -134,20 +134,28 @@ Proposta (a confirmar pelo mantenedor no PR): seguir o plano B da spec, em vers�
 | `tr-e5982a2f…` | True, True |
 | `tr-047042cd…` | True, True |
 
-Os valores batem com o esperado (3 `True` e 2 `False`). Cada trace tem **duas** assessments com o mesmo nome; a causa não foi apurada (hipótese: uma do monitoring e outra do `evaluate` da etapa 5, ou execução em duplicidade). Não afeta o resultado, mas o consumidor do feedback deve tolerar duplicatas.
+Os valores batem com o esperado (3 `True` e 2 `False`). Cada trace tem **duas** assessments com o mesmo nome; a 2ª rodada abaixo mostra que uma vem do monitoring e a outra do `evaluate`. O consumidor do feedback deve tolerar duplicatas quando o `evaluate` roda sobre traces já avaliados.
+
+### 2ª rodada (2026-11-12, 12:04 UTC), mesmo experiment, etapa 4 antes da 5
+
+- `start()` de novo sem erro. O experiment passou a ter 10 traces (5 da 1ª rodada + 5 novos).
+- Leitura às 12:04:37 UTC, **antes** do `evaluate`: os 5 traces novos tinham **1** assessment `has_source` cada, com `source_type='CODE'` e `source_id='has_source'` (2 `False` e 3 `True`, como esperado). Como o `evaluate` ainda não tinha rodado, o feedback veio do scorer agendado.
+- Os 5 traces da 1ª rodada continuam com 2 assessments cada, o que bate com a explicação: uma do monitoring e outra do `evaluate` da etapa 5 daquela rodada.
+- Plano B: `evaluate` sobre os 10 traces, run `charming-pig-605`, `has_source/mean = 0.6` (3 de 5 nos novos; a média também bate com a rodada anterior).
+- Não medida: a latência entre a criação do trace e a assessment (só há o horário da leitura).
 
 ### Checklist
 
 | Verificação | Resultado | Evidência |
 |---|---|---|
-| Scorer de código registrado e iniciado no experiment | ✅ | saída da etapa 3 |
-| Feedback anexado aos 5 traces **pelo scorer agendado** | ❓ não conclusivo: há 2 assessments por trace e a origem de cada uma (monitoring ou `evaluate` da etapa 5) não foi identificada | saída da etapa 4 |
-| Plano B (`search_traces` + `evaluate`) funciona | ✅ `has_source/mean = 0.6` | captura do run `languid-stork-757` |
+| Scorer de código registrado e iniciado no experiment | ✅ | saída da etapa 3 (2 rodadas) |
+| Feedback anexado aos traces **pelo scorer agendado** | ✅ 2ª rodada: 1 assessment `CODE` por trace novo antes do `evaluate` | saída da etapa 4 (2ª rodada) |
+| Plano B (`search_traces` + `evaluate`) funciona | ✅ `has_source/mean = 0.6` | capturas dos runs `languid-stork-757` e `charming-pig-605` |
 
 ### Resultado
 
-**Passou com ressalva (não conclusivo):** o `start()` de um scorer de código foi aceito sem erro e o plano B funciona. Não está provado que o monitoring agendado anexou feedback sozinho, porque o `evaluate` da etapa 5 também grava assessments nos traces e não se sabe se a etapa 4 rodou antes dela. Para fechar: rodar de novo em experiment novo, com a etapa 4 antes da 5, imprimindo a origem (`source`) de cada assessment.
+**Passou:** na 2ª rodada, um scorer de código agendado (`start()`) anexou feedback `CODE` aos traces novos sem nenhuma chamada ao `evaluate`. A 1ª rodada era ambígua porque o `evaluate` também grava assessments; a duplicata dos traces antigos vem daí. O plano B também foi validado.
 
 ### Decisão
 
-Tratar o plano B (job diário `atlas_agent_monitoring`, já validado) como o caminho garantido; o production monitoring com scorer de código fica como tentativa a reconfirmar na P10.8. Pendências para a P3.8/P10.8: repetir o teste na ordem acima, tempo de latência entre trace e assessment (não medido), a causa da duplicata, e o comportamento com LLM judge em amostra de 20% (não testado).
+Manter o production monitoring com scorer de código como caminho preferencial (ADR-0013), com o job diário `atlas_agent_monitoring` como plano B já validado. Pendências para a P10.8: latência entre trace e assessment (não medida), LLM judge em amostra de 20% (não testado) e se o scorer continua ativo depois de `stop()`/redeploy.

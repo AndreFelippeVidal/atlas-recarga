@@ -1,6 +1,6 @@
 # ADR-0013 — Avaliar e monitorar o agente com MLflow 3 GenAI (offline + gate + produção)
 
-- **Status:** aceito com plano B (Spike S0.3 não conclusivo em 2026-11-12; plano B validado) · **Data:** 2026-11-11 · **Relacionados:** SPEC-005, SPEC-008, ADR-0006
+- **Status:** aceito (Spike S0.3 passou em 2026-11-12; plano B também validado) · **Data:** 2026-11-11 · **Relacionados:** SPEC-005, SPEC-008, ADR-0006
 
 ## Contexto
 A H4 do discovery exige que o agente seja confiável **e continue confiável**. Mudanças de prompt, de modelo (`ATLAS_LLM_SERVICE`) ou de metric view podem degradar a qualidade em silêncio. O medo da Helena é levar um número errado ao comitê. Uma avaliação única no lançamento não protege contra isso.
@@ -29,6 +29,6 @@ A H4 do discovery exige que o agente seja confiável **e continue confiável**. 
 ## Consequências
 - **Positivas:** a métrica de acurácia do PRD vira um **gate de merge**; as falhas de produção alimentam o golden set (ciclo de melhoria).
 - **Negativas aceitas:** o gate custa ~30 chamadas ao agente por PR relevante e precisa de um token do workspace como GitHub secret (escopo mínimo). O scorer `numeric_match` depende de extrair o número principal da resposta, por isso o formato do bloco `Fonte:` é contrato (SPEC-005 §4).
-- **Spike S0.3 (2026-11-12):** `start()` de um scorer de código foi aceito, mas não está provado que o monitoring agendado anexou o feedback; o plano B abaixo foi validado. Ver `docs/spikes/S0-results.md`.
+- **Spike S0.3 (2026-11-12):** um scorer de código agendado (`start()`) anexou feedback `CODE` a traces novos, sem `evaluate`, e o plano B abaixo também foi validado. Ver `docs/spikes/S0-results.md`.
 - **Plano B (S0.3):** job diário com `mlflow.search_traces` + `mlflow.genai.evaluate` gravando em `atlas.observability.agent_quality_daily`.
 - **Revisitar se:** o production monitoring virar GA, ou o custo dos judges passar da cota (reduzir a amostra para 10%).
