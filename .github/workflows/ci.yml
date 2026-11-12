@@ -118,7 +118,9 @@ jobs:
       - uses: databricks/setup-cli@483500c487a296b26b5875a07decbd6e7b1b58c5 # v1.24.0
         with:
           version: 1.24.0
-      - run: databricks bundle validate -t dev
+      - run: |
+          databricks bundle validate -t dev
+          databricks bundle validate -t demo
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
