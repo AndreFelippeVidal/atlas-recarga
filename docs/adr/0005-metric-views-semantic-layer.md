@@ -29,3 +29,6 @@ A dor central da Helena: "cada área calcula a receita de um jeito". Cinco consu
 - **Positivas:** o teste de consistência entre consumidores (PRD §4) fica possível; um único `GRANT` em `semantic`.
 - **Negativas aceitas:** toda nova métrica exige um PR no YAML, o que é mais lento, mas é uma decisão de governança. O MoM fica fora das medidas no MVP (SPEC-004 §5).
 - **Plano B (S0.4 falhar):** views SQL por granularidade com `COMMENT` detalhado, Genie sobre o gold e o golden set ampliado.
+
+## Validação (Spike S0.4, 2026-11-12)
+Metric view com `MEASURE()` e Genie sobre ela funcionam na Free Edition, e as respostas batem com o SQL direto, inclusive a medida composta `avg_ticket`. O plano B não foi acionado. Cuidado ao automatizar: o `aitools query` remove a indentação do YAML, então o deploy usa a SQL Statement API ou um `sql_task`. Detalhes em [S0-results](../spikes/S0-results.md).

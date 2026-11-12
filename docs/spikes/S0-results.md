@@ -159,3 +159,48 @@ Os valores batem com o esperado (3 `True` e 2 `False`). Cada trace tem **duas** 
 ### Decisão
 
 Manter o production monitoring com scorer de código como caminho preferencial (ADR-0013), com o job diário `atlas_agent_monitoring` como plano B já validado. Pendências para a P10.8: latência entre trace e assessment (não medida), LLM judge em amostra de 20% (não testado) e se o scorer continua ativo depois de `stop()`/redeploy.
+
+## S0.4 — Metric views + Genie
+
+- **Data:** 2026-11-12
+- **ADR:** [0005](../adr/0005-metric-views-semantic-layer.md)
+- **Artefatos:** `spikes/s0_4_metric_view.sql` e `spikes/s0_4_genie_space.json` (descartáveis)
+
+### Execução
+
+- Fonte: `samples.tpch.orders` (o catálogo `atlas` só nasce na P5.2). Schema descartável `workspace.atlas_spike_s0_4`.
+- `CREATE VIEW … WITH METRICS LANGUAGE YAML` (version 1.1, `comment`, `display_name` e `synonyms`) funcionou no SQL warehouse da Free Edition. Medidas: `gross_revenue`, `order_count` e a composta `avg_ticket = MEASURE(gross_revenue) / MEASURE(order_count)`.
+- `MEASURE()` por `order_status` devolveu os mesmos valores do SQL direto sobre `samples.tpch.orders`, incluindo o `avg_ticket` (a composta fica correta no agrupamento):
+
+| order_status | gross_revenue | orders | avg_ticket |
+|---|---|---|---|
+| F | 549181919365.27 | 3654501 | 150275.487505755232 |
+| O | 548923692869.55 | 3654310 | 150212.678417963993 |
+| P | 35333603011.43 | 191189 | 184809.811293693675 |
+
+- Genie Space criado por `databricks genie create-space` (`serialized_space` v2) com **só a metric view** como fonte. O space guarda a view em `data_sources.tables`.
+- Conversation API (`start-conversation`), 2 perguntas em PT-BR, ambas `COMPLETED`:
+  - "Qual o ticket médio por status do pedido?" → `MEASURE(avg_ticket) … GROUP BY ALL` sobre `mv_orders`; valores iguais aos da tabela acima. O Genie mapeou "ticket médio" pelo `synonyms`.
+  - "Qual a receita bruta total por mês em 1995, os 3 maiores?" → `MEASURE(gross_revenue)` com `RANK()`; jan/1995 14.690.432.880,22, jul 14.581.176.323,30 e mar 14.574.503.669,87, iguais ao SQL direto.
+
+### Achados práticos para a P7.1 / P7.5
+
+- `databricks experimental aitools tools query` **remove a indentação** do SQL, o que quebra o YAML do `AS $$ … $$` (`Failed to parse YAML`). Para criar metric views, use a SQL Statement API (`databricks api post /api/2.0/sql/statements`) ou o `sql_task` de um job/bundle.
+- O `create-space` não exigiu `parent_path`.
+- Não testado: grants por schema (P7.3), recusa de pergunta fora do escopo, `COMMENT`/instruções do space com 10 exemplos (P7.5), AI/BI Dashboard sobre a view.
+
+### Checklist
+
+| Verificação | Resultado | Evidência |
+|---|---|---|
+| Metric view criada na Free Edition | ✅ | `CREATE VIEW … WITH METRICS` |
+| `MEASURE()` funciona e bate com o SQL direto | ✅ 3 grupos, incluindo a medida composta | tabela acima |
+| Genie responde usando a view | ✅ as 2 perguntas geraram SQL com `MEASURE()` sobre a view | conversation API |
+
+### Resultado
+
+**Passou.** Metric views e Genie funcionam na Free Edition; o plano B (views SQL + Genie sobre o gold) não é acionado.
+
+### Decisão
+
+ADR-0005 mantido como `aceito`, com a nota do S0.4. Os objetos do spike (`workspace.atlas_spike_s0_4` e o Genie Space `01f1dea09d7d1c7ebd204024f1350b36`) devem ser removidos pelo mantenedor depois da revisão.
