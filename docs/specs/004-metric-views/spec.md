@@ -8,9 +8,13 @@ Uma **camada semântica única** em `atlas.semantic`: toda métrica de negócio 
 ## 2. Sintaxe
 Metric views via `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML AS $$ ... $$` (YAML `version: 1.1`), versionadas em `semantic/*.yaml` no repo e aplicadas pelo bundle. Medidas são consultadas com `MEASURE(<nome>)`.
 
+**Deploy:** o job `atlas_semantic_deploy` (sob demanda) roda `semantic/apply_metric_views.py` como `spark_python_task` serverless: troca `${catalog}` pelo catálogo do target e executa o `CREATE OR REPLACE VIEW` com o YAML literal, sem reindentar (ADR-0005). Não é `sql_task` porque o catálogo muda por target (`atlas_dev` e `atlas`) e o YAML não aceita parâmetro.
+
 ## 3. `atlas.semantic.mv_recharges`
 
 **Fonte:** `gold.fct_recharges`, com joins `pos` → `gold.dim_pos`, `pos.municipality` → `gold.dim_municipality` e `pos.distributor` → `gold.dim_distributor`.
+
+> Os joins se chamam `dim_pos` (com `dim_municipality` e `dim_distributor` aninhados), não `pos`: um alias que é prefixo de coluna da fato (`pos_id`) falha com `INVALID_EXTRACT_BASE_FIELD_TYPE`. Na tabela abaixo, `pos.municipality.x` significa `dim_pos.dim_municipality.x`.
 
 **Campos (dimensões)**
 

@@ -1,0 +1,132 @@
+# atlas.semantic.mv_recharges (SPEC-004 §3). Definição única das métricas de recarga.
+# `${catalog}` é trocado por `atlas_dev` ou `atlas` em semantic/apply_metric_views.py; o resto
+# vai literal para `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML`.
+# Os aliases dos joins usam o prefixo `dim_` porque `pos` seria prefixo da coluna `pos_id` da
+# fato (erro INVALID_EXTRACT_BASE_FIELD_TYPE); o join aninhado exige a cadeia completa.
+version: 1.1
+source: ${catalog}.gold.fct_recharges
+comment: >-
+  Recargas de celular da rede Eaí? Telecom (dados sintéticos). Grão: recarga. Receita, quantidade
+  e PDVs ativos consideram só recargas aprovadas; a taxa de estorno considera todas.
+joins:
+  - name: dim_pos
+    source: ${catalog}.gold.dim_pos
+    'on': source.pos_id = dim_pos.pos_id
+    joins:
+      - name: dim_municipality
+        source: ${catalog}.gold.dim_municipality
+        'on': dim_pos.municipality_ibge_code = dim_municipality.municipality_ibge_code
+      - name: dim_distributor
+        source: ${catalog}.gold.dim_distributor
+        'on': dim_pos.distributor_id = dim_distributor.distributor_id
+dimensions:
+  - name: recharge_date
+    expr: source.recharge_date
+    comment: Dia de negócio da recarga, em America/Sao_Paulo.
+    synonyms: [data, dia]
+  - name: recharge_month
+    expr: DATE_TRUNC('MONTH', source.recharge_date)
+    comment: Mês de negócio da recarga, em America/Sao_Paulo.
+    synonyms: [mês]
+  - name: recharge_hour_local
+    expr: source.recharge_hour_local
+    comment: Hora da recarga, de 0 a 23, no fuso da UF do PDV.
+    synonyms: [hora, horário, horário de pico]
+  - name: region
+    expr: dim_pos.dim_municipality.region
+    comment: Região do Brasil do município do PDV (Norte, Nordeste, Centro-Oeste, Sudeste, Sul).
+    synonyms: [região]
+  - name: uf
+    expr: dim_pos.dim_municipality.uf
+    comment: Sigla da UF do município do PDV.
+    synonyms: [estado, UF]
+  - name: municipality_ibge_code
+    expr: dim_pos.dim_municipality.municipality_ibge_code
+    comment: Código IBGE do município do PDV, 7 dígitos.
+    synonyms: [código IBGE]
+  - name: municipality_name
+    expr: dim_pos.dim_municipality.municipality_name
+    comment: Nome do município do PDV.
+    synonyms: [município, cidade]
+  - name: ddd
+    expr: dim_pos.dim_municipality.ddd
+    comment: DDD aproximado do município do PDV.
+    synonyms: [DDD, código de área]
+  - name: pos_type
+    expr: dim_pos.pos_type
+    comment: >-
+      Tipo do PDV: newsstand (banca), pharmacy (farmácia), grocery (mercearia), lottery
+      (lotérica) ou partner_app (app parceiro).
+    synonyms: [tipo de PDV, canal]
+  - name: distributor_name
+    expr: dim_pos.dim_distributor.distributor_name
+    comment: Nome do distribuidor que atende o PDV.
+    synonyms: [distribuidor]
+measures:
+  - name: gross_revenue
+    expr: SUM(source.amount_brl) FILTER (WHERE source.status = 'approved')
+    comment: "Receita bruta em reais (BRL): soma do valor de face das recargas aprovadas."
+    synonyms: [receita, faturamento, volume]
+    format:
+      type: currency
+      currency_code: BRL
+      decimal_places:
+        type: exact
+        places: 2
+  - name: recharge_count
+    expr: COUNT(1) FILTER (WHERE source.status = 'approved')
+    comment: Quantidade de recargas aprovadas.
+    synonyms: [recargas, quantidade]
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+  - name: avg_ticket
+    expr: MEASURE(gross_revenue) / MEASURE(recharge_count)
+    comment: "Ticket médio em reais (BRL): receita bruta dividida pela quantidade de recargas aprovadas."
+    synonyms: [ticket médio]
+    format:
+      type: currency
+      currency_code: BRL
+      decimal_places:
+        type: exact
+        places: 2
+  - name: active_pos
+    expr: COUNT(DISTINCT source.pos_id) FILTER (WHERE source.status = 'approved')
+    comment: >-
+      PDVs ativos: PDV com pelo menos 1 recarga aprovada no período filtrado.
+    synonyms: [PDVs ativos]
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+  - name: revenue_per_active_pos
+    expr: MEASURE(gross_revenue) / MEASURE(active_pos)
+    comment: "Receita por PDV ativo em reais (BRL): receita bruta dividida pelos PDVs ativos."
+    synonyms: [receita por PDV]
+    format:
+      type: currency
+      currency_code: BRL
+      decimal_places:
+        type: exact
+        places: 2
+  - name: reversal_rate
+    expr: COUNT(1) FILTER (WHERE source.status = 'reversed') / COUNT(1)
+    comment: "Taxa de estorno: recargas estornadas divididas por todas as recargas (fração de 0 a 1)."
+    synonyms: [taxa de estorno]
+    format:
+      type: percentage
+      decimal_places:
+        type: max
+        places: 2
+  - name: distinct_subscribers
+    expr: COUNT(DISTINCT source.subscriber_id) FILTER (WHERE source.status = 'approved')
+    comment: Assinantes distintos com pelo menos 1 recarga aprovada no período filtrado.
+    synonyms: [assinantes]
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0

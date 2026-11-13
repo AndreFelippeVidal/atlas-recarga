@@ -1,5 +1,6 @@
 # Declarative Automation Bundle do Atlas Recarga (SPEC-002 §2, tech-stack "Deploy").
 # P5.1: esqueleto. P5.2: catálogo, schemas e Volume (scripts/setup_workspace.py).
+# P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml).
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
 # DATABRICKS_HOST/DATABRICKS_TOKEN no CI (ADR-0015).
@@ -58,6 +59,23 @@ resources:
             python_file: pipeline/freshness.py
             parameters:
               - ${var.catalog}
+
+    atlas_semantic_deploy:
+      name: atlas_semantic_deploy
+      description: "Aplica as metric views de semantic/*.yaml em <catalog>.semantic (SPEC-004 §2). Sob demanda: rode depois do gold existir e a cada mudança nos YAMLs."
+      max_concurrent_runs: 1
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: apply_metric_views
+          environment_key: default
+          spark_python_task:
+            python_file: semantic/apply_metric_views.py
+            parameters:
+              - ${var.catalog}
+              - ${workspace.file_path}/semantic
 
 targets:
   dev:
