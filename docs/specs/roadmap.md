@@ -111,7 +111,7 @@ _Bronze → silver → gold com expectations e linhagem; gold D-1 até 08:00._
 _`mv_recharges` como a única porta de leitura, com AI/BI e Genie em cima._
 
 - [x] **P7.1** 🤖 `semantic/mv_recharges.yaml` + deploy — _pronto quando:_ `SELECT MEASURE(gross_revenue)` funciona (#41) — conferido no `dev` pelo mantenedor via `scripts/check_mv_recharges.py`: as 7 medidas respondem (`gross_revenue` 48.880.720,00) e a soma das 5 regiões bate com o total; o job `atlas_semantic_deploy` aplicou o YAML pelo `spark.sql` · depende de P6.5
-- [x] **P7.2** 🤖 Teste de consistência metric view × SQL direto no gold — _pronto quando:_ Critério 1 da SPEC-004 §8 (#42) — conferência no `dev` pelo mantenedor via `scripts/check_mv_consistency.py` antes do merge · depende de P7.1
+- [x] **P7.2** 🤖 Teste de consistência metric view × SQL direto no gold — _pronto quando:_ Critério 1 da SPEC-004 §8 (#42) — conferido no `dev` pelo mantenedor via `scripts/check_mv_consistency.py`: 12 meses (2025-11 a 2026-10) e o total (48.880.720,00) iguais ao centavo entre `MEASURE(gross_revenue)` e o gold · depende de P7.1
 - [ ] **P7.3** 🤝 Grants: `atlas_readers` só em `semantic` + teste de PERMISSION_DENIED — _pronto quando:_ Critério 4 da SPEC-004 §8 · depende de P7.1
 - [ ] **P7.4** 🤝 AI/BI Dashboard "Atlas — Visão Comercial" (páginas Brasil, UF, Rede) — _pronto quando:_ Publicado; filtros de mês, região e UF · depende de P7.1
 - [ ] **P7.5** 🤝 Genie Space "Atlas Recarga" com instruções e 10 exemplos — _pronto quando:_ Critério 5 da SPEC-004 §8 · depende de P7.1
