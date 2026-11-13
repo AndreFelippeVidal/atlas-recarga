@@ -23,16 +23,17 @@ import re
 import sys
 from datetime import date, datetime
 from decimal import Decimal
-from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-# No workspace o script roda de dentro de `commission/`; o pacote precisa do diretório raiz.
-_ROOT = Path(__file__).resolve().parents[1]
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
 
-from commission import rules  # noqa: E402
+def _rules() -> Any:
+    """`commission.rules`, importado na hora: no serverless o script roda via `exec`, sem
+    `__file__`, então `main` põe a raiz do bundle no `sys.path` antes do primeiro uso."""
+    import importlib
+
+    return importlib.import_module("commission.rules")
+
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -83,9 +84,10 @@ def tier_case(column: Any, field: str) -> Any:
     """`CASE` Spark que escolhe `name` ou `rate` da faixa a partir de `rules.TIERS`."""
     from pyspark.sql import functions as F
 
+    rules = _rules()
     ordered = sorted(rules.TIERS, key=lambda t: t.floor, reverse=True)
 
-    def value(tier: rules.Tier) -> Any:
+    def value(tier: Any) -> Any:
         return F.lit(tier.name if field == "name" else tier.rate)
 
     if ordered[-1].floor != 0:
@@ -106,6 +108,7 @@ def build_lines(volumes: Any, pos: Any, batch_id: str) -> Any:
     """
     from pyspark.sql import functions as F
 
+    rules = _rules()
     base = F.col("approved_amount_brl").cast(MONEY)
     pos_lines = (
         volumes.where(F.col("approved_amount_brl") > 0)
@@ -259,8 +262,11 @@ def create_draft(spark: Any, catalog: str, reference_month: str = "") -> str:
     return batch_id
 
 
-def main(catalog: str, reference_month: str = "") -> None:
+def main(catalog: str, root: str, reference_month: str = "") -> None:
     from pyspark.sql import SparkSession  # só existe no workspace
+
+    if root not in sys.path:
+        sys.path.insert(0, root)  # raiz do bundle, onde mora o pacote `commission`
 
     spark: Any = SparkSession.builder.getOrCreate()
     batch_id = create_draft(spark, catalog, reference_month)
@@ -269,4 +275,4 @@ def main(catalog: str, reference_month: str = "") -> None:
 
 if __name__ == "__main__":
     # sem sys.exit: no serverless, `SystemExit` (até com 0) marca a task como falha
-    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "")
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "")

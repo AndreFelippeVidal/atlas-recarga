@@ -216,6 +216,7 @@ resources:
             python_file: commission/draft.py
             parameters:
               - ${var.catalog}
+              - ${workspace.file_path}
               - "{{job.parameters.reference_month}}"
 
 targets:
