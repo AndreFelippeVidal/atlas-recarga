@@ -15,24 +15,24 @@
 - **Depende de:** P7.1
 - **Pronto quando:** Os KPIs batem com o AI/BI
 
-### P12.3 🤖 `/api/map/uf` e `/api/map/municipality` (com `mom_change`) + validação de `measure`
+### P12.3 🤖 `/api/map/region`, `/api/map/uf` e `/api/map/municipality` (com `mom_change`) + validação de `measure`
 
 - **Depende de:** P12.2
-- **Pronto quando:** 400 para medida inválida; a soma das UFs é igual ao KPI
+- **Pronto quando:** 400 para medida inválida; a soma das regiões e a das UFs são iguais ao KPI
 
 ### P12.4 🤖 Frontend: esqueleto Vite + React + TS, layout, KPI cards
 
 - **Depende de:** P0.5
 - **Pronto quando:** Build no CI (`tsc`, `eslint`, `vitest`)
 
-### P12.5 🤖 Mapa por UF com `d3-geo`, escala de quantis, legenda, tooltip
+### P12.5 🤖 Mapa por região (UFs pintadas pela região) com `d3-geo`, escala de quantis, legenda, tooltip
 
 - **Depende de:** P12.1, P12.3, P12.4
 - **Pronto quando:** Visual conferido por você
 - **Passos:**
   - Usar o skill dataviz para a paleta e a legenda
 
-### P12.6 🤖 Drill-down: clique → zoom → municípios; breadcrumb e Esc
+### P12.6 🤖 Drill-down: Brasil → região → UF → municípios, com zoom; breadcrumb e Esc
 
 - **Depende de:** P12.5
 - **Pronto quando:** Critério 1 da SPEC-007 §6 (queda no PA visível)
