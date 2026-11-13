@@ -173,3 +173,4 @@ def test_check_script_covers_every_measure_and_flags_empty_values() -> None:
     assert check.region_lines([])[0].startswith("FALHA")
     assert check.region_lines([["Sul", "10.50"]])[0].startswith("ok")
     assert check.region_lines([["Sul", None]])[0].startswith("FALHA")
+    assert check.region_lines([["Sul", "abc"]])[0].startswith("FALHA")

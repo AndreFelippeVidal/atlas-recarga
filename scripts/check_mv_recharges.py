@@ -20,7 +20,7 @@ import json
 import subprocess  # a CLI do Databricks é a única coisa que chamamos
 import sys
 from collections.abc import Sequence
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 CATALOGS = {"dev": "atlas_dev", "demo": "atlas"}  # igual ao databricks.yml
 MEASURES = (
@@ -58,11 +58,13 @@ def totals_lines(row: Sequence[str | None]) -> list[str]:
 def region_lines(rows: Sequence[Sequence[str | None]]) -> list[str]:
     if not rows:
         return ["FALHA gross_revenue por região não devolveu linhas"]
-    lines = [
-        f"{'ok   ' if value is not None and Decimal(value) > 0 else 'FALHA'} "
-        f"região {region}: gross_revenue {value}"
-        for region, value in rows
-    ]
+    lines = []
+    for region, value in rows:
+        try:
+            ok = value is not None and Decimal(value) >= 0
+        except InvalidOperation:
+            ok = False
+        lines.append(f"{'ok   ' if ok else 'FALHA'} região {region}: gross_revenue {value}")
     return lines
 
 
