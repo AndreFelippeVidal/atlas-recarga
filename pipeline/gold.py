@@ -1,7 +1,7 @@
-"""Camada gold do pipeline `atlas_medallion` (SPEC-002 §3), task P6.5.
+"""Camada gold do pipeline `atlas_medallion` (SPEC-002 §3), tasks P6.5 e P6.6.
 
 Modelo dimensional consumido pelas metric views (SPEC-004): `dim_municipality`, `dim_pos`,
-`dim_distributor` e `fct_recharges`. Todas são materialized views lidas de silver.
+`dim_distributor`, `fct_recharges` e `agg_pos_month`. Todas são materialized views.
 
 * Cada tabela declara o schema em DDL com `COMMENT` em **todas** as colunas, além do `comment` da
   tabela, porque o Genie e o agente leem essas descrições (SPEC-002 §3, última linha).
@@ -88,6 +88,27 @@ FCT_RECHARGES: list[Column] = [
     ("subscriber_id", "STRING", "Identificador anônimo do assinante que recarregou."),
 ]
 
+AGG_POS_MONTH: list[Column] = [
+    ("pos_id", "STRING", "PDV. Liga em dim_pos. Chave primária junto com recharge_month."),
+    (
+        "recharge_month",
+        "DATE",
+        "Mês de negócio: primeiro dia do mês, em America/Sao_Paulo. Chave primária com pos_id.",
+    ),
+    (
+        "approved_amount_brl",
+        "DECIMAL(14,2)",
+        "Soma, em reais (BRL), das recargas aprovadas do PDV no mês. Base da comissão.",
+    ),
+    ("approved_count", "BIGINT", "Quantidade de recargas aprovadas do PDV no mês."),
+    ("reversed_count", "BIGINT", "Quantidade de recargas estornadas do PDV no mês."),
+    (
+        "distinct_subscribers",
+        "BIGINT",
+        "Assinantes distintos com recarga aprovada no PDV no mês.",
+    ),
+]
+
 
 def ddl(columns: list[Column]) -> str:
     """Schema em DDL com `COMMENT` por coluna (o que o Catalog, o Genie e o agente leem)."""
@@ -148,3 +169,46 @@ def fct_recharges() -> DataFrame:
         "recharge_month", F.trunc(F.col("recharge_date"), "month")
     )
     return project(base, FCT_RECHARGES)
+
+
+@dp.materialized_view(
+    name="gold.agg_pos_month",
+    comment=(
+        "Agregado de recargas por PDV e mês, base da comissão. Só recargas aprovadas entram "
+        "nos valores e em assinantes distintos; estornos aparecem em reversed_count. Inclui "
+        "o PDV ativo sem recarga no mês, com zeros. Grão: PDV x mês."
+    ),
+    schema=ddl(AGG_POS_MONTH),
+)
+def agg_pos_month() -> DataFrame:
+    facts = dp.read("gold.fct_recharges")
+    pos = dp.read("gold.dim_pos")
+    months = facts.select("recharge_month").distinct()
+
+    # PDV ativo no mês: aberto até o último dia do mês e não fechado antes do primeiro dia.
+    active = pos.join(
+        months,
+        (F.col("opened_date") <= F.last_day(F.col("recharge_month")))
+        & (F.col("closed_date").isNull() | (F.col("closed_date") >= F.col("recharge_month"))),
+    ).select("pos_id", "recharge_month")
+    # Quem tem recarga no mês entra mesmo fora da janela, para a soma bater com a fato.
+    keys = active.unionByName(facts.select("pos_id", "recharge_month")).distinct()
+
+    totals = facts.groupBy("pos_id", "recharge_month").agg(
+        F.sum(F.when(F.col("status") == "approved", F.col("amount_brl"))).alias(
+            "approved_amount_brl"
+        ),
+        F.count(F.when(F.col("status") == "approved", 1)).alias("approved_count"),
+        F.count(F.when(F.col("status") == "reversed", 1)).alias("reversed_count"),
+        F.countDistinct(F.when(F.col("status") == "approved", F.col("subscriber_id"))).alias(
+            "distinct_subscribers"
+        ),
+    )
+    joined = keys.join(totals, ["pos_id", "recharge_month"], "left").fillna(
+        0,
+        subset=["approved_count", "reversed_count", "distinct_subscribers"],
+    )
+    joined = joined.withColumn(
+        "approved_amount_brl", F.coalesce(F.col("approved_amount_brl"), F.lit(0))
+    )
+    return project(joined, AGG_POS_MONTH)
