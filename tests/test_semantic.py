@@ -174,3 +174,58 @@ def test_check_script_covers_every_measure_and_flags_empty_values() -> None:
     assert check.region_lines([["Sul", "10.50"]])[0].startswith("ok")
     assert check.region_lines([["Sul", None]])[0].startswith("FALHA")
     assert check.region_lines([["Sul", "abc"]])[0].startswith("FALHA")
+
+
+def _load_consistency_check() -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        "check_mv_consistency", ROOT / "scripts" / "check_mv_consistency.py"
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["check_mv_consistency"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_consistency_query_compares_measure_with_direct_gold_sql() -> None:
+    check = _load_consistency_check()
+    query = check.build_compare_query("atlas_dev")
+    assert "MEASURE(gross_revenue)" in query
+    assert "atlas_dev.semantic.mv_recharges" in query
+    assert "atlas_dev.gold.fct_recharges" in query
+    assert "status = 'approved'" in query
+    assert "FULL OUTER JOIN" in query
+    assert "'TOTAL'" in query
+    assert "(SELECT MEASURE" not in query  # MEASURE só em CTE/nível superior (validado na P7.1)
+    assert query.count("WHERE status = 'approved'") == 2  # por mês e total no gold
+
+
+def test_consistency_lines_are_exact_to_the_cent() -> None:
+    check = _load_consistency_check()
+    same = [["2026-10-01", "100.00", "100.0"], ["TOTAL", "100.00", "100.00"]]
+    assert all(line.startswith("ok") for line in check.compare_lines(same))
+    off_by_cent = [["2026-10-01", "100.01", "100.00"], ["TOTAL", "100.00", "100.00"]]
+    lines = check.compare_lines(off_by_cent)
+    assert lines[0].startswith("FALHA") and lines[1].startswith("ok")
+
+
+def test_consistency_flags_missing_side_empty_and_no_total() -> None:
+    check = _load_consistency_check()
+    total = ["TOTAL", "1.00", "1.00"]
+    assert check.compare_lines([["2026-10-01", None, "1.00"], total])[0].startswith("FALHA")
+    assert check.compare_lines([["2026-10-01", "x", "1.00"], total])[0].startswith("FALHA")
+    assert check.compare_lines([total])[0].startswith("FALHA")  # sem meses
+    assert check.compare_lines([["2026-10-01", "1.00", "1.00"]])[0].startswith("FALHA")
+
+
+def test_consistency_main_exit_codes(monkeypatch: pytest.MonkeyPatch) -> None:
+    check = _load_consistency_check()
+    argv = ["--target", "dev", "--profile", "p", "--warehouse-id", "w"]
+    monkeypatch.setattr(
+        check, "_run", lambda *_: [["2026-10-01", "1.00", "1.00"], ["TOTAL", "1.00", "1.00"]]
+    )
+    assert check.main(argv) == 0
+    monkeypatch.setattr(
+        check, "_run", lambda *_: [["2026-10-01", "1.01", "1.00"], ["TOTAL", "1.00", "1.00"]]
+    )
+    assert check.main(argv) == 1
