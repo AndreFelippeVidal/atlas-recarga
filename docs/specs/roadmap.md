@@ -28,7 +28,7 @@
 | 10 | Agente de negócio | [005-business-agent](005-business-agent/spec.md) | 8 |
 | 11 | MCP server | [006-mcp-server](006-mcp-server/spec.md) | 5 |
 | 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 8 |
-| 13 | Demo e release v1.0 | — | 4 |
+| 13 | Demo e release v1.0 | — | 5 |
 
 ## Fase 0 — Fundação do repositório → [009-repo-foundation](009-repo-foundation/spec.md)
 
@@ -180,7 +180,8 @@ _KPIs + mapa coroplético UF → município, p95 < 3s._
 
 _Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medidas e publicadas._
 
-- [ ] **P13.1** 🤖 `make apps-start` + runbook de demo (auto-stop de 24h) — _pronto quando:_ Os 3 Apps sobem com um comando e os healthchecks passam · depende de P10.8, P11.5, P12.8
+- [ ] **P13.0** 🤝 Migrar schemas, Volume e grants do UC de `setup_workspace.py` para o `databricks.yml` (ADR-0017) — _pronto quando:_ `bundle validate` mostra os schemas com nome fixo em `dev` e `demo`; um `bundle deploy` num catálogo vazio cria schemas, Volume e grants; o script fica só com catálogo e grupos; a P7.3 (`check_readers_permissions.py`) continua passando · depende de P10.8, P11.5, P12.8
+- [ ] **P13.1** 🤖 `make apps-start` + runbook de demo (auto-stop de 24h) — _pronto quando:_ Os 3 Apps sobem com um comando e os healthchecks passam · depende de P10.8, P11.5, P12.8, P13.0
 - [ ] **P13.2** 🤖 Teste de consistência entre os 5 consumidores — _pronto quando:_ Mesmo `gross_revenue` no AI/BI, Genie, agente, MCP e React · depende de P13.1
 - [ ] **P13.3** 🤖 README final (repo-readme-generator) com as métricas medidas do PRD §4 — _pronto quando:_ Uma pessoa nova roda a demo sem perguntar nada · depende de P13.2
 - [ ] **P13.4** 👤 Tag `v1.0.0` + release notes — _pronto quando:_ Release publicado · depende de P13.3
