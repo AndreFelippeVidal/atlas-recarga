@@ -191,8 +191,12 @@ _Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medida
 |---|---|
 | v1.1 | Geo híbrido: CEP → código IBGE em tabela de referência cacheada (ADR-0004) |
 | v1.1 | Medidas com janela nas metric views; filtros de distribuidor e tipo de PDV no mapa |
+| v1.1 | Painel "Leitura do mapa" / "Onde crescer" no dashboard React, sem IA: texto determinístico calculado no backend (maior UF do mês, maior queda contra o mês anterior) |
+| v1.1 | Filtros de recorte e escopo no dashboard React (hoje só mês e medida) |
 | v2 | Forecast e metas regionais com backtesting |
 | v2 | Personas do agente (Helena, Analista, Regional) com golden set por persona |
 | v2 | DQ por camada + Lakehouse Monitoring; expectations de volume bloqueantes |
 | v2 | UI de aprovação de comissão (novo ADR sobre o slot de App) |
+| v2 | Dashboard React com abas (Hierarquia, Indicadores, Território) em vez de tela única |
+| v2 | "Pergunte ao Genie" embutido no `atlas-web`: pede ADR novo sobre a alocação de Apps (ADR-0009) |
 | v3 | Row-level security por região; alertas proativos de queda regional |
