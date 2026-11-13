@@ -29,7 +29,7 @@ PDV fechado no meio do mês recebe sobre o volume até `closed_date`. PDV com vo
 
 | Tabela | Propriedades | Conteúdo |
 |---|---|---|
-| `batches` | | `batch_id` (`COM-YYYY-MM-vN`), `reference_month`, `version`, `status`, `total_pos_brl`, `total_distributor_brl`, `source_snapshot_version` (versão Delta do gold usada), `remittance_sha256`, `created_at_utc` |
+| `batches` | | `batch_id` (`COM-YYYY-MM-vN`), `reference_month`, `version`, `status`, `total_pos_brl`, `total_distributor_brl`, `source_snapshot_version` (versão Delta do gold usada), `remittance_sha256`, `demo_mode` (BOOLEAN NOT NULL, sempre informado: `false` no fluxo normal; ver §9), `created_at_utc` |
 | `batch_lines` | | Linhas de rascunho: `batch_id`, `beneficiary_type` (`pos`\|`distributor`), `beneficiary_id`, `base_amount_brl`, `tier`, `rate`, `commission_brl`, `flags` (array) |
 | `batch_events` | `delta.appendOnly = true` | Trilha de auditoria: `event_id`, `batch_id`, `from_status`, `to_status`, `actor` (`current_user()`), `role`, `justification`, `event_ts_utc` |
 | `locked_lines` | `delta.appendOnly = true` | Cópia das linhas no momento do lock. **Fonte oficial** para a metric view de comissão |
