@@ -14,7 +14,7 @@ uv run python scripts/setup_workspace.py --target dev --profile <perfil>
 ```
 
 `dev` usa o catálogo `atlas_dev` e `demo` usa `atlas`, como no `databricks.yml`. Desde a P7.3 ele também
-aplica os grants de `atlas_readers`: `USE CATALOG` e `USE SCHEMA` + `SELECT` só em `semantic`. Os
+aplica os grants de leitura (ADR-0016: o grupo de workspace não vale no UC, então use `--reader <principal>`, repetível): `USE CATALOG` e `USE SCHEMA` + `SELECT` só em `semantic`. Os
 grants de `commission` ficam para a SPEC-003.
 
 ## `check_readers_permissions.py` (P7.3)

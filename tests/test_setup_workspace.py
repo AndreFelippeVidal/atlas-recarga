@@ -181,3 +181,27 @@ def test_grants_reject_unsafe_catalog_names() -> None:
 def test_dry_run_lists_the_grants(capsys: pytest.CaptureFixture[str]) -> None:
     assert setup.main(["--target", "dev", "--profile", "x", "--dry-run"]) == 0
     assert "GRANT USE SCHEMA, SELECT ON SCHEMA atlas_dev.semantic" in capsys.readouterr().out
+
+
+def test_each_reader_principal_gets_the_grants_directly() -> None:
+    grants = setup.build_grant_statements("atlas_dev", ["5846127f-3d8e-4597-8b69-6e5c58359b0e"])
+    assert len(grants) == 4
+    assert grants[2] == (
+        "GRANT USE CATALOG ON CATALOG atlas_dev TO `5846127f-3d8e-4597-8b69-6e5c58359b0e`"
+    )
+    assert not any("gold" in g or "commission" in g for g in grants)
+
+
+@pytest.mark.parametrize("bad", ["", "a`; DROP CATALOG x --", "x y", "-lead", "a`b"])
+def test_rejects_unsafe_reader_principals(bad: str) -> None:
+    with pytest.raises(ValueError, match="invalid principal"):
+        setup.build_grant_statements("atlas_dev", [bad])
+
+
+def test_main_passes_readers_to_the_grants(monkeypatch: pytest.MonkeyPatch) -> None:
+    ran: list[str] = []
+    monkeypatch.setattr(setup, "_run_sql", lambda _p, _w, statement: ran.append(statement))
+    monkeypatch.setattr(setup, "_ensure_groups", lambda _p: [])
+    argv = ["--target", "dev", "--profile", "x", "--warehouse-id", "w", "--reader", "sp-1"]
+    assert setup.main(argv) == 0
+    assert "GRANT USE CATALOG ON CATALOG atlas_dev TO `sp-1`" in ran

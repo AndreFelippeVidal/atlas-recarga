@@ -1,9 +1,11 @@
-"""Confere as permissões de `atlas_readers` (SPEC-004 §7 e §8, critério 4; task P7.3).
+"""Confere as permissões do leitor de `semantic` (SPEC-004 §7 e §8, critério 4; task P7.3).
 
-O **mantenedor** roda este script com o perfil da CLI de um usuário que está **só** em
-`atlas_readers` (o segundo usuário do S0.6), depois de aplicar os grants:
+O **mantenedor** roda este script com o perfil da CLI de um principal que **não é dono** do
+catálogo (um service principal, como o do agente) e que recebeu os grants por principal
+(ADR-0016), depois de aplicá-los:
 
-    uv run python scripts/setup_workspace.py --target dev --profile andrevidal
+    uv run python scripts/setup_workspace.py --target dev --profile andrevidal \\
+        --reader <application-id-do-leitor>
     uv run python scripts/check_readers_permissions.py --target dev \\
         --profile <perfil-do-leitor> --warehouse-id <id>
 
@@ -11,7 +13,7 @@ Só lê. Espera `SELECT` em `semantic.mv_recharges` com sucesso e `PERMISSION_DE
 `gold`, `silver`, `bronze` e `commission`. Sai com 0 se tudo bate e com 1 caso contrário.
 `USE CATALOG` só deixa ver o catálogo; o `SELECT` em `semantic` não vaza os outros schemas.
 O critério 4 fala do service principal do agente; ele só existe a partir da Fase 10, então aqui
-o leitor é o segundo usuário do S0.6 (que não pode estar em outro grupo com acesso).
+o leitor é um service principal de teste (que não pode ter outro acesso).
 Um erro que não seja de permissão (tabela inexistente, warehouse parado) conta como FALHA:
 só `PERMISSION_DENIED` prova o bloqueio.
 """
