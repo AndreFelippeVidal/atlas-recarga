@@ -13,5 +13,16 @@ uv run python scripts/setup_workspace.py --target dev --profile <perfil> --dry-r
 uv run python scripts/setup_workspace.py --target dev --profile <perfil>
 ```
 
-`dev` usa o catálogo `atlas_dev` e `demo` usa `atlas`, como no `databricks.yml`. Os grants ficam
-para a P7.3 e a SPEC-003.
+`dev` usa o catálogo `atlas_dev` e `demo` usa `atlas`, como no `databricks.yml`. Desde a P7.3 ele também
+aplica os grants de `atlas_readers`: `USE CATALOG` e `USE SCHEMA` + `SELECT` só em `semantic`. Os
+grants de `commission` ficam para a SPEC-003.
+
+## `check_readers_permissions.py` (P7.3)
+
+Roda com o perfil de um usuário que está **só** em `atlas_readers`. Confere que o `SELECT` em
+`semantic.mv_recharges` funciona e que `gold`, `silver`, `bronze` e `commission` dão
+`PERMISSION_DENIED` (SPEC-004 §8, critério 4):
+
+```bash
+uv run python scripts/check_readers_permissions.py --target dev --profile <perfil-do-leitor> --warehouse-id <id>
+```

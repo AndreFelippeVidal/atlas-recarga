@@ -159,5 +159,25 @@ def test_main_runs_every_statement_then_groups(
     monkeypatch.setattr(setup, "_run_sql", lambda _p, _w, statement: ran.append(statement))
     monkeypatch.setattr(setup, "_ensure_groups", lambda _p: ["atlas_readers"])
     assert setup.main(["--target", "demo", "--profile", "x", "--warehouse-id", "w"]) == 0
-    assert ran == setup.build_statements("atlas")
+    assert ran == setup.build_statements("atlas") + setup.build_grant_statements("atlas")
     assert "groups created: atlas_readers" in capsys.readouterr().out
+
+
+def test_readers_get_select_only_on_semantic() -> None:
+    grants = setup.build_grant_statements("atlas_dev")
+    assert grants == [
+        "GRANT USE CATALOG ON CATALOG atlas_dev TO `atlas_readers`",
+        "GRANT USE SCHEMA, SELECT ON SCHEMA atlas_dev.semantic TO `atlas_readers`",
+    ]
+    for layer in ("raw", "bronze", "silver", "gold", "commission", "eval", "observability"):
+        assert not any(f"atlas_dev.{layer}" in g for g in grants)
+
+
+def test_grants_reject_unsafe_catalog_names() -> None:
+    with pytest.raises(ValueError):
+        setup.build_grant_statements("atlas; DROP CATALOG x")
+
+
+def test_dry_run_lists_the_grants(capsys: pytest.CaptureFixture[str]) -> None:
+    assert setup.main(["--target", "dev", "--profile", "x", "--dry-run"]) == 0
+    assert "GRANT USE SCHEMA, SELECT ON SCHEMA atlas_dev.semantic" in capsys.readouterr().out

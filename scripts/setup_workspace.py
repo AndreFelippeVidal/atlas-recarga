@@ -8,8 +8,9 @@ run again. It uses the Databricks CLI (no extra dependency) and never touches se
     uv run python scripts/setup_workspace.py --target dev --profile andrevidal
 
 Targets mirror `databricks.yml`: `dev` -> catalog `atlas_dev`, `demo` -> catalog `atlas`.
-Schemas follow ADR-0003. Grants are NOT part of this task: `atlas_readers` gets `SELECT` on
-`semantic` in P7.3, and the `commission` grants come with SPEC-003.
+Schemas follow ADR-0003. Grants (P7.3, SPEC-004 §7): `atlas_readers` gets `USE CATALOG` and
+`USE SCHEMA` + `SELECT` on `semantic` only, nothing on gold/silver/bronze/commission. The
+`commission` grants come with SPEC-003. Grants need the group to exist, so they run after it.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ SCHEMAS = (
 VOLUME_SCHEMA = "raw"
 VOLUME_NAME = "landing"
 GROUPS = ("atlas_readers", "atlas_commission_analysts", "atlas_commission_directors")
+READERS_GROUP = "atlas_readers"
 ALREADY_EXISTS = ("already exists", "already in use", "conflict")
 MAX_POLLS = 90  # ~3 min at 2 s; a stuck statement fails instead of hanging
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -53,6 +55,16 @@ def build_statements(catalog: str) -> list[str]:
         "COMMENT 'Landing dos arquivos sintéticos (SPEC-001); fonte imutável do pipeline'"
     )
     return statements
+
+
+def build_grant_statements(catalog: str) -> list[str]:
+    """Grants of `atlas_readers`: the metric views are the only read door (SPEC-004 §7)."""
+    if not _IDENTIFIER.fullmatch(catalog):
+        raise ValueError(f"invalid catalog name: {catalog!r}")
+    return [
+        f"GRANT USE CATALOG ON CATALOG {catalog} TO `{READERS_GROUP}`",
+        f"GRANT USE SCHEMA, SELECT ON SCHEMA {catalog}.semantic TO `{READERS_GROUP}`",
+    ]
 
 
 def _cli(profile: str, args: Sequence[str], body: Mapping[str, object] | None = None) -> Any:
@@ -128,6 +140,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.dry_run:
         print("\n".join(f"{s};" for s in statements))
         print("\n".join(f"-- group (created if missing): {g}" for g in GROUPS))
+        print("\n".join(f"{s};" for s in build_grant_statements(CATALOGS[args.target])))
         return 0
 
     warehouse_id = _pick_warehouse(args.profile, args.warehouse_id)
@@ -136,6 +149,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ok: {statement.split(' COMMENT')[0]}")
     created = _ensure_groups(args.profile)
     print(f"groups created: {', '.join(created) or 'none (already existed)'}")
+    for statement in build_grant_statements(CATALOGS[args.target]):
+        _run_sql(args.profile, warehouse_id, statement)  # GRANT is idempotent in Unity Catalog
+        print(f"ok: {statement}")
     return 0
 
 
