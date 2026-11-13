@@ -35,11 +35,15 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "cli/src", "cli/tests", "commission"]
+files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_commission_append_only.py", "cli/src", "cli/tests", "commission"]
 
 [[tool.mypy.overrides]]
 module = ["pyarrow", "pyarrow.*"]
 ignore_missing_imports = true  # pyarrow não publica stubs
+
+[[tool.mypy.overrides]]
+module = ["pyspark", "pyspark.*"]
+ignore_missing_imports = true  # só existe no workspace; o import é feito dentro de main()
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "cli/tests", "commission/tests"]
