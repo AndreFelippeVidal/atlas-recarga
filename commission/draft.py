@@ -88,6 +88,8 @@ def tier_case(column: Any, field: str) -> Any:
     def value(tier: rules.Tier) -> Any:
         return F.lit(tier.name if field == "name" else tier.rate)
 
+    if ordered[-1].floor != 0:
+        raise RuntimeError("a menor faixa de rules.TIERS precisa começar em 0")
     expr = None
     for tier in ordered[:-1]:
         cond = column >= F.lit(tier.floor)
@@ -183,8 +185,16 @@ def create_draft(spark: Any, catalog: str, reference_month: str = "") -> str:
 
     agg_t = f"{catalog}.gold.agg_pos_month"
     snapshot_version = int(spark.sql(f"DESCRIBE HISTORY {agg_t} LIMIT 1").first()["version"])
-    volumes = spark.table(agg_t).where(F.col("recharge_month") == F.lit(month))
+    # Lê exatamente a versão registrada no cabeçalho, mesmo se o pipeline atualizar o gold.
+    snapshot_sql = f"SELECT * FROM {agg_t} VERSION AS OF {snapshot_version}"  # noqa: S608
+    volumes = spark.sql(snapshot_sql).where(F.col("recharge_month") == F.lit(month))
     pos = spark.table(f"{catalog}.gold.dim_pos")
+
+    duplicated = pos.groupBy("pos_id").count().where(F.col("count") > 1).count()
+    if duplicated:
+        raise RuntimeError(f"{duplicated} pos_id duplicado(s) em dim_pos; o join inflaria a base")
+    if volumes.where(F.col("approved_amount_brl") > 0).limit(1).count() == 0:
+        raise RuntimeError(f"sem volume aprovado em {month:%Y-%m}; nenhum lote criado")
 
     # Todo PDV com volume precisa de distribuidor: senão a soma do distribuidor perderia base.
     orphans = (
@@ -199,12 +209,11 @@ def create_draft(spark: Any, catalog: str, reference_month: str = "") -> str:
     # Sem cache (não existe em serverless): grava as linhas e soma o que foi gravado, para o
     # total ser a soma exata das linhas persistidas mesmo se o gold mudar no meio.
     lines = build_lines(volumes, pos, batch_id)
+    # O cabeçalho não existe (checado acima): o que houver em batch_lines é órfão.
     delete_sql = f"DELETE FROM {lines_t} WHERE batch_id = :batch_id"  # noqa: S608
     spark.sql(delete_sql, args={"batch_id": batch_id})  # órfãs de uma execução que caiu antes
     lines.select(*spark.table(lines_t).columns).writeTo(lines_t).append()
     written = spark.table(lines_t).where(F.col("batch_id") == batch_id)
-    if written.limit(1).count() == 0:
-        raise RuntimeError(f"sem volume aprovado em {month:%Y-%m}; nenhum lote criado")
     total_pos = sum_commission(written, "pos")
     total_distributor = sum_commission(written, "distributor")
 

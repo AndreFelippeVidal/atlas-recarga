@@ -42,3 +42,17 @@ def test_tier_rates_match_the_rules_module() -> None:
 
     expected = {t.name: t.rate for t in rules.TIERS}
     assert {name: Decimal(rate) for name, rate in check.TIER_RATES.items()} == expected
+
+
+def test_tier_floors_match_the_rules_module() -> None:
+    from decimal import Decimal
+
+    from commission import rules
+
+    assert {name: Decimal(f) for name, f in check.TIER_FLOORS.items()} == {
+        t.name: t.floor for t in rules.TIERS
+    }
+    sql = check.queries("atlas_dev", "COM-2026-10-v1")["bad_lines"]
+    for tier in rules.TIERS:
+        if tier.floor:
+            assert f">= {tier.floor:.2f} THEN '{tier.name}'" in sql

@@ -11,7 +11,7 @@ Confere, só com leitura:
 1. o lote existe, `version = 1`, `status = 'draft'`, `demo_mode = false`, com a versão do gold;
 2. `total_pos_brl` e `total_distributor_brl` = soma das linhas (já arredondadas);
 3. base dos PDVs = volume aprovado do mês em `gold.agg_pos_month`; distribuidores = PDVs;
-4. nenhuma linha com base <= 0; faixa, taxa e comissão (HALF_EVEN) coerentes com a SPEC-003 §2;
+4. sem linha com base <= 0; faixa (pela base), taxa e comissão (HALF_EVEN) conforme a SPEC-003 §2;
 5. exatamente 1 evento `NULL -> draft` por `system` em `batch_events`.
 
 A reconciliação independente em SQL é a P8.4; aqui só há sanidade. Sai com 0 ou 1.
@@ -29,6 +29,7 @@ from collections.abc import Sequence
 
 CATALOGS = {"dev": "atlas_dev", "demo": "atlas"}  # igual ao databricks.yml
 _BATCH_ID = re.compile(r"^COM-\d{4}-(0[1-9]|1[0-2])-v[1-9]\d*$")
+TIER_FLOORS = {"bronze": "0", "silver": "5000.00", "gold": "20000.00", "diamond": "50000.00"}
 TIER_RATES = {"bronze": "0.0200", "silver": "0.0300", "gold": "0.0400", "diamond": "0.0500"}
 
 
@@ -76,7 +77,15 @@ def queries(catalog: str, batch_id: str) -> dict[str, str]:
     c = f"{catalog}.commission"
     lines = f"{c}.batch_lines WHERE batch_id = '{batch_id}'"
     rate_by_tier = " ".join(f"WHEN '{t}' THEN {r}" for t, r in TIER_RATES.items())
-    bad_pos = f"beneficiary_type = 'pos' AND (tier IS NULL OR rate != CASE tier {rate_by_tier} END)"
+    tier_by_base = (
+        "CASE WHEN base_amount_brl >= 50000.00 THEN 'diamond' "
+        "WHEN base_amount_brl >= 20000.00 THEN 'gold' "
+        "WHEN base_amount_brl >= 5000.00 THEN 'silver' ELSE 'bronze' END"
+    )
+    bad_pos = (
+        "beneficiary_type = 'pos' AND (tier IS NULL OR tier != "
+        f"{tier_by_base} OR rate != CASE tier {rate_by_tier} END)"
+    )
     bad_distributor = "beneficiary_type = 'distributor' AND (tier IS NOT NULL OR rate != 0.0300)"
     return {
         "header": (
