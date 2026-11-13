@@ -3,7 +3,8 @@
 Roda como `spark_python_task` serverless no job `atlas_commission_draft`. Lê só
 `gold.agg_pos_month` (e `gold.dim_pos` para o distribuidor) e grava `commission.batch_lines`,
 `commission.batches` (`status = 'draft'`) e o primeiro evento em `commission.batch_events`.
-Determinístico, sem IA (ADR-0010). Não reconcilia (P8.4), não marca flags (P8.5) e não aprova.
+Determinístico, sem IA (ADR-0010). A reconciliação é a task seguinte do job (`reconcile.py`,
+P8.4). Não marca flags (P8.5) e não aprova.
 
 * Mês de referência: o mês civil anterior ao de hoje em America/Sao_Paulo, ou o informado
   (`YYYY-MM`, nunca o mês corrente nem um futuro).

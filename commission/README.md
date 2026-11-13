@@ -4,7 +4,7 @@ Regras e jobs do fechamento de comissão. Governado pela [SPEC-003](../docs/spec
 
 ## Rascunho do lote (P8.3)
 
-`draft.py` calcula o lote `COM-YYYY-MM-v1` em `draft` a partir de `gold.agg_pos_month` (job `atlas_commission_draft`). Faixas e taxas vêm de `rules.TIERS`; o arredondamento é HALF_EVEN por linha (`bround`). O mês é o anterior ao corrente em America/Sao_Paulo, ou o `reference_month` (`YYYY-MM`) do job. Se o `v1` já existe, o job recusa e não altera nada. Reconciliação, flags e aprovação vêm nas P8.4 a P8.6.
+`draft.py` calcula o lote `COM-YYYY-MM-v1` em `draft` a partir de `gold.agg_pos_month` (job `atlas_commission_draft`). Faixas e taxas vêm de `rules.TIERS`; o arredondamento é HALF_EVEN por linha (`bround`). O mês é o anterior ao corrente em America/Sao_Paulo, ou o `reference_month` (`YYYY-MM`) do job. Se o `v1` já existe, o job recusa e não altera nada. `reconcile.py` (task `reconcile_draft`, a seguinte no mesmo job) recalcula o lote em SQL puro sobre `gold.fct_recharges`, confere os totais de controle e grava `commission.reconciliation` (uma linha por lote; falha o job se a diferença não for R$ 0,00). Flags e aprovação vêm nas P8.5 e P8.6.
 
 ```bash
 databricks bundle deploy -t dev --profile <perfil>
