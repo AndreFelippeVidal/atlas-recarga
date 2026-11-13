@@ -20,3 +20,4 @@ Formato [MADR](https://adr.github.io/madr/). Cada ADR registra o contexto, **pel
 | [0014](0014-branch-protection-solo-maintainer.md) | Proteção da `main`: PR + checks, 0 aprovações (mantenedor único) | aceito |
 | [0015](0015-ci-databricks-auth.md) | Auth do `bundle validate` no CI: secrets num GitHub Environment | aceito |
 | [0016](0016-uc-grants-per-principal.md) | Grants no Unity Catalog por principal, não por grupo de workspace | proposto |
+| [0017](0017-uc-objects-in-bundle.md) | Schemas, Volume e grants do UC declarados no bundle; catálogo e grupos em bootstrap | proposto |
