@@ -2,6 +2,7 @@
 # P5.1: esqueleto. P5.2: catálogo, schemas e Volume (scripts/setup_workspace.py).
 # P7.4: dashboard `atlas_visao_comercial` (AI/BI sobre atlas.semantic.mv_recharges).
 # P7.5: Genie Space `atlas_recarga` (só mv_recharges; mv_commission entra na P8.11).
+# P8.2: job `atlas_commission_deploy` (tabelas de commission.*; não executa o review).
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml).
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
@@ -178,6 +179,23 @@ resources:
             parameters:
               - ${var.catalog}
               - ${workspace.file_path}/semantic
+
+    atlas_commission_deploy:
+      name: atlas_commission_deploy
+      description: "Cria as tabelas de <catalog>.commission a partir de commission/ddl/*.sql (SPEC-003 §3). Sob demanda e idempotente; não calcula nem aprova lotes."
+      max_concurrent_runs: 1
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: apply_ddl
+          environment_key: default
+          spark_python_task:
+            python_file: commission/apply_ddl.py
+            parameters:
+              - ${var.catalog}
+              - ${workspace.file_path}/commission/ddl
 
 targets:
   dev:
