@@ -114,7 +114,7 @@ _`mv_recharges` como a única porta de leitura, com AI/BI e Genie em cima._
 - [x] **P7.2** 🤖 Teste de consistência metric view × SQL direto no gold — _pronto quando:_ Critério 1 da SPEC-004 §8 (#42) — conferido no `dev` pelo mantenedor via `scripts/check_mv_consistency.py`: 12 meses (2025-11 a 2026-10) e o total (48.880.720,00) iguais ao centavo entre `MEASURE(gross_revenue)` e o gold · depende de P7.1
 - [x] **P7.3** 🤝 Grants: `atlas_readers` só em `semantic` + teste de PERMISSION_DENIED — _pronto quando:_ Critério 4 da SPEC-004 §8 (#43) — conferido no `dev` via `scripts/check_readers_permissions.py` com um service principal de teste: `SELECT` em `mv_recharges` permitido; `PERMISSION_DENIED` em gold, silver, bronze e commission. Grants por principal (`--reader`), pois grupo de workspace não vale no UC (ADR-0016) · depende de P7.1
 - [x] **P7.4** 🤝 AI/BI Dashboard "Atlas — Visão Comercial" (páginas Brasil, UF, Rede) — _pronto quando:_ Publicado; filtros de mês, região e UF (#45) — conferido no `dev` pelo mantenedor: ranking de UFs e filtros funcionam; o mapa nativo não reconhece UFs do Brasil, então o coroplético fica na SPEC-007 · depende de P7.1
-- [ ] **P7.5** 🤝 Genie Space "Atlas Recarga" com instruções e 10 exemplos — _pronto quando:_ Critério 5 da SPEC-004 §8 · depende de P7.1
+- [x] **P7.5** 🤝 Genie Space "Atlas Recarga" com instruções e 10 exemplos — _pronto quando:_ Critério 5 da SPEC-004 §8 (#48) — Space no bundle (só `mv_recharges`; `mv_commission` entra na P8.11); critério 5 a conferir pelo mantenedor no `dev` via `scripts/check_genie_space.py` · depende de P7.1
 
 ## Fase 8 — Fechamento de comissão → [003-commission-closing](003-commission-closing/spec.md)
 
