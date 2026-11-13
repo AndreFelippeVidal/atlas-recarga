@@ -2,7 +2,8 @@
 
 Roda como `spark_python_task` serverless no job `atlas_commission_deploy` (databricks.yml), que
 recebe o catálogo do target e o diretório `commission/ddl` sincronizado pelo bundle. Idempotente:
-`CREATE TABLE IF NOT EXISTS`. **Só cria tabelas**; não calcula nem aprova nada.
+`CREATE TABLE IF NOT EXISTS` (não altera colunas de uma tabela existente; só reafirma o
+`appendOnly`). **Só cria tabelas**; não calcula nem aprova nada.
 
 * Um arquivo por tabela, uma instrução por arquivo; o nome do arquivo é o nome da tabela.
 * Só `${catalog}` é trocado, depois de validado; nada de SQL livre.
@@ -48,6 +49,14 @@ def build_ddl(catalog: str, name: str, sql_text: str) -> str:
     return body
 
 
+def build_append_only_alter(catalog: str, name: str) -> str:
+    """Garante `delta.appendOnly` também numa tabela que já existia sem a propriedade."""
+    check_identifier(catalog, "catalog name")
+    if name not in APPEND_ONLY_TABLES:
+        raise ValueError(f"{name} não é append-only")
+    return f"ALTER TABLE {catalog}.{SCHEMA}.{name} SET TBLPROPERTIES ('delta.appendOnly' = 'true')"
+
+
 def main(catalog: str, directory: str) -> None:
     from pyspark.sql import SparkSession  # só existe no workspace
 
@@ -55,6 +64,8 @@ def main(catalog: str, directory: str) -> None:
     spark: Any = SparkSession.builder.getOrCreate()
     for name, sql_text in load_definitions(Path(directory)):
         spark.sql(build_ddl(catalog, name, sql_text))
+        if name in APPEND_ONLY_TABLES:
+            spark.sql(build_append_only_alter(catalog, name))
         print(f"aplicada: {catalog}.{SCHEMA}.{name}")
 
 

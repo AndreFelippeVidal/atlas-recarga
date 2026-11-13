@@ -29,7 +29,7 @@ CATALOGS = {"dev": "atlas_dev", "demo": "atlas"}  # igual ao databricks.yml
 APPEND_ONLY = ("batch_events", "locked_lines")
 MUTABLE = ("batches", "batch_lines", "reconciliation")
 PROBE = "_probe_append_only"
-REJECTION_MARKERS = ("DELTA_CANNOT_MODIFY_APPEND_ONLY", "appendOnly")
+REJECTION_MARKERS = ("DELTA_CANNOT_MODIFY_APPEND_ONLY", "only allow appends")
 
 
 def properties_query(catalog: str, table: str) -> str:
@@ -81,16 +81,21 @@ def _run(profile: str, warehouse_id: str, statement: str) -> list[list[str | Non
 
 
 def check(profile: str, warehouse_id: str, catalog: str) -> list[str]:
+    """Uma linha `ok`/`FALHA` por verificação; erro de infraestrutura vira `FALHA`, não traceback."""
+
     def run(statement: str) -> list[list[str | None]]:
         return _run(profile, warehouse_id, statement)
 
     lines: list[str] = []
-    for table in APPEND_ONLY:
-        ok = is_append_only(run(properties_query(catalog, table)))
-        lines.append(f"{'ok   ' if ok else 'FALHA'} {table}: delta.appendOnly = true")
-    for table in MUTABLE:
-        ok = not is_append_only(run(properties_query(catalog, table)))
-        lines.append(f"{'ok   ' if ok else 'FALHA'} {table}: não é append-only")
+    try:
+        for table in APPEND_ONLY:
+            ok = is_append_only(run(properties_query(catalog, table)))
+            lines.append(f"{'ok   ' if ok else 'FALHA'} {table}: delta.appendOnly = true")
+        for table in MUTABLE:
+            ok = not is_append_only(run(properties_query(catalog, table)))
+            lines.append(f"{'ok   ' if ok else 'FALHA'} {table}: não é append-only")
+    except RuntimeError as error:
+        return [*lines, f"FALHA não consegui ler as propriedades (o deploy rodou?): {error}"]
 
     sql = probe_statements(catalog)
     try:
@@ -106,8 +111,13 @@ def check(profile: str, warehouse_id: str, catalog: str) -> list[str]:
                     f"{'ok   ' if ok else 'FALHA'} {op.upper()} na sonda rejeitado"
                     + ("" if ok else f" por outro motivo: {error}")
                 )
+    except RuntimeError as error:
+        lines.append(f"FALHA a sonda não rodou: {error}")
     finally:
-        run(sql["drop"])
+        try:
+            run(sql["drop"])
+        except RuntimeError as error:
+            lines.append(f"FALHA não consegui descartar {PROBE}; apague à mão: {error}")
     return lines
 
 

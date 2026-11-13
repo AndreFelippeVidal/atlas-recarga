@@ -138,7 +138,16 @@ def test_check_helpers() -> None:
     assert not check.is_append_only([["delta.appendOnly", "false"]])
     assert not check.is_append_only([])
     assert check.is_rejection("[DELTA_CANNOT_MODIFY_APPEND_ONLY] This table is configured")
+    assert check.is_rejection("This table is configured to only allow appends.")
     assert not check.is_rejection("TABLE_OR_VIEW_NOT_FOUND")
+    assert not check.is_rejection("PERMISSION_DENIED on delta.appendOnly property")
+
+
+def test_append_only_alter_only_for_audit_tables() -> None:
+    alter = apply_ddl.build_append_only_alter("atlas_dev", "locked_lines")
+    assert alter.startswith("ALTER TABLE atlas_dev.commission.locked_lines SET TBLPROPERTIES")
+    with pytest.raises(ValueError, match="append-only"):
+        apply_ddl.build_append_only_alter("atlas_dev", "batches")
 
 
 def test_probe_statements_are_scoped_and_append_only() -> None:
