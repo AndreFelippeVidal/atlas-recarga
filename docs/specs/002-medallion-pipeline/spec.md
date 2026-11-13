@@ -41,7 +41,12 @@ Transformar os arquivos de landing em tabelas **bronze → silver → gold** no 
 | `gold.dim_pos` | PDV | `pos_id`, `pos_type`, `distributor_id`, `municipality_ibge_code`, `opened_date`, `closed_date` |
 | `gold.dim_distributor` | distribuidor | `distributor_id`, `distributor_name`, `hq_uf` |
 | `gold.fct_recharges` | recarga | `recharge_id`, `recharge_date`, `recharge_month` (DATE, 1º dia), `recharge_hour_local`, `pos_id`, `amount_brl`, `status`, `subscriber_id` |
-| `gold.agg_pos_month` | PDV × mês | `approved_amount_brl`, `approved_count`, `reversed_count`, `distinct_subscribers`. Base da comissão (SPEC-003) |
+| `gold.agg_pos_month` | PDV × mês | `pos_id`, `recharge_month`, `approved_amount_brl`, `approved_count`, `reversed_count`, `distinct_subscribers`. Base da comissão (SPEC-003) |
+
+Regras de `gold.agg_pos_month`:
+- **Grão e linhas:** uma linha por PDV ativo em cada mês presente em `fct_recharges`, com zeros para o PDV aberto sem recarga no mês. Ativo no mês = `opened_date` até o último dia do mês e `closed_date` nula ou a partir do primeiro dia. Um PDV com recarga no mês entra mesmo fora dessa janela, para a soma bater com `fct_recharges`.
+- **Status:** `approved_amount_brl`, `approved_count` e `distinct_subscribers` contam só `status = 'approved'`; `reversed_count` conta `status = 'reversed'`.
+- **Tipos:** `approved_amount_brl` é `DECIMAL(14,2)`; as contagens são `BIGINT`.
 
 Todas as gold têm `COMMENT` na tabela e em cada coluna, porque o Genie e o agente leem essas descrições.
 
