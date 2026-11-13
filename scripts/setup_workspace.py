@@ -8,8 +8,9 @@ run again. It uses the Databricks CLI (no extra dependency) and never touches se
     uv run python scripts/setup_workspace.py --target dev --profile andrevidal
 
 Targets mirror `databricks.yml`: `dev` -> catalog `atlas_dev`, `demo` -> catalog `atlas`.
-Schemas follow ADR-0003. Grants are NOT part of this task: `atlas_readers` gets `SELECT` on
-`semantic` in P7.3, and the `commission` grants come with SPEC-003.
+Schemas follow ADR-0003. Grants (P7.3, SPEC-004 §7): `atlas_readers` gets `USE CATALOG` and
+`USE SCHEMA` + `SELECT` on `semantic` only, nothing on gold/silver/bronze/commission. The
+`commission` grants come with SPEC-003. Grants need the group to exist, so they run after it.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ SCHEMAS = (
 VOLUME_SCHEMA = "raw"
 VOLUME_NAME = "landing"
 GROUPS = ("atlas_readers", "atlas_commission_analysts", "atlas_commission_directors")
+READERS_GROUP = "atlas_readers"
 ALREADY_EXISTS = ("already exists", "already in use", "conflict")
 MAX_POLLS = 90  # ~3 min at 2 s; a stuck statement fails instead of hanging
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -52,6 +54,28 @@ def build_statements(catalog: str) -> list[str]:
         f"CREATE VOLUME IF NOT EXISTS {catalog}.{VOLUME_SCHEMA}.{VOLUME_NAME} "
         "COMMENT 'Landing dos arquivos sintéticos (SPEC-001); fonte imutável do pipeline'"
     )
+    return statements
+
+
+_PRINCIPAL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]*$")  # user e-mail, SP name or application id
+
+
+def build_grant_statements(catalog: str, readers: Sequence[str] = ()) -> list[str]:
+    """Grants of the readers: the metric views are the only read door (SPEC-004 §7).
+
+    `atlas_readers` is a workspace group, which Unity Catalog does not evaluate (ADR-0016), so
+    each reader principal also gets the grants directly. Names are validated, never free SQL.
+    """
+    if not _IDENTIFIER.fullmatch(catalog):
+        raise ValueError(f"invalid catalog name: {catalog!r}")
+    statements = []
+    for principal in (READERS_GROUP, *readers):
+        if principal != READERS_GROUP and not _PRINCIPAL.fullmatch(principal):
+            raise ValueError(f"invalid principal: {principal!r}")
+        statements += [
+            f"GRANT USE CATALOG ON CATALOG {catalog} TO `{principal}`",
+            f"GRANT USE SCHEMA, SELECT ON SCHEMA {catalog}.semantic TO `{principal}`",
+        ]
     return statements
 
 
@@ -121,6 +145,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--target", choices=sorted(CATALOGS), required=True)
     parser.add_argument("--profile", required=True, help="Databricks CLI profile (never implicit)")
     parser.add_argument("--warehouse-id", help="SQL warehouse; auto-picked if there is only one")
+    parser.add_argument(
+        "--reader",
+        action="append",
+        default=[],
+        help="principal (user e-mail, SP name or application id) that reads `semantic`; repeatable",
+    )
     parser.add_argument("--dry-run", action="store_true", help="print the plan and change nothing")
     args = parser.parse_args(argv)
 
@@ -128,6 +158,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.dry_run:
         print("\n".join(f"{s};" for s in statements))
         print("\n".join(f"-- group (created if missing): {g}" for g in GROUPS))
+        grants = build_grant_statements(CATALOGS[args.target], args.reader)
+        print("\n".join(f"{s};" for s in grants))
         return 0
 
     warehouse_id = _pick_warehouse(args.profile, args.warehouse_id)
@@ -136,6 +168,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ok: {statement.split(' COMMENT')[0]}")
     created = _ensure_groups(args.profile)
     print(f"groups created: {', '.join(created) or 'none (already existed)'}")
+    for statement in build_grant_statements(CATALOGS[args.target], args.reader):
+        _run_sql(args.profile, warehouse_id, statement)  # GRANT is idempotent in Unity Catalog
+        print(f"ok: {statement}")
     return 0
 
 

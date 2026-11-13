@@ -67,6 +67,8 @@ A variação mês contra mês **não** vira medida no MVP. O consumidor consulta
 ## 7. Permissões
 O grupo `atlas_readers` (Helena, gerentes e os service principals do agente, do MCP e do React) recebe `SELECT` em `atlas.semantic.*` e **nada** em `gold`, `silver`, `bronze` e `commission`. As metric views são a única porta de leitura.
 
+> **Limite de plataforma (ADR-0016):** `atlas_readers` é um grupo de workspace e o Unity Catalog não avalia grants dele. Na prática o `SELECT` é concedido **a cada principal** (`setup_workspace.py --reader`); o grant no grupo fica para quando ele for um grupo de conta.
+
 ## 8. Critérios de aceite
 - **Dado** o mês M, **quando** consulto `MEASURE(gross_revenue)` na metric view e o SQL de referência direto no gold, **então** os valores são iguais ao centavo.
 - **Dado** um rascunho de comissão em `draft`, **então** `mv_commission` não retorna nenhuma linha dele.
