@@ -1,0 +1,148 @@
+"""Checks de `silver.recharges` (SPEC-002 §3, P6.2). Sem workspace e sem pyspark."""
+
+from __future__ import annotations
+
+import ast
+import importlib.util
+import sys
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parents[1]
+SILVER = ROOT / "pipeline" / "silver.py"
+
+
+def _load_script() -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        "check_silver_recharges", ROOT / "scripts" / "check_silver_recharges.py"
+    )
+    assert spec
+    assert spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["check_silver_recharges"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _recharges_decorators() -> dict[str, list[tuple[str, ...]]]:
+    """decorator -> lista de argumentos literais, da função `recharges` de `silver.py`."""
+    tree = ast.parse(SILVER.read_text(encoding="utf-8"))
+    func = next(
+        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "recharges"
+    )
+    found: dict[str, list[tuple[str, ...]]] = {}
+    for deco in func.decorator_list:
+        assert isinstance(deco, ast.Call)
+        assert isinstance(deco.func, ast.Attribute)
+        args = tuple(str(ast.literal_eval(a)) for a in deco.args)
+        kwargs = tuple(str(ast.literal_eval(k.value)) for k in deco.keywords)
+        found.setdefault(deco.func.attr, []).append(args + kwargs)
+    return found
+
+
+def test_silver_recharges_expectations_follow_the_spec() -> None:
+    decorators = _recharges_decorators()
+    assert decorators["expect_or_drop"] == [
+        ("pos_not_null", "pos_id IS NOT NULL"),
+        ("positive_amount", "amount_brl > 0"),
+        ("valid_status", "status IN ('approved','reversed')"),
+    ]
+    assert decorators["expect"] == [("face_value", "amount_brl IN (10,15,20,25,30,40,50,100)")]
+    assert "expect_or_fail" not in decorators
+
+
+def test_silver_recharges_is_a_streaming_table_with_comment() -> None:
+    table = _recharges_decorators()["table"]
+    assert len(table) == 1
+    assert table[0][0] == "silver.recharges"
+    assert table[0][1]
+
+
+def test_silver_derives_the_business_date_in_sao_paulo_and_dedups_by_id() -> None:
+    text = SILVER.read_text(encoding="utf-8")
+    assert 'BUSINESS_TZ = "America/Sao_Paulo"' in text
+    assert 'dropDuplicates(["recharge_id"])' in text
+    assert '"recharge_hour_local"' in text
+
+
+def _pure_namespace() -> dict[str, Any]:
+    """Executa só as constantes e `utc_offset_for_uf` de `silver.py` (sem importar pyspark)."""
+    tree = ast.parse(SILVER.read_text(encoding="utf-8"))
+    keep: list[ast.stmt] = []
+    for node in tree.body:
+        is_const = isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant | ast.Dict)
+        is_fn = isinstance(node, ast.FunctionDef) and node.name == "utc_offset_for_uf"
+        if is_const or is_fn:
+            keep.append(node)
+    namespace: dict[str, Any] = {}
+    exec(compile(ast.Module(keep, []), str(SILVER), "exec"), namespace)  # noqa: S102
+    return namespace
+
+
+def _local_hour(ts_utc: datetime, uf: str | None) -> int:
+    offset = _pure_namespace()["utc_offset_for_uf"](uf)
+    sign = -1 if offset.startswith("-") else 1
+    hours = int(offset[1:3])
+    return (ts_utc + sign * timedelta(hours=hours)).hour
+
+
+def test_local_hour_follows_the_uf_timezone() -> None:
+    ts = datetime(2026, 3, 10, 2, 30, tzinfo=UTC)
+    assert _local_hour(ts, "AC") == 21  # UTC-5, dia anterior
+    assert _local_hour(ts, "AM") == 22
+    assert _local_hour(ts, "MS") == 22
+    assert _local_hour(ts, "SP") == 23  # UTC-3
+    assert _local_hour(ts, "PA") == 23
+    assert _local_hour(ts, None) == 23  # PDV órfão: padrão de Brasília
+
+
+def test_every_uf_in_the_offset_map_is_a_real_brazilian_uf() -> None:
+    ns = _pure_namespace()
+    assert set(ns["UTC_OFFSET_BY_UF"]) == {"AC", "AM", "RO", "RR", "MT", "MS"}
+    assert ns["utc_offset_for_uf"]("SP") == "-03:00"
+
+
+def test_business_date_is_the_sao_paulo_day_not_the_utc_day() -> None:
+    # 02:30 UTC de 11/03 ainda é 23:30 de 10/03 em São Paulo (UTC-3): o dia de negócio é 10.
+    ts = datetime(2026, 3, 11, 2, 30, tzinfo=UTC)
+    assert ts.astimezone(ZoneInfo(_pure_namespace()["BUSINESS_TZ"])).date() == date(2026, 3, 10)
+    assert ts.date() == date(2026, 3, 11)
+
+
+def test_expected_silver_count_subtracts_dups_nulls_and_negatives_but_not_orphans() -> None:
+    script = _load_script()
+    manifest = {
+        "counts": {"recharges": 1_999_930},
+        "scenarios": {
+            "duplicates": {"rows": 4000},
+            "null_pos": {"rows": 1000},
+            "negative_amount": {"rows": 10},
+            "unknown_pos": {"rows": 1000},
+            "late_arrival": {"rows": 9915},
+        },
+    }
+    assert script.expected_silver_count(manifest) == 1_999_930 - 4000 - 1000 - 10
+
+
+def test_expected_silver_count_without_scenarios_is_the_total() -> None:
+    script = _load_script()
+    assert script.expected_silver_count({"counts": {"recharges": 7}, "scenarios": {}}) == 7
+
+
+def test_compare_flags_a_mismatch() -> None:
+    script = _load_script()
+    assert script.compare(10, 10).startswith("ok")
+    assert script.compare(10, 9).startswith("FALHA")
+
+
+def test_query_reads_only_silver_recharges() -> None:
+    script = _load_script()
+    assert "FROM atlas_dev.silver.recharges" in script.build_query("atlas_dev")
+
+
+def test_bundle_registers_the_silver_file() -> None:
+    text = (ROOT / "databricks.yml").read_text(encoding="utf-8")
+    assert "pipeline/silver.py" in text

@@ -21,6 +21,8 @@ resources:
       libraries:
         - file:
             path: pipeline/bronze.py
+        - file:
+            path: pipeline/silver.py
       configuration:
         atlas.landing_path: /Volumes/${var.catalog}/raw/landing
 
