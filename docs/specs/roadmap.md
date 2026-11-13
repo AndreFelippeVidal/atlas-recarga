@@ -169,10 +169,10 @@ _KPIs + mapa coroplético UF → município, p95 < 3s._
 
 - [ ] **P12.1** 🤖 `scripts/fetch_geo.py`: malhas do IBGE → TopoJSON simplificado em `apps/web/public/geo/` — _pronto quando:_ Tamanhos dentro do limite; teste de match de 100% com `dim_municipality` · depende de P4.2
 - [ ] **P12.2** 🤖 Backend FastAPI: `/api/months`, `/api/kpis`, `/api/health` + cache — _pronto quando:_ Os KPIs batem com o AI/BI · depende de P7.1
-- [ ] **P12.3** 🤖 `/api/map/uf` e `/api/map/municipality` (com `mom_change`) + validação de `measure` — _pronto quando:_ 400 para medida inválida; a soma das UFs é igual ao KPI · depende de P12.2
+- [ ] **P12.3** 🤖 `/api/map/region`, `/api/map/uf` e `/api/map/municipality` (com `mom_change`) + validação de `measure` — _pronto quando:_ 400 para medida inválida; a soma das regiões e a das UFs são iguais ao KPI · depende de P12.2
 - [ ] **P12.4** 🤖 Frontend: esqueleto Vite + React + TS, layout, KPI cards — _pronto quando:_ Build no CI (`tsc`, `eslint`, `vitest`) · depende de P0.5
-- [ ] **P12.5** 🤖 Mapa por UF com `d3-geo`, escala de quantis, legenda, tooltip — _pronto quando:_ Visual conferido por você · depende de P12.1, P12.3, P12.4
-- [ ] **P12.6** 🤖 Drill-down: clique → zoom → municípios; breadcrumb e Esc — _pronto quando:_ Critério 1 da SPEC-007 §6 (queda no PA visível) · depende de P12.5
+- [ ] **P12.5** 🤖 Mapa por região (UFs pintadas pela região) com `d3-geo`, escala de quantis, legenda, tooltip — _pronto quando:_ Visual conferido por você · depende de P12.1, P12.3, P12.4
+- [ ] **P12.6** 🤖 Drill-down: Brasil → região → UF → municípios, com zoom; breadcrumb e Esc — _pronto quando:_ Critério 1 da SPEC-007 §6 (queda no PA visível) · depende de P12.5
 - [ ] **P12.7** 🤖 Escala divergente `mom_change`, estados de loading e erro, acessibilidade — _pronto quando:_ Critério 6 da SPEC-007 §6 + navegação por teclado · depende de P12.6
 - [ ] **P12.8** 🤝 Deploy do App `atlas-web` + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.7
 
