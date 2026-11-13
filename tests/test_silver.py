@@ -1,6 +1,4 @@
-"""Checks de `silver.recharges` e da quarentena (SPEC-002 §3, P6.2 e P6.3).
-
-Sem workspace e sem pyspark."""
+"""Checks de `silver.recharges` e da quarentena (SPEC-002 §3, P6.2 e P6.3). Sem workspace."""
 
 from __future__ import annotations
 
@@ -164,11 +162,28 @@ def test_quarantine_is_a_table_without_dropping_expectations() -> None:
     assert ast.literal_eval(first.keywords[0].value) == "silver.recharges_quarantine"
 
 
+def _join_types(func_name: str) -> list[str]:
+    """Tipos (literais) dos `.join(..., "pos_id", <tipo>)` da função de `silver.py`."""
+    tree = ast.parse(SILVER.read_text(encoding="utf-8"))
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == func_name)
+    found: list[str] = []
+    for node in ast.walk(func):
+        is_join = (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "join"
+            and len(node.args) == 3
+        )
+        if is_join:
+            assert isinstance(node, ast.Call)
+            found.append(str(ast.literal_eval(node.args[2])))
+    return found
+
+
 def test_orphans_are_split_with_inner_join_and_anti_join() -> None:
-    text = SILVER.read_text(encoding="utf-8")
-    assert 'deduped.join(F.broadcast(pos_uf()), "pos_id", "inner")' in text
-    assert '"left_anti"' in text
-    assert 'F.col("pos_id").isNotNull()' in text  # nulo não é órfão
+    assert _join_types("recharges") == ["inner"]
+    assert _join_types("recharges_quarantine") == ["left_anti"]
+    assert 'F.col("pos_id").isNotNull()' in SILVER.read_text(encoding="utf-8")  # nulo não é órfão
 
 
 def test_expected_quarantine_count_is_the_unknown_pos_rows() -> None:

@@ -18,6 +18,11 @@ P6.3: recarga cujo `pos_id` não existe em `bronze.pos` (provisório até a P6.4
 `silver.pos`) não entra em `silver.recharges`; vai para `silver.recharges_quarantine`, que as retém
 (não as descarta). `pos_id` nulo não é órfão: `pos_not_null` o descarta em `silver.recharges`.
 As duas tabelas particionam o bronze sem sobreposição.
+Limitação conhecida (stream-static): o lado estático (`bronze.pos`) é um snapshot por atualização.
+Uma recarga que chega antes do seu PDV vai para a quarentena e lá fica, sem voltar para
+`silver.recharges` (reprocessar a quarentena é trabalho futuro). Os dois fluxos leem snapshots
+separados; com `bronze.pos` estático, como hoje, a partição é exata. Na P6.4, `known_pos` e
+`pos_uf` mudam juntos para `silver.pos`.
 """
 
 from pyspark import pipelines as dp
