@@ -19,3 +19,4 @@ Formato [MADR](https://adr.github.io/madr/). Cada ADR registra o contexto, **pel
 | [0013](0013-mlflow-genai-evaluation-monitoring.md) | Avaliação e monitoramento com MLflow 3 GenAI | aceito (Spike S0.3) |
 | [0014](0014-branch-protection-solo-maintainer.md) | Proteção da `main`: PR + checks, 0 aprovações (mantenedor único) | aceito |
 | [0015](0015-ci-databricks-auth.md) | Auth do `bundle validate` no CI: secrets num GitHub Environment | aceito |
+| [0016](0016-uc-grants-per-principal.md) | Grants no Unity Catalog por principal, não por grupo de workspace | proposto |
