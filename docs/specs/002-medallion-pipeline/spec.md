@@ -59,6 +59,8 @@ Todas as gold têm `COMMENT` na tabela e em cada coluna, porque o Genie e o agen
 | Mais de 1% de linhas descartadas no silver em um dia | A task 3 registra `quality_status = 'degraded'`. Não bloqueia no MVP; bloqueia na v2 |
 | Reprocessamento total | Full refresh do pipeline; o bronze é reconstruído a partir do Volume (fonte imutável) |
 
+**`observability.pipeline_freshness` (task 3 do job):** uma linha por execução, com `run_ts_utc`, `business_date`, `max_recharge_date`, `freshness_status`, `ingested_count`, `dropped_count`, `dropped_ratio` e `quality_status`. `stale` = `max(recharge_date)` de `gold.fct_recharges` anterior a D-1 em America/Sao_Paulo (ou fato vazia). `degraded` = mais de 1% dos `recharge_id` ingeridos no bronze nas últimas 24 h ausentes de `silver.recharges` e de `silver.recharges_quarantine` (duplicados e quarentena não contam como descarte). A task de comissão (dia 1º) entra no job junto com a SPEC-003.
+
 ## 5. Critérios de aceite
 - **Dado** o dataset padrão com `--scenarios all`, **quando** o pipeline roda, **então** `silver.recharges` = total gerado − duplicados − nulos − negativos − órfãos, conforme o `_manifest.json`, com diferença exata de 0.
 - **Dado** os órfãos injetados, **então** `silver.recharges_quarantine` contém exatamente as linhas `unknown_pos`.
