@@ -103,7 +103,7 @@ _Bronze → silver → gold com expectations e linhagem; gold D-1 até 08:00._
 - [x] **P6.3** 🤖 Silver `recharges_quarantine` (PDV órfão) — _pronto quando:_ Critério 2 da SPEC-002 §5 (#35) — conferência no workspace pelo mantenedor via `scripts/check_silver_recharges.py` · depende de P6.2
 - [x] **P6.4** 🤖 Silver das dimensões com `expect_or_fail` — _pronto quando:_ Critério 4 da SPEC-002 §5 (teste com um PDV de município inválido) (#36) — conferido no `dev` pelo mantenedor via `scripts/check_silver_pos_integrity.py` · depende de P6.1
 - [x] **P6.5** 🤖 Gold: `dim_*` + `fct_recharges` com COMMENT em tabelas e colunas — _pronto quando:_ Linhagem visível; todas as colunas descritas (#37) — conferido no `dev` pelo mantenedor: contagens batem com o silver, COMMENT em tabelas e colunas, `amount_brl` DECIMAL(14,2), 0 fatos sem PDV, linhagem visível · depende de P6.3, P6.4
-- [x] **P6.6** 🤖 Gold `agg_pos_month` — _pronto quando:_ A soma bate com `fct_recharges` por mês (#38) — conferência no workspace pelo mantenedor via `scripts/check_gold_agg_pos_month.py` · depende de P6.5
+- [x] **P6.6** 🤖 Gold `agg_pos_month` — _pronto quando:_ A soma bate com `fct_recharges` por mês (#38) — conferido no `dev` pelo mantenedor via `scripts/check_gold_agg_pos_month.py`: 12 meses (2025-11 a 2026-10) com valor aprovado, aprovadas e estornadas iguais à `fct_recharges`; 0 duplicatas · depende de P6.5
 - [ ] **P6.7** 🤝 Job `atlas_daily` (06:00) + task de frescor em `observability.pipeline_freshness` — _pronto quando:_ Execução agendada termina antes das 08:00 · depende de P6.6
 
 ## Fase 7 — Camada semântica (recargas) → [004-metric-views](004-metric-views/spec.md)
