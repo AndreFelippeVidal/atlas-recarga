@@ -32,12 +32,12 @@ def evaluate(sql: str | None) -> list[str]:
     if not sql:
         return ["FALHA o Genie não devolveu SQL"]
     text = sql.lower()
-    uses_ddd = re.search(r"\bddd\b", text) is not None
+    groups_by_ddd = re.search(r"group\s+by[^;]*\bddd\b", text) is not None
     uses_measure = re.search(r"measure\s*\(\s*(\w+\.)?gross_revenue\s*\)", text) is not None
-    leaks = [s for s in FORBIDDEN_SCHEMAS if re.search(rf"\.{s}\.", text)]
+    leaks = [s for s in FORBIDDEN_SCHEMAS if re.search(rf"\b{s}\.", text)]
     checks = [
         ("consulta mv_recharges", "mv_recharges" in text),
-        ("usa a dimensão ddd", uses_ddd),
+        ("agrupa por ddd", groups_by_ddd),
         ("usa MEASURE(gross_revenue)", uses_measure),
         ("não lê gold/silver/bronze/commission" + (f" (leu {leaks})" if leaks else ""), not leaks),
     ]
@@ -54,14 +54,17 @@ def extract_sql(message: dict[str, Any]) -> str | None:
 
 
 def find_space_id(spaces_response: Any, title: str = SPACE_TITLE) -> str | None:
-    """Id do Space cujo título contém `title` (o modo dev pode prefixar o título)."""
+    """Id do único Space cujo título contém `title` (o modo dev pode prefixar o título).
+
+    Devolve None se não houver nenhum; levanta erro se houver mais de um (dev e demo juntos).
+    """
     spaces = spaces_response
     if isinstance(spaces_response, dict):
         spaces = spaces_response.get("spaces", [])
-    for space in spaces or []:
-        if title in (space.get("title") or ""):
-            return str(space["space_id"])
-    return None
+    found = [str(s["space_id"]) for s in spaces or [] if title in (s.get("title") or "")]
+    if len(found) > 1:
+        raise RuntimeError(f"{len(found)} Spaces com '{title}'; apague o que não é deste target")
+    return found[0] if found else None
 
 
 def _cli(profile: str, *args: str) -> Any:
