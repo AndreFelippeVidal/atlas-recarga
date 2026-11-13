@@ -47,6 +47,9 @@ def test_reads_only_the_closed_lists() -> None:
     assert check.ALLOWED == (("semantic", "mv_recharges"),)
     assert {s for s, _ in check.DENIED} == {"gold", "silver", "bronze", "commission"}
     assert "MEASURE(gross_revenue)" in check.build_select("atlas_dev", "semantic", "mv_recharges")
+    assert (
+        check.build_select("atlas_dev", "commission", None) == "SHOW TABLES IN atlas_dev.commission"
+    )
     assert check.build_select("atlas_dev", "gold", "fct_recharges").endswith("LIMIT 1")
 
 

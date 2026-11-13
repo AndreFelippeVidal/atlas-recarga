@@ -32,13 +32,18 @@ DENIED = (
     ("gold", "fct_recharges"),
     ("silver", "recharges"),
     ("bronze", "recharges"),
-    ("commission", "locked_lines"),
+    ("commission", None),  # `locked_lines` só existe a partir da P8.2; até lá, lista o schema
 )
 DENIAL_MARKERS = ("permission_denied", "insufficient_permissions", "does not have select")
 
 
-def build_select(catalog: str, schema: str, table: str) -> str:
-    """`SELECT` de uma tabela de lista fechada; o catálogo vem de `CATALOGS`."""
+def build_select(catalog: str, schema: str, table: str | None) -> str:
+    """`SELECT` de uma tabela de lista fechada; o catálogo vem de `CATALOGS`.
+
+    Sem tabela (ainda não criada), lista o schema: sem acesso, também dá `PERMISSION_DENIED`.
+    """
+    if table is None:
+        return f"SHOW TABLES IN {catalog}.{schema}"
     if schema == "semantic":
         return f"SELECT CAST(MEASURE(gross_revenue) AS STRING) FROM {catalog}.{schema}.{table}"  # noqa: S608
     return f"SELECT 1 FROM {catalog}.{schema}.{table} LIMIT 1"  # noqa: S608
@@ -99,9 +104,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     catalog = CATALOGS[args.target]
 
-    def probe(pairs: Sequence[tuple[str, str]]) -> dict[str, dict[str, object]]:
+    def probe(pairs: Sequence[tuple[str, str | None]]) -> dict[str, dict[str, object]]:
         return {
-            f"{schema}.{table}": _status(
+            f"{schema}.{table or '*'}": _status(
                 args.profile, args.warehouse_id, build_select(catalog, schema, table)
             )
             for schema, table in pairs
