@@ -39,6 +39,7 @@ def test_single_dataset_over_metric_view(dash: dict[str, Any]) -> None:
     # Nome curto: o catálogo vem de dataset_catalog no bundle (muda por target).
     assert ds["asset_name"] == "mv_recharges"
     assert "queryLines" not in ds
+    assert "columns" not in ds  # sem coluna derivada: nada de lógica fora da metric view
 
 
 def test_global_filters_month_region_uf(dash: dict[str, Any]) -> None:
@@ -52,14 +53,13 @@ def test_global_filters_month_region_uf(dash: dict[str, Any]) -> None:
 
 
 def test_fields_exist_in_metric_view(dash: dict[str, Any]) -> None:
-    extra = {"uf_iso"}  # coluna derivada do dataset (mapa)
     for w in _widgets(dash):
         for q in w.get("queries", []):
             for f in q["query"]["fields"]:
                 for m in re.findall(r"MEASURE\(`(\w+)`\)", f["expression"]):
                     assert m in MEASURES, (w["name"], m)
                 if "MEASURE" not in f["expression"]:
-                    assert f["name"] in DIMENSIONS | extra, (w["name"], f["name"])
+                    assert f["name"] in DIMENSIONS, (w["name"], f["name"])
 
 
 def test_encodings_match_query_fields(dash: dict[str, Any]) -> None:

@@ -3,14 +3,7 @@
     {
       "name": "ds_recharges",
       "displayName": "mv_recharges",
-      "asset_name": "mv_recharges",
-      "columns": [
-        {
-          "displayName": "uf_iso",
-          "description": "UF no padrão ISO 3166-2 (BR-SP), para o mapa",
-          "expression": "CONCAT('BR-', `uf`)"
-        }
-      ]
+      "asset_name": "mv_recharges"
     }
   ],
   "pages": [
@@ -368,7 +361,7 @@
         },
         {
           "widget": {
-            "name": "br-map",
+            "name": "br-uf",
             "queries": [
               {
                 "name": "main_query",
@@ -376,8 +369,8 @@
                   "datasetName": "ds_recharges",
                   "fields": [
                     {
-                      "name": "uf_iso",
-                      "expression": "`uf_iso`"
+                      "name": "uf",
+                      "expression": "`uf`"
                     },
                     {
                       "name": "measure(gross_revenue)",
@@ -389,38 +382,34 @@
               }
             ],
             "spec": {
-              "version": 1,
-              "widgetType": "choropleth-map",
+              "version": 3,
+              "widgetType": "bar",
               "encodings": {
-                "region": {
-                  "regionType": "mapbox-v4-admin",
-                  "admin0": {
-                    "type": "value",
-                    "value": "Brazil",
-                    "geographicRole": "admin0-name"
-                  },
-                  "admin1": {
-                    "fieldName": "uf_iso",
-                    "type": "field",
-                    "geographicRole": "admin1-iso"
-                  }
-                },
-                "color": {
-                  "fieldName": "measure(gross_revenue)",
-                  "displayName": "Receita bruta",
+                "x": {
                   "scale": {
-                    "type": "quantitative",
-                    "colorRamp": {
-                      "mode": "custom-sequential",
-                      "start": "#CFE3F5",
-                      "end": "#0B3C6E"
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(gross_revenue)",
+                      "displayName": "Receita bruta"
+                    }
+                  ]
+                },
+                "y": {
+                  "fieldName": "uf",
+                  "displayName": "UF",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "value"
                     }
                   }
                 }
               },
               "frame": {
                 "showTitle": true,
-                "title": "Receita bruta por UF"
+                "title": "Ranking de UFs por receita bruta"
               }
             }
           },
