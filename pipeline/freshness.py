@@ -76,7 +76,7 @@ def quality_status(ratio: float) -> str:
     return "degraded" if ratio > DEGRADED_THRESHOLD else "ok"
 
 
-def main(catalog: str) -> int:
+def main(catalog: str) -> None:
     from pyspark.sql import SparkSession  # só existe no workspace
 
     catalog = check_catalog(catalog)
@@ -105,8 +105,8 @@ def main(catalog: str) -> int:
         },
     )
     print(f"freshness={fresh} quality={quality} ingested={ingested} dropped={dropped}")
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1]))
+    # sem sys.exit: no serverless, `SystemExit` (até com 0) marca a task como falha
+    main(sys.argv[1])
