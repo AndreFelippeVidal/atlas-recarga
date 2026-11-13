@@ -66,3 +66,14 @@ def test_ddd_only_in_select_fails_the_group_by_check() -> None:
 
 def test_unqualified_gold_table_is_a_leak() -> None:
     assert any(line.startswith("FALHA") for line in check.evaluate(GOOD + " JOIN gold.dim_pos"))
+
+
+def test_backticked_sql_as_generated_by_genie_passes() -> None:
+    sql = (
+        "SELECT `ddd`, MEASURE(`gross_revenue`) AS `gross_revenue` FROM "
+        "`atlas_dev`.`semantic`.`mv_recharges` WHERE `recharge_month` = DATE'2026-10-01' "
+        "GROUP BY `ddd` ORDER BY `gross_revenue` DESC"
+    )
+    assert all(line.startswith("ok") for line in check.evaluate(sql))
+    qualified = "SELECT ddd, MEASURE(`mv_recharges`.`gross_revenue`) FROM mv_recharges GROUP BY ddd"
+    assert all(line.startswith("ok") for line in check.evaluate(qualified))

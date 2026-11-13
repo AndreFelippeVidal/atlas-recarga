@@ -33,7 +33,7 @@ def evaluate(sql: str | None) -> list[str]:
         return ["FALHA o Genie não devolveu SQL"]
     text = sql.lower()
     groups_by_ddd = re.search(r"group\s+by[^;]*\bddd\b", text) is not None
-    uses_measure = re.search(r"measure\s*\(\s*(\w+\.)?gross_revenue\s*\)", text) is not None
+    uses_measure = re.search(r"measure\s*\(\s*([`\w]+\.)?`?gross_revenue`?\s*\)", text) is not None
     leaks = [s for s in FORBIDDEN_SCHEMAS if re.search(rf"\b{s}\.", text)]
     checks = [
         ("consulta mv_recharges", "mv_recharges" in text),
