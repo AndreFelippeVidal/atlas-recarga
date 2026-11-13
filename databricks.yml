@@ -23,6 +23,8 @@ resources:
             path: pipeline/bronze.py
         - file:
             path: pipeline/silver.py
+        - file:
+            path: pipeline/gold.py
       configuration:
         atlas.landing_path: /Volumes/${var.catalog}/raw/landing
 
