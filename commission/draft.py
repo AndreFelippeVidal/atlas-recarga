@@ -186,11 +186,11 @@ def create_draft(spark: Any, catalog: str, reference_month: str = "") -> str:
             f"{batch_id} já existe; nada foi alterado (nova versão só após rejeição)"
         )
 
-    agg_t = f"{catalog}.gold.agg_pos_month"
-    snapshot_version = int(spark.sql(f"DESCRIBE HISTORY {agg_t} LIMIT 1").first()["version"])
-    # Lê exatamente a versão registrada no cabeçalho, mesmo se o pipeline atualizar o gold.
-    snapshot_sql = f"SELECT * FROM {agg_t} VERSION AS OF {snapshot_version}"  # noqa: S608
-    volumes = spark.sql(snapshot_sql).where(F.col("recharge_month") == F.lit(month))
+    # `gold.agg_pos_month` é uma materialized view: não tem versão Delta (DESCRIBE HISTORY e
+    # VERSION AS OF falham), então `source_snapshot_version` fica nulo (SPEC-003 §3).
+    volumes = spark.table(f"{catalog}.gold.agg_pos_month").where(
+        F.col("recharge_month") == F.lit(month)
+    )
     pos = spark.table(f"{catalog}.gold.dim_pos")
 
     duplicated = pos.groupBy("pos_id").count().where(F.col("count") > 1).count()
@@ -243,7 +243,7 @@ def create_draft(spark: Any, catalog: str, reference_month: str = "") -> str:
                 "draft",
                 total_pos,
                 total_distributor,
-                snapshot_version,
+                None,  # source_snapshot_version: MV sem versão Delta
                 None,
                 False,
                 datetime.now(ZoneInfo("UTC")),

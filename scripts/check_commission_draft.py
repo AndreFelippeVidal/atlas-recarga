@@ -8,7 +8,7 @@ O lote só existe no workspace, então o **mantenedor** roda este script depois 
         --warehouse-id <id> --batch-id COM-2026-10-v1
 
 Confere, só com leitura:
-1. o lote existe, `version = 1`, `status = 'draft'`, `demo_mode = false`, com a versão do gold;
+1. o lote existe, `version = 1`, `status = 'draft'`, `demo_mode = false`;
 2. `total_pos_brl` e `total_distributor_brl` = soma das linhas (já arredondadas);
 3. base dos PDVs = volume aprovado do mês em `gold.agg_pos_month`; distribuidores = PDVs;
 4. sem linha com base <= 0; faixa (pela base), taxa e comissão (HALF_EVEN) conforme a SPEC-003 §2;
@@ -89,7 +89,7 @@ def queries(catalog: str, batch_id: str) -> dict[str, str]:
     bad_distributor = "beneficiary_type = 'distributor' AND (tier IS NOT NULL OR rate != 0.0300)"
     return {
         "header": (
-            "SELECT version, status, demo_mode, source_snapshot_version IS NOT NULL, "
+            "SELECT version, status, demo_mode, "
             "CAST(total_pos_brl AS DECIMAL(24,2)), CAST(total_distributor_brl AS DECIMAL(24,2)), "
             f"CAST(reference_month AS STRING) FROM {c}.batches WHERE batch_id = '{batch_id}'"
         ),
@@ -130,7 +130,7 @@ def check(profile: str, warehouse_id: str, catalog: str, batch_id: str) -> list[
         header = one(sql["header"])
         if not header:
             return [f"FALHA {batch_id} não existe (o job atlas_commission_draft rodou?)"]
-        version, status, demo, has_snapshot, total_pos, total_dist, month = header
+        version, status, demo, total_pos, total_dist, month = header
         sums = one(sql["sums"])
         gold = one(sql["gold_volume"])
         bad = one(sql["bad_lines"])
@@ -145,7 +145,6 @@ def check(profile: str, warehouse_id: str, catalog: str, batch_id: str) -> list[
             version == "1" and status == "draft", f"{batch_id}: version={version} status={status}"
         ),
         _mark(demo == "false", f"demo_mode = {demo}"),
-        _mark(has_snapshot == "true", "source_snapshot_version preenchida"),
         _mark(
             total_pos == commission_pos and total_dist == commission_dist,
             f"totais = soma das linhas (PDV {total_pos}, distribuidor {total_dist})",
