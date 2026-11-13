@@ -121,7 +121,7 @@ _`mv_recharges` como a única porta de leitura, com AI/BI e Genie em cima._
 _Cálculo determinístico, reconciliação, 2 aprovações humanas e lote imutável._
 
 - [x] **P8.1** 🤖 `commission/rules.py` (faixas, taxas, arredondamento) + testes de borda — _pronto quando:_ Critério 2 da SPEC-003 §8; cobertura ≥ 95% no módulo (#49) — cobertura 100% medida com `pytest-cov` · depende de P6.6
-- [ ] **P8.2** 🤖 Tabelas `commission.*` com `delta.appendOnly` em `batch_events` e `locked_lines` — _pronto quando:_ Teste: um UPDATE é rejeitado · depende de P8.1
+- [x] **P8.2** 🤖 Tabelas `commission.*` com `delta.appendOnly` em `batch_events` e `locked_lines` — _pronto quando:_ Teste: um UPDATE é rejeitado (#50) — DDL e job `atlas_commission_deploy` prontos; a rejeição de UPDATE/DELETE é conferida no `dev` pelo mantenedor via `scripts/check_commission_append_only.py` · depende de P8.1
 - [ ] **P8.3** 🤖 Cálculo do rascunho (`draft`) em PySpark — _pronto quando:_ Lote `COM-YYYY-MM-v1` criado para o último mês fechado · depende de P8.2
 - [ ] **P8.4** 🤖 Reconciliação independente em SQL + totais de controle — _pronto quando:_ Critério 1 da SPEC-003 §8 (R$ 0,00) · depende de P8.3
 - [ ] **P8.5** 🤖 Flags de revisão (`spike_3x`, `fractioning_suspect`, `tier_jump`, `closed_pos`) — _pronto quando:_ Critério 3 da SPEC-003 §8 · depende de P8.4
