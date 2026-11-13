@@ -81,7 +81,7 @@ def _run(profile: str, warehouse_id: str, statement: str) -> list[list[str | Non
 
 
 def check(profile: str, warehouse_id: str, catalog: str) -> list[str]:
-    """Uma linha `ok`/`FALHA` por verificação; erro de infraestrutura vira `FALHA`, não traceback."""
+    """Uma linha `ok`/`FALHA` por verificação; erro de infra vira `FALHA`."""
 
     def run(statement: str) -> list[list[str | None]]:
         return _run(profile, warehouse_id, statement)
