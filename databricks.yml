@@ -1,6 +1,7 @@
 # Declarative Automation Bundle do Atlas Recarga (SPEC-002 §2, tech-stack "Deploy").
 # P5.1: esqueleto. P5.2: catálogo, schemas e Volume (scripts/setup_workspace.py).
 # P7.4: dashboard `atlas_visao_comercial` (AI/BI sobre atlas.semantic.mv_recharges).
+# P7.5: Genie Space `atlas_recarga` (só mv_recharges; mv_commission entra na P8.11).
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml).
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
@@ -23,6 +24,95 @@ resources:
       # Os datasets usam nomes curtos (mv_recharges); o catálogo muda por target (SPEC-004 §6).
       dataset_catalog: ${var.catalog}
       dataset_schema: semantic
+
+  genie_spaces:
+    atlas_recarga:
+      title: "Atlas Recarga"
+      description: "Perguntas em português sobre as recargas da rede Eaí? Telecom (dados sintéticos). Fonte única: a metric view mv_recharges, com receita, quantidade, ticket médio, PDVs ativos e taxa de estorno por região, UF, DDD, tipo de PDV e distribuidor."
+      warehouse_id: ${var.warehouse_id}
+      parent_path: /Workspace/Users/${workspace.current_user.userName}/atlas_genie
+      serialized_space:
+        version: 2
+        config:
+          sample_questions:
+            - id: "00000000000000000000000000000001"
+              question: ["Qual a receita total em outubro de 2026?"]
+            - id: "00000000000000000000000000000002"
+              question: ["Qual a receita por DDD em outubro?"]
+            - id: "00000000000000000000000000000003"
+              question: ["Qual a receita por região em outubro?"]
+            - id: "00000000000000000000000000000004"
+              question: ["Quais as 5 UFs com maior receita em outubro?"]
+            - id: "00000000000000000000000000000005"
+              question: ["Qual o ticket médio por tipo de PDV em outubro?"]
+        data_sources:
+          tables:
+            - identifier: ${var.catalog}.semantic.mv_recharges
+              column_configs:
+                - column_name: distributor_name
+                  enable_entity_matching: true
+                  enable_format_assistance: true
+                - column_name: pos_type
+                  enable_entity_matching: true
+                  enable_format_assistance: true
+                - column_name: region
+                  enable_entity_matching: true
+                  enable_format_assistance: true
+                - column_name: uf
+                  enable_entity_matching: true
+                  enable_format_assistance: true
+        instructions:
+          example_question_sqls:
+            - id: "0000000000000000000000000000000b"
+              question: ["Qual a receita total em outubro de 2026?"]
+              sql: ["SELECT MEASURE(mv_recharges.gross_revenue) AS gross_revenue FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01'"]
+            - id: "0000000000000000000000000000000c"
+              question: ["Qual a receita por DDD em outubro?"]
+              sql: ["SELECT mv_recharges.ddd, MEASURE(mv_recharges.gross_revenue) AS gross_revenue FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.ddd ORDER BY gross_revenue DESC"]
+            - id: "0000000000000000000000000000000d"
+              question: ["Qual a receita por região em outubro?"]
+              sql: ["SELECT mv_recharges.region, MEASURE(mv_recharges.gross_revenue) AS gross_revenue FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.region ORDER BY gross_revenue DESC"]
+            - id: "0000000000000000000000000000000e"
+              question: ["Quais as 5 UFs com maior receita em outubro?"]
+              sql: ["SELECT mv_recharges.uf, MEASURE(mv_recharges.gross_revenue) AS gross_revenue FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.uf ORDER BY gross_revenue DESC LIMIT 5"]
+            - id: "0000000000000000000000000000000f"
+              question: ["Qual o ticket médio por tipo de PDV em outubro?"]
+              sql: ["SELECT mv_recharges.pos_type, MEASURE(mv_recharges.avg_ticket) AS avg_ticket FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.pos_type ORDER BY avg_ticket DESC"]
+            - id: "00000000000000000000000000000010"
+              question: ["Quantos PDVs ativos tivemos em outubro, por região?"]
+              sql: ["SELECT mv_recharges.region, MEASURE(mv_recharges.active_pos) AS active_pos FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.region ORDER BY active_pos DESC"]
+            - id: "00000000000000000000000000000011"
+              question: ["Qual a taxa de estorno por UF em outubro?"]
+              sql: ["SELECT mv_recharges.uf, MEASURE(mv_recharges.reversal_rate) AS reversal_rate FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.uf ORDER BY reversal_rate DESC"]
+            - id: "00000000000000000000000000000012"
+              question: ["Qual a receita por distribuidor em outubro?"]
+              sql: ["SELECT mv_recharges.distributor_name, MEASURE(mv_recharges.gross_revenue) AS gross_revenue FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.distributor_name ORDER BY gross_revenue DESC"]
+            - id: "00000000000000000000000000000013"
+              question: ["Em que horário do dia a receita é maior?"]
+              sql: ["SELECT mv_recharges.recharge_hour_local, MEASURE(mv_recharges.gross_revenue) AS gross_revenue FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges GROUP BY mv_recharges.recharge_hour_local ORDER BY gross_revenue DESC"]
+            - id: "00000000000000000000000000000014"
+              question: ["Como a receita de outubro variou contra setembro, por região?"]
+              sql: ["WITH monthly AS (SELECT mv_recharges.region, mv_recharges.recharge_month, MEASURE(mv_recharges.gross_revenue) AS gross_revenue FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month IN (DATE'2026-09-01', DATE'2026-10-01') GROUP BY mv_recharges.region, mv_recharges.recharge_month) SELECT cur.region, prev.gross_revenue AS september, cur.gross_revenue AS october, ROUND((cur.gross_revenue - prev.gross_revenue) / prev.gross_revenue * 100, 2) AS change_pct FROM monthly cur JOIN monthly prev ON cur.region = prev.region AND cur.recharge_month = DATE'2026-10-01' AND prev.recharge_month = DATE'2026-09-01' ORDER BY change_pct"]
+          text_instructions:
+            - id: "0000000000000000000000000000001f"
+              content:
+                - "## PURPOSE"
+                - "- Responder, em português, sobre recargas de celular da Eaí? Telecom (dados sintéticos), usando só a metric view mv_recharges."
+                - ""
+                - "## DISAMBIGUATION"
+                - "- Receita, faturamento e volume significam a medida gross_revenue; ticket médio é avg_ticket; taxa de estorno é reversal_rate."
+                - "- PDV ativo é o PDV com pelo menos 1 recarga aprovada no período filtrado (medida active_pos)."
+                - "- Sem período na pergunta, use o último mês fechado (2026-10) e diga qual mês usou."
+                - "- A coluna region guarda siglas: N, NE, CO, SE, S. A coluna uf guarda a sigla da UF."
+                - "- Para variação contra o mês anterior, consulte os dois meses e calcule a diferença na consulta; não existe medida de variação."
+                - ""
+                - "## CONSTRAINTS"
+                - "- Responda só com dados de mv_recharges; se a pergunta pedir comissão ou outro assunto, diga que está fora do escopo deste Space."
+                - "- Use MEASURE() para toda medida; nunca recalcule receita, ticket ou taxa à mão."
+                - ""
+                - "## Instructions you must follow when providing summaries"
+                - "- Valores em reais com 2 casas decimais; taxas em percentual com 2 casas."
+                - "- Sempre informe o mês ou período usado."
 
   pipelines:
     atlas_medallion:
