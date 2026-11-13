@@ -59,3 +59,20 @@ def test_job_in_bundle_runs_at_6_sao_paulo_and_checks_after_refresh() -> None:
     assert "pipeline_task" in tasks["refresh_pipeline"]
     assert tasks["check_freshness"]["depends_on"] == [{"task_key": "refresh_pipeline"}]
     assert job["email_notifications"]["on_failure"]
+
+
+def test_check_script_finds_the_dev_prefixed_job() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "check_atlas_daily", ROOT / "scripts" / "check_atlas_daily.py"
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["check_atlas_daily"] = module
+    spec.loader.exec_module(module)
+    jobs = [
+        {"job_id": 1, "settings": {"name": "[dev fulano] atlas_daily"}},
+        {"job_id": 2, "settings": {"name": "outro_job"}},
+        {"job_id": 3, "settings": {"name": "not_atlas_daily"}},
+    ]
+    assert module.matching_job_ids(jobs) == [1]
+    assert module.matching_job_ids([{"job_id": 9, "settings": {"name": "atlas_daily"}}]) == [9]

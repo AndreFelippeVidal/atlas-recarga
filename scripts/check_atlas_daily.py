@@ -23,12 +23,23 @@ from zoneinfo import ZoneInfo
 CATALOGS = {"dev": "atlas_dev", "demo": "atlas"}  # igual ao databricks.yml
 TZ = ZoneInfo("America/Sao_Paulo")
 DEADLINE = time(8, 0)
+JOB_NAME = "atlas_daily"
 
 
 def finished_before_deadline(end_ms: int, deadline: time = DEADLINE) -> bool:
     """Fim da execução (epoch ms) é no mesmo dia local e antes do prazo?"""
     end = datetime.fromtimestamp(end_ms / 1000, TZ)
     return end.time() < deadline
+
+
+def matching_job_ids(jobs: object) -> list[int]:
+    """Ids dos jobs `atlas_daily`; em `dev` o bundle prefixa o nome (`[dev fulano] atlas_daily`)."""
+    ids: list[int] = []
+    for job in jobs if isinstance(jobs, list) else []:
+        name = str(job.get("settings", {}).get("name", "")) if isinstance(job, dict) else ""
+        if name == JOB_NAME or name.endswith(f"] {JOB_NAME}"):
+            ids.append(int(job["job_id"]))
+    return ids
 
 
 def _cli(profile: str, args: Sequence[str], body: dict[str, object] | None = None) -> object:
@@ -49,8 +60,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     catalog = CATALOGS[args.target]
 
-    jobs = _cli(args.profile, ["jobs", "list", "--name", "atlas_daily"])
-    ids = [j["job_id"] for j in jobs or [] if isinstance(j, dict)]  # type: ignore[union-attr]
+    ids = matching_job_ids(_cli(args.profile, ["jobs", "list"]))
     if len(ids) != 1:
         print(f"FALHA esperava 1 job atlas_daily, achei {len(ids)}")
         return 1
