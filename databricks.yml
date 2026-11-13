@@ -3,6 +3,7 @@
 # P7.4: dashboard `atlas_visao_comercial` (AI/BI sobre atlas.semantic.mv_recharges).
 # P7.5: Genie Space `atlas_recarga` (só mv_recharges; mv_commission entra na P8.11).
 # P8.2: job `atlas_commission_deploy` (tabelas de commission.*; não executa o review).
+# P8.3: job `atlas_commission_draft` (cria o rascunho COM-YYYY-MM-v1; não aprova nada).
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml).
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
@@ -196,6 +197,26 @@ resources:
             parameters:
               - ${var.catalog}
               - ${workspace.file_path}/commission/ddl
+
+    atlas_commission_draft:
+      name: atlas_commission_draft
+      description: "Calcula o rascunho COM-YYYY-MM-v1 do mês anterior (ou de reference_month) em <catalog>.commission, status draft (SPEC-003 §2-§4). Recusa se o lote já existe; não reconcilia nem aprova."
+      max_concurrent_runs: 1
+      parameters:
+        - name: reference_month
+          default: ""
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: calculate_draft
+          environment_key: default
+          spark_python_task:
+            python_file: commission/draft.py
+            parameters:
+              - ${var.catalog}
+              - "{{job.parameters.reference_month}}"
 
 targets:
   dev:

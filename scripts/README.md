@@ -26,3 +26,11 @@ Roda com o perfil de um usuário que está **só** em `atlas_readers`. Confere q
 ```bash
 uv run python scripts/check_readers_permissions.py --target dev --profile <perfil-do-leitor> --warehouse-id <id>
 ```
+
+## `check_commission_draft.py` (P8.3)
+
+Depois de rodar o job `atlas_commission_draft`, confere o rascunho `COM-YYYY-MM-v1` (SPEC-003 §2 a §4): status `draft`, totais iguais à soma das linhas, base dos PDVs igual ao volume aprovado do mês no gold, faixa e taxa coerentes e o evento inicial em `batch_events`. Só leitura; a reconciliação independente é a P8.4.
+
+```bash
+uv run python scripts/check_commission_draft.py --target dev --profile <perfil> --warehouse-id <id> --batch-id COM-2026-10-v1
+```

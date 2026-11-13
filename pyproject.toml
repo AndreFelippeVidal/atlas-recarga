@@ -35,7 +35,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_commission_append_only.py", "cli/src", "cli/tests", "commission"]
+files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_commission_append_only.py", "scripts/check_commission_draft.py", "cli/src", "cli/tests", "commission"]
 
 [[tool.mypy.overrides]]
 module = ["pyarrow", "pyarrow.*"]
