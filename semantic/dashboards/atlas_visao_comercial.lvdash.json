@@ -1,0 +1,1279 @@
+{
+  "datasets": [
+    {
+      "name": "ds_recharges",
+      "displayName": "mv_recharges",
+      "asset_name": "mv_recharges"
+    }
+  ],
+  "pages": [
+    {
+      "name": "brasil",
+      "displayName": "Brasil",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "br-title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Brasil\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "br-sub",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Receita, volume e rede de PDVs da Eaí? Telecom. Use os filtros de mês, região e UF."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "br-gross",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "measure(gross_revenue)",
+                      "expression": "MEASURE(`gross_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(gross_revenue)",
+                  "displayName": "Receita bruta",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "BRL",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Receita bruta"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "br-count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "measure(recharge_count)",
+                      "expression": "MEASURE(`recharge_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(recharge_count)",
+                  "displayName": "Recargas aprovadas",
+                  "format": {
+                    "type": "number",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Recargas aprovadas"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "br-ticket",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "measure(avg_ticket)",
+                      "expression": "MEASURE(`avg_ticket`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(avg_ticket)",
+                  "displayName": "Ticket médio",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "BRL",
+                    "decimalPlaces": {
+                      "type": "fixed",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Ticket médio"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "br-pos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "measure(active_pos)",
+                      "expression": "MEASURE(`active_pos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(active_pos)",
+                  "displayName": "PDVs ativos",
+                  "format": {
+                    "type": "number",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "PDVs ativos",
+                "showDescription": true,
+                "description": "PDV com ao menos 1 recarga aprovada no período filtrado"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "br-trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "recharge_month",
+                      "expression": "`recharge_month`"
+                    },
+                    {
+                      "name": "measure(gross_revenue)",
+                      "expression": "MEASURE(`gross_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "recharge_month",
+                  "displayName": "Mês",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(gross_revenue)",
+                      "displayName": "Receita bruta"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Receita bruta por mês"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 7,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "br-region",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "measure(gross_revenue)",
+                      "expression": "MEASURE(`gross_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "region",
+                  "displayName": "Região",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "value"
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(gross_revenue)",
+                      "displayName": "Receita bruta"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Receita bruta por região"
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 5,
+            "width": 5,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "br-uf",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "uf",
+                      "expression": "`uf`"
+                    },
+                    {
+                      "name": "measure(gross_revenue)",
+                      "expression": "MEASURE(`gross_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(gross_revenue)",
+                      "displayName": "Receita bruta"
+                    }
+                  ]
+                },
+                "y": {
+                  "fieldName": "uf",
+                  "displayName": "UF",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "value"
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Ranking de UFs por receita bruta"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ]
+    },
+    {
+      "name": "uf",
+      "displayName": "Região e UF",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "uf-title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Região e UF\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "uf-sub",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Detalhe por UF e município; o mapa e os totais respeitam os filtros."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "uf-bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "uf",
+                      "expression": "`uf`"
+                    },
+                    {
+                      "name": "measure(gross_revenue)",
+                      "expression": "MEASURE(`gross_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "uf",
+                  "displayName": "UF",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "value"
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(gross_revenue)",
+                      "displayName": "Receita bruta"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Receita bruta por UF"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "uf-ticket",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "uf",
+                      "expression": "`uf`"
+                    },
+                    {
+                      "name": "measure(avg_ticket)",
+                      "expression": "MEASURE(`avg_ticket`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "uf",
+                  "displayName": "UF",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(avg_ticket)",
+                      "displayName": "Ticket médio"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Ticket médio por UF"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "uf-table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "uf",
+                      "expression": "`uf`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "municipality_name",
+                      "expression": "`municipality_name`"
+                    },
+                    {
+                      "name": "measure(gross_revenue)",
+                      "expression": "MEASURE(`gross_revenue`)"
+                    },
+                    {
+                      "name": "measure(recharge_count)",
+                      "expression": "MEASURE(`recharge_count`)"
+                    },
+                    {
+                      "name": "measure(avg_ticket)",
+                      "expression": "MEASURE(`avg_ticket`)"
+                    },
+                    {
+                      "name": "measure(active_pos)",
+                      "expression": "MEASURE(`active_pos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "uf",
+                    "displayName": "UF"
+                  },
+                  {
+                    "fieldName": "region",
+                    "displayName": "Região"
+                  },
+                  {
+                    "fieldName": "municipality_name",
+                    "displayName": "Município"
+                  },
+                  {
+                    "fieldName": "measure(gross_revenue)",
+                    "displayName": "Receita bruta",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "measure(recharge_count)",
+                    "displayName": "Recargas aprovadas",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "measure(avg_ticket)",
+                    "displayName": "Ticket médio",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "measure(active_pos)",
+                    "displayName": "PDVs ativos",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Municípios"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 9
+          }
+        }
+      ]
+    },
+    {
+      "name": "rede",
+      "displayName": "Rede",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "rd-title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Rede\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "rd-sub",
+            "multilineTextboxSpec": {
+              "lines": [
+                "PDVs ativos e desempenho por tipo de PDV e distribuidor."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "rd-pos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "measure(active_pos)",
+                      "expression": "MEASURE(`active_pos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(active_pos)",
+                  "displayName": "PDVs ativos",
+                  "format": {
+                    "type": "number",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "PDVs ativos",
+                "showDescription": true,
+                "description": "PDV com ao menos 1 recarga aprovada no período filtrado"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "rd-rpp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "measure(revenue_per_active_pos)",
+                      "expression": "MEASURE(`revenue_per_active_pos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(revenue_per_active_pos)",
+                  "displayName": "Receita por PDV ativo",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "BRL",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Receita por PDV ativo"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "rd-rev",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "measure(reversal_rate)",
+                      "expression": "MEASURE(`reversal_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(reversal_rate)",
+                  "displayName": "Taxa de estorno",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Taxa de estorno"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "rd-type-pos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "pos_type",
+                      "expression": "`pos_type`"
+                    },
+                    {
+                      "name": "measure(active_pos)",
+                      "expression": "MEASURE(`active_pos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "pos_type",
+                  "displayName": "Tipo de PDV",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "value"
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(active_pos)",
+                      "displayName": "PDVs ativos"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "PDVs ativos por tipo"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "rd-type-rpp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "pos_type",
+                      "expression": "`pos_type`"
+                    },
+                    {
+                      "name": "measure(revenue_per_active_pos)",
+                      "expression": "MEASURE(`revenue_per_active_pos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "pos_type",
+                  "displayName": "Tipo de PDV",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(revenue_per_active_pos)",
+                      "displayName": "Receita por PDV ativo"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Receita por PDV ativo, por tipo"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 5,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "rd-dist",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "distributor_name",
+                      "expression": "`distributor_name`"
+                    },
+                    {
+                      "name": "measure(gross_revenue)",
+                      "expression": "MEASURE(`gross_revenue`)"
+                    },
+                    {
+                      "name": "measure(recharge_count)",
+                      "expression": "MEASURE(`recharge_count`)"
+                    },
+                    {
+                      "name": "measure(active_pos)",
+                      "expression": "MEASURE(`active_pos`)"
+                    },
+                    {
+                      "name": "measure(reversal_rate)",
+                      "expression": "MEASURE(`reversal_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "distributor_name",
+                    "displayName": "Distribuidor"
+                  },
+                  {
+                    "fieldName": "measure(gross_revenue)",
+                    "displayName": "Receita bruta",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "measure(recharge_count)",
+                    "displayName": "Recargas aprovadas",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "measure(active_pos)",
+                    "displayName": "PDVs ativos",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "measure(reversal_rate)",
+                    "displayName": "Taxa de estorno",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Distribuidores"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 12,
+            "height": 7
+          }
+        }
+      ]
+    },
+    {
+      "name": "filters",
+      "displayName": "Filtros",
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "f-month",
+            "queries": [
+              {
+                "name": "q_recharge_month",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "recharge_month",
+                      "expression": "`recharge_month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "recharge_month",
+                    "displayName": "Mês",
+                    "queryName": "q_recharge_month"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Mês"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "f-region",
+            "queries": [
+              {
+                "name": "q_region",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "region",
+                    "displayName": "Região",
+                    "queryName": "q_region"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Região"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "f-uf",
+            "queries": [
+              {
+                "name": "q_uf",
+                "query": {
+                  "datasetName": "ds_recharges",
+                  "fields": [
+                    {
+                      "name": "uf",
+                      "expression": "`uf`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "uf",
+                    "displayName": "UF",
+                    "queryName": "q_uf"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "UF"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#FCFCFC",
+        "dark": "#1F272D"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#11171C"
+      },
+      "fontColor": {
+        "light": "#11171C",
+        "dark": "#E8ECF0"
+      },
+      "selectionColor": {
+        "light": "#2272B4",
+        "dark": "#8ACAFF"
+      },
+      "visualizationColors": [
+        "#0072B2",
+        "#E69F00",
+        "#009E73",
+        "#CC79A7",
+        "#D55E00",
+        "#56B4E9"
+      ],
+      "widgetHeaderAlignment": "LEFT"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 # Declarative Automation Bundle do Atlas Recarga (SPEC-002 §2, tech-stack "Deploy").
 # P5.1: esqueleto. P5.2: catálogo, schemas e Volume (scripts/setup_workspace.py).
+# P7.4: dashboard `atlas_visao_comercial` (AI/BI sobre atlas.semantic.mv_recharges).
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml).
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
@@ -10,8 +11,19 @@ bundle:
 variables:
   catalog:
     description: Catálogo do Unity Catalog onde o bundle cria os objetos.
+  warehouse_id:
+    description: SQL warehouse que executa as queries do dashboard (P7.4). Definido por target.
 
 resources:
+  dashboards:
+    atlas_visao_comercial:
+      display_name: "Atlas — Visão Comercial"
+      file_path: semantic/dashboards/atlas_visao_comercial.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      # Os datasets usam nomes curtos (mv_recharges); o catálogo muda por target (SPEC-004 §6).
+      dataset_catalog: ${var.catalog}
+      dataset_schema: semantic
+
   pipelines:
     atlas_medallion:
       name: atlas_medallion
@@ -83,6 +95,7 @@ targets:
     mode: development
     variables:
       catalog: atlas_dev
+      warehouse_id: af0a1dbe08dd5514
 
   demo:
     mode: production
@@ -90,3 +103,4 @@ targets:
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
     variables:
       catalog: atlas
+      warehouse_id: af0a1dbe08dd5514
