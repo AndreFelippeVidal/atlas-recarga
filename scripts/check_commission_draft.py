@@ -11,7 +11,7 @@ Confere, só com leitura:
 1. o lote existe, `version = 1`, `status = 'draft'`, `demo_mode = false`, com a versão do gold;
 2. `total_pos_brl` e `total_distributor_brl` = soma das linhas (já arredondadas);
 3. base dos PDVs = volume aprovado do mês em `gold.agg_pos_month`; distribuidores = PDVs;
-4. nenhuma linha com base <= 0; faixa e taxa coerentes com a SPEC-003 §2; 2 casas;
+4. nenhuma linha com base <= 0; faixa, taxa e comissão (HALF_EVEN) coerentes com a SPEC-003 §2;
 5. exatamente 1 evento `NULL -> draft` por `system` em `batch_events`.
 
 A reconciliação independente em SQL é a P8.4; aqui só há sanidade. Sai com 0 ou 1.
@@ -96,7 +96,8 @@ def queries(catalog: str, batch_id: str) -> dict[str, str]:
         ),
         "bad_lines": (
             f"SELECT COUNT(*) FROM {lines} AND (base_amount_brl <= 0 "
-            f"OR commission_brl != ROUND(commission_brl, 2) OR ({bad_pos}) OR ({bad_distributor}))"
+            "OR commission_brl != CAST(BROUND(base_amount_brl * rate, 2) AS DECIMAL(14,2)) "
+            f"OR ({bad_pos}) OR ({bad_distributor}))"
         ),
         "events": (
             f"SELECT COUNT(*) FROM {c}.batch_events WHERE batch_id = '{batch_id}' "

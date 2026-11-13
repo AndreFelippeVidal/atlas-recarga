@@ -142,7 +142,7 @@ def build_lines(volumes: Any, pos: Any, batch_id: str) -> Any:
 
 
 def sum_commission(lines: Any, beneficiary_type: str) -> Decimal:
-    """Soma das linhas já arredondadas (nunca o total recalculado)."""
+    """Soma das linhas já gravadas e arredondadas (nunca o total recalculado)."""
     from pyspark.sql import functions as F
 
     row = (
@@ -196,16 +196,17 @@ def create_draft(spark: Any, catalog: str, reference_month: str = "") -> str:
     if orphans:
         raise RuntimeError(f"{orphans} PDV(s) com volume sem distribuidor em dim_pos")
 
-    lines = build_lines(volumes, pos, batch_id).cache()
-    if lines.limit(1).count() == 0:
-        raise RuntimeError(f"sem volume aprovado em {month:%Y-%m}; nenhum lote criado")
-    total_pos = sum_commission(lines, "pos")
-    total_distributor = sum_commission(lines, "distributor")
-
-    # Apaga linhas órfãs de uma execução que caiu antes do cabeçalho (o lote não existe).
+    # Sem cache (não existe em serverless): grava as linhas e soma o que foi gravado, para o
+    # total ser a soma exata das linhas persistidas mesmo se o gold mudar no meio.
+    lines = build_lines(volumes, pos, batch_id)
     delete_sql = f"DELETE FROM {lines_t} WHERE batch_id = :batch_id"  # noqa: S608
-    spark.sql(delete_sql, args={"batch_id": batch_id})
+    spark.sql(delete_sql, args={"batch_id": batch_id})  # órfãs de uma execução que caiu antes
     lines.select(*spark.table(lines_t).columns).writeTo(lines_t).append()
+    written = spark.table(lines_t).where(F.col("batch_id") == batch_id)
+    if written.limit(1).count() == 0:
+        raise RuntimeError(f"sem volume aprovado em {month:%Y-%m}; nenhum lote criado")
+    total_pos = sum_commission(written, "pos")
+    total_distributor = sum_commission(written, "distributor")
 
     header_schema = StructType(
         [
@@ -241,6 +242,7 @@ def create_draft(spark: Any, catalog: str, reference_month: str = "") -> str:
     header.writeTo(batches_t).append()
     spark.sql(
         f"INSERT INTO {events_t} "
+        "(event_id, batch_id, from_status, to_status, actor, role, justification, event_ts_utc) "
         "SELECT uuid(), :batch_id, CAST(NULL AS STRING), 'draft', current_user(), 'system', "
         "CAST(NULL AS STRING), current_timestamp()",
         args={"batch_id": batch_id},
