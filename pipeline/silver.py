@@ -1,4 +1,4 @@
-"""Camada silver do pipeline `atlas_medallion` (SPEC-002 §3), task P6.2: `silver.recharges`.
+"""Camada silver do pipeline `atlas_medallion` (SPEC-002 §3), tasks P6.2 e P6.3.
 
 Limpa, tipa e deduplica as recargas do bronze.
 
@@ -14,7 +14,10 @@ Limpa, tipa e deduplica as recargas do bronze.
 Provisório até a P6.4: a UF vem de `bronze.pos` + `bronze.municipalities`; lá troca para
 `silver.pos`. Risco conhecido até lá: chave repetida em `bronze.pos`/`municipalities` duplicaria
 linhas no join (o script de conferência pega pela unicidade de `recharge_id`).
-Provisório até a P6.3: recargas de PDV órfão ainda passam (a quarentena as separa).
+P6.3: recarga cujo `pos_id` não existe em `bronze.pos` (provisório até a P6.4, quando vira
+`silver.pos`) não entra em `silver.recharges`; vai para `silver.recharges_quarantine`, que as retém
+(não as descarta). `pos_id` nulo não é órfão: `pos_not_null` o descarta em `silver.recharges`.
+As duas tabelas particionam o bronze sem sobreposição.
 """
 
 from pyspark import pipelines as dp
@@ -51,6 +54,11 @@ def local_offset(uf: Column) -> Column:
     return F.coalesce(mapping[uf], F.lit(DEFAULT_UTC_OFFSET))
 
 
+def known_pos() -> DataFrame:
+    """`pos_id` dos PDVs existentes (provisório: `bronze.pos` até a P6.4)."""
+    return dp.read("bronze.pos").select("pos_id").distinct()
+
+
 def pos_uf() -> DataFrame:
     """`pos_id` -> `uf` do município do PDV."""
     pos = dp.read("bronze.pos").select("pos_id", "municipality_ibge_code")
@@ -71,7 +79,9 @@ def pos_uf() -> DataFrame:
 @dp.expect("face_value", "amount_brl IN (10,15,20,25,30,40,50,100)")
 def recharges() -> DataFrame:
     deduped = dp.read_stream("bronze.recharges").dropDuplicates(["recharge_id"])
-    joined = deduped.join(F.broadcast(pos_uf()), "pos_id", "left")
+    # inner: recarga de PDV órfão sai daqui e vai para a quarentena; `pos_id` nulo também
+    # não casa, e é o `pos_not_null` quem o descarta, então não precisa de tratamento extra.
+    joined = deduped.join(F.broadcast(pos_uf()), "pos_id", "inner")
     local_ts = F.from_utc_timestamp(F.col("recharge_ts_utc"), local_offset(F.col("uf")))
     return joined.select(
         "recharge_id",
@@ -80,6 +90,32 @@ def recharges() -> DataFrame:
             "recharge_date"
         ),
         F.hour(local_ts).alias("recharge_hour_local"),
+        "pos_id",
+        "subscriber_id",
+        "amount_brl",
+        "status",
+        "_source_file",
+        "_ingested_at_utc",
+    )
+
+
+@dp.table(
+    name="silver.recharges_quarantine",
+    comment=(
+        "Recargas retidas porque o pos_id não existe em silver.pos (PDV órfão). "
+        "Ficam aqui para análise; não entram em silver.recharges."
+    ),
+)
+def recharges_quarantine() -> DataFrame:
+    deduped = (
+        dp.read_stream("bronze.recharges")
+        .where(F.col("pos_id").isNotNull())
+        .dropDuplicates(["recharge_id"])
+    )
+    orphans = deduped.join(F.broadcast(known_pos()), "pos_id", "left_anti")
+    return orphans.select(
+        "recharge_id",
+        "recharge_ts_utc",
         "pos_id",
         "subscriber_id",
         "amount_brl",

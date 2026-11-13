@@ -1,4 +1,6 @@
-"""Checks de `silver.recharges` (SPEC-002 §3, P6.2). Sem workspace e sem pyspark."""
+"""Checks de `silver.recharges` e da quarentena (SPEC-002 §3, P6.2 e P6.3).
+
+Sem workspace e sem pyspark."""
 
 from __future__ import annotations
 
@@ -112,7 +114,7 @@ def test_business_date_is_the_sao_paulo_day_not_the_utc_day() -> None:
     assert ts.date() == date(2026, 3, 11)
 
 
-def test_expected_silver_count_subtracts_dups_nulls_and_negatives_but_not_orphans() -> None:
+def test_expected_silver_count_subtracts_dups_nulls_negatives_and_orphans() -> None:
     script = _load_script()
     manifest = {
         "counts": {"recharges": 1_999_930},
@@ -124,7 +126,7 @@ def test_expected_silver_count_subtracts_dups_nulls_and_negatives_but_not_orphan
             "late_arrival": {"rows": 9915},
         },
     }
-    assert script.expected_silver_count(manifest) == 1_999_930 - 4000 - 1000 - 10
+    assert script.expected_silver_count(manifest) == 1_999_930 - 4000 - 1000 - 10 - 1000
 
 
 def test_expected_silver_count_without_scenarios_is_the_total() -> None:
@@ -146,3 +148,42 @@ def test_query_reads_only_silver_recharges() -> None:
 def test_bundle_registers_the_silver_file() -> None:
     text = (ROOT / "databricks.yml").read_text(encoding="utf-8")
     assert "pipeline/silver.py" in text
+
+
+def test_quarantine_is_a_table_without_dropping_expectations() -> None:
+    tree = ast.parse(SILVER.read_text(encoding="utf-8"))
+    func = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.FunctionDef) and n.name == "recharges_quarantine"
+    )
+    names = [d.func.attr for d in func.decorator_list if isinstance(d, ast.Call)]  # type: ignore[attr-defined]
+    assert names == ["table"]  # reter, não descartar: sem expect_or_drop
+    first = func.decorator_list[0]
+    assert isinstance(first, ast.Call)
+    assert ast.literal_eval(first.keywords[0].value) == "silver.recharges_quarantine"
+
+
+def test_orphans_are_split_with_inner_join_and_anti_join() -> None:
+    text = SILVER.read_text(encoding="utf-8")
+    assert 'deduped.join(F.broadcast(pos_uf()), "pos_id", "inner")' in text
+    assert '"left_anti"' in text
+    assert 'F.col("pos_id").isNotNull()' in text  # nulo não é órfão
+
+
+def test_expected_quarantine_count_is_the_unknown_pos_rows() -> None:
+    script = _load_script()
+    manifest = {"counts": {"recharges": 9}, "scenarios": {"unknown_pos": {"rows": 1000}}}
+    assert script.expected_quarantine_count(manifest) == 1000
+    assert script.expected_quarantine_count({"counts": {"recharges": 9}}) == 0
+
+
+def test_quarantine_query_and_closed_table_list() -> None:
+    import pytest
+
+    script = _load_script()
+    assert "FROM atlas.silver.recharges_quarantine" in script.build_query(
+        "atlas", "recharges_quarantine"
+    )
+    with pytest.raises(ValueError):
+        script.build_query("atlas", "pos; DROP TABLE x")
