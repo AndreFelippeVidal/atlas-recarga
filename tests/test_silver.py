@@ -266,3 +266,28 @@ def test_silver_pos_joins_are_left_so_an_invalid_pdv_fails_instead_of_vanishing(
     ]
     assert types == ["left", "left"]
     assert "_pk_rows" in SILVER.read_text(encoding="utf-8")
+
+
+def test_integrity_script_corrupts_only_the_first_pos_municipality(tmp_path: Path) -> None:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    spec = importlib.util.spec_from_file_location(
+        "check_silver_pos_integrity", ROOT / "scripts" / "check_silver_pos_integrity.py"
+    )
+    assert spec
+    assert spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    src = tmp_path / "pos.parquet"
+    pq.write_table(
+        pa.table({"pos_id": ["a", "b"], "municipality_ibge_code": ["3550308", "3304557"]}), src
+    )
+    dst = tmp_path / "out.parquet"
+    module.corrupt_municipality(src, dst)
+    assert pq.read_table(dst).column("municipality_ibge_code").to_pylist() == [
+        "9999999",
+        "3304557",
+    ]
+    assert pq.read_table(src).column("municipality_ibge_code").to_pylist()[0] == "3550308"
+    assert set(module.LANDING) == {"dev"}  # nunca toca o demo

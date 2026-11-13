@@ -21,7 +21,8 @@ views com `expect_or_fail`: dimensão corrompida derruba o pipeline e o gold do 
 servido (SPEC-002 §4). Expectation só enxerga colunas da própria linha, então a referência
 cruzada vira uma coluna booleana `_*_in_reference` (left join) e a unicidade da PK vira
 `_pk_rows` (contagem por chave); o `expect_or_fail` confere essas colunas. Essas colunas `_*`
-fazem parte do schema silver e não devem ser herdadas pelo gold.
+fazem parte do schema silver e não devem ser herdadas pelo gold. Efeito: uma dimensão que viola
+`expect_or_fail` também pausa `silver.recharges` e a quarentena nessa atualização (SPEC-002 §4).
 Limitação conhecida (stream-static): o lado estático (`silver.pos`) é um snapshot por atualização.
 Uma recarga que chega antes do seu PDV vai para a quarentena e lá fica, sem voltar para
 `silver.recharges` (reprocessar a quarentena é trabalho futuro).
