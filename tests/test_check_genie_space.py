@@ -77,3 +77,11 @@ def test_backticked_sql_as_generated_by_genie_passes() -> None:
     assert all(line.startswith("ok") for line in check.evaluate(sql))
     qualified = "SELECT ddd, MEASURE(`mv_recharges`.`gross_revenue`) FROM mv_recharges GROUP BY ddd"
     assert all(line.startswith("ok") for line in check.evaluate(qualified))
+
+
+def test_group_by_all_with_ddd_in_select_passes_but_without_ddd_fails() -> None:
+    base = "SELECT {cols} FROM `atlas_dev`.`semantic`.`mv_recharges` GROUP BY ALL"
+    good = base.format(cols="`ddd`, MEASURE(`gross_revenue`) AS `gross_revenue`")
+    assert all(line.startswith("ok") for line in check.evaluate(good))
+    bad = base.format(cols="`region`, MEASURE(`gross_revenue`) AS `gross_revenue`")
+    assert any(line.startswith("FALHA") and "ddd" in line for line in check.evaluate(bad))

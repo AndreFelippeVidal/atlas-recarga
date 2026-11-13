@@ -32,7 +32,11 @@ def evaluate(sql: str | None) -> list[str]:
     if not sql:
         return ["FALHA o Genie não devolveu SQL"]
     text = sql.lower()
-    groups_by_ddd = re.search(r"group\s+by[^;]*\bddd\b", text) is not None
+    # `GROUP BY ddd` ou `GROUP BY ALL` com `ddd` no SELECT: o Genie usa as duas formas.
+    groups_by_ddd = re.search(r"group\s+by[^;]*\bddd\b", text) is not None or (
+        re.search(r"group\s+by\s+all\b", text) is not None
+        and re.search(r"select[^;]*?\bddd\b[^;]*?\bfrom\b", text, re.DOTALL) is not None
+    )
     uses_measure = re.search(r"measure\s*\(\s*([`\w]+\.)?`?gross_revenue`?\s*\)", text) is not None
     leaks = [s for s in FORBIDDEN_SCHEMAS if re.search(rf"\b{s}\.", text)]
     checks = [
