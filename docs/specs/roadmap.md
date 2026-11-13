@@ -98,7 +98,7 @@ _`databricks.yml` cria o catálogo, os schemas, o Volume e os grupos, de forma r
 
 _Bronze → silver → gold com expectations e linhagem; gold D-1 até 08:00._
 
-- [ ] **P6.1** 🤖 Bronze: Auto Loader de `recharges`, MVs de `pos`, `distributors`, `municipalities` — _pronto quando:_ As contagens no bronze são iguais às do manifest · depende de P4.9, P5.2
+- [x] **P6.1** 🤖 Bronze: Auto Loader de `recharges`, MVs de `pos`, `distributors`, `municipalities` — _pronto quando:_ As contagens no bronze são iguais às do manifest (#33) — conferência no workspace pelo mantenedor via `scripts/check_bronze_counts.py` · depende de P4.9, P5.2
 - [ ] **P6.2** 🤖 Silver `recharges`: dedup, `recharge_date` em America/Sao_Paulo, expectations drop/warn — _pronto quando:_ Critério 1 da SPEC-002 §5 · depende de P6.1
 - [ ] **P6.3** 🤖 Silver `recharges_quarantine` (PDV órfão) — _pronto quando:_ Critério 2 da SPEC-002 §5 · depende de P6.2
 - [ ] **P6.4** 🤖 Silver das dimensões com `expect_or_fail` — _pronto quando:_ Critério 4 da SPEC-002 §5 (teste com um PDV de município inválido) · depende de P6.1

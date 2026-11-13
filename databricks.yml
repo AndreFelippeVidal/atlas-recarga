@@ -1,5 +1,6 @@
 # Declarative Automation Bundle do Atlas Recarga (SPEC-002 §2, tech-stack "Deploy").
-# P5.1: só o esqueleto. Catálogo, schemas e Volume entram na P5.2; o pipeline, na Fase 6.
+# P5.1: esqueleto. P5.2: catálogo, schemas e Volume (scripts/setup_workspace.py).
+# P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
 # DATABRICKS_HOST/DATABRICKS_TOKEN no CI (ADR-0015).
 bundle:
@@ -8,6 +9,20 @@ bundle:
 variables:
   catalog:
     description: Catálogo do Unity Catalog onde o bundle cria os objetos.
+
+resources:
+  pipelines:
+    atlas_medallion:
+      name: atlas_medallion
+      catalog: ${var.catalog}
+      schema: bronze  # default; os datasets das outras camadas virão qualificados (silver.x, gold.x)
+      serverless: true
+      channel: CURRENT
+      libraries:
+        - file:
+            path: pipeline/bronze.py
+      configuration:
+        atlas.landing_path: /Volumes/${var.catalog}/raw/landing
 
 targets:
   dev:
