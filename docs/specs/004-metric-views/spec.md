@@ -60,7 +60,7 @@ A variação mês contra mês **não** vira medida no MVP. O consumidor consulta
 
 | Consumidor | Como usa |
 |---|---|
-| **AI/BI Dashboard** `Atlas — Visão Comercial` | Páginas: Brasil (KPIs + mapa por UF nativo), Região/UF (tabela municipal), Rede (PDVs ativos por tipo), Comissão (só `mv_commission`). Filtros globais: mês, região, UF |
+| **AI/BI Dashboard** `Atlas — Visão Comercial` | Páginas: Brasil (KPIs + ranking de UFs), Região/UF (tabela municipal), Rede (PDVs ativos por tipo), Comissão (só `mv_commission`). Filtros globais: mês, região, UF. O mapa coroplético fica na SPEC-007 (React): o mapa nativo do AI/BI não reconhece UFs do Brasil e não há lat/lon no MVP (ADR-0004) |
 | **Genie Space** `Atlas Recarga` | Fontes: **só** `mv_recharges` e `mv_commission`. Instruções em PT-BR com as definições oficiais e 10 perguntas de exemplo (subconjunto do golden set). Usado pelo agente (SPEC-005) |
 | **Agente, MCP e React** | Consultam via SQL warehouse com `MEASURE()`. Nunca leem `gold.*` diretamente |
 
