@@ -63,6 +63,22 @@ def test_batch_total_is_sum_of_rounded_lines() -> None:
     assert rules.batch_total([]) == D("0.00")
 
 
+def test_batch_total_rejects_unrounded_line() -> None:
+    with pytest.raises(ValueError, match="rounded"):
+        rules.batch_total([D("0.0150")])
+
+
+@pytest.mark.parametrize("bad", ["NaN", "Infinity", "-Infinity"])
+def test_non_finite_volume_is_value_error(bad: str) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        rules.tier_for(D(bad))
+
+
+def test_tiers_sorted_by_floor() -> None:
+    floors = [t.floor for t in rules.TIERS]
+    assert floors == sorted(floors)
+
+
 def test_zero_boundaries() -> None:
     assert rules.tier_for(D("0")).name == "bronze"
     assert rules.distributor_commission(D("0")) == D("0.00")

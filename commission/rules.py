@@ -36,6 +36,8 @@ def round_brl(value: Decimal) -> Decimal:
 
 
 def _check_volume(volume: Decimal) -> None:
+    if not volume.is_finite():
+        raise ValueError(f"volume must be finite, got {volume}")
     if volume < 0:
         raise ValueError(f"volume must be >= 0, got {volume}")
 
@@ -43,11 +45,8 @@ def _check_volume(volume: Decimal) -> None:
 def tier_for(volume: Decimal) -> Tier:
     """Faixa do PDV: a de maior limite inferior menor ou igual ao volume."""
     _check_volume(volume)
-    chosen = TIERS[0]
-    for tier in TIERS:
-        if volume >= tier.floor:
-            chosen = tier
-    return chosen
+    # TIERS está em ordem crescente de floor: o primeiro match de trás para frente é o maior.
+    return next(t for t in reversed(TIERS) if volume >= t.floor)
 
 
 def pos_commission(volume: Decimal) -> tuple[Tier, Decimal]:
@@ -69,8 +68,13 @@ def has_line(volume: Decimal) -> bool:
 
 
 def batch_total(lines: Iterable[Decimal]) -> Decimal:
-    """Total do lote: soma das linhas arredondadas por linha, nunca o total recalculado.
+    """Total do lote: soma das linhas, que já devem estar em centavos.
 
-    Idempotente para linhas que já estão em centavos.
+    Rejeita linha não arredondada: o total nunca é recalculado nem corrigido em silêncio.
     """
-    return sum((round_brl(x) for x in lines), Decimal("0.00"))
+    total = Decimal("0.00")
+    for x in lines:
+        if x != round_brl(x):
+            raise ValueError(f"line must already be rounded to cents, got {x}")
+        total += x
+    return total
