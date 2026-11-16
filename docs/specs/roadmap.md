@@ -138,7 +138,7 @@ _Cálculo determinístico, reconciliação, 2 aprovações humanas e lote imutá
 _Escrever o teste antes do agente: golden set e scorers prontos._
 
 - [x] **P9.1** 🤖 `eval/golden_set.yaml` com ~30 casos (20 métricas, 5 comparativos, 5 recusas) — _pronto quando:_ Toda `reference_sql` executa e retorna 1 valor (#61) — estrutura validada no CI; a execução no `dev` fica com o mantenedor via `scripts/check_golden_set.py` · depende de P7.5, P8.11
-- [ ] **P9.2** 🤖 Sync do golden set para `atlas.eval.agent_golden_set` (dataset MLflow) — _pronto quando:_ O dataset aparece no UC com versão · depende de P9.1
+- [x] **P9.2** 🤖 Sync do golden set para `atlas.eval.agent_golden_set` (dataset MLflow) — _pronto quando:_ O dataset aparece no UC com versão (#63) — job `atlas_eval_sync`; a conferência no `dev` fica com o mantenedor via `scripts/check_agent_golden_set.py` · depende de P9.1
 - [ ] **P9.3** 🤖 Scorers de código (`numeric_match`, `cites_metric_view`, `read_only_tools`, `no_tool_on_refusal`) + testes unitários com traces fake — _pronto quando:_ Cobertura ≥ 90% nos scorers · depende de P9.1
 
 ## Fase 10 — Agente de negócio → [005-business-agent](005-business-agent/spec.md)
