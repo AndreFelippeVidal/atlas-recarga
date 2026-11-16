@@ -71,6 +71,9 @@ stateDiagram-v2
    - `tier_jump`: subiu 2 ou mais faixas em relação ao mês anterior (PDV sem linha no mês anterior não sinaliza).
    - `closed_pos`: PDV fechado no mês.
 4. O relatório é um notebook/dashboard `commission_review` por `batch_id`, com totais, top 20 maiores linhas, linhas com flag e comparação com o mês anterior.
+   - **Fonte:** só `commission.*` (`batches`, `batch_lines`, `reconciliation`), somente leitura, pois um rascunho nunca aparece na camada semântica (SPEC-004 §4). É relatório do próprio domínio, não consumidor da camada semântica; nenhum agente, MCP, app ou Genie o usa e `atlas_readers` não ganha acesso (ADR-0018). Lê `batch_lines` também para lotes `locked` (as linhas copiadas em `locked_lines` são idênticas por construção do lock).
+   - **Lote anterior:** o último lote `locked` do mês civil anterior (maior versão; lotes `ADJ` não contam). Sem ele, a comparação fica vazia.
+   - **Comparação:** os totais do lote contra os do anterior e, por PDV, a faixa e a comissão atuais contra as anteriores, com os 50 PDVs de maior mudança (PDV novo conta a mudança inteira; PDV que existia e sumiu não aparece, e a diferença agregada está nos totais).
 
 ## 6. Remessa simulada
 `/Volumes/<catalog>/commission/remittance/<batch_id>.csv` (Volume `commission.remittance`, criado pelo `atlas_commission_deploy` a partir de `commission/ddl/volumes/`; `<catalog>` é `atlas` no `demo`) (`beneficiary_type, beneficiary_id, commission_brl`) + `<batch_id>.sha256`. **Nada é enviado para fora do workspace.**
