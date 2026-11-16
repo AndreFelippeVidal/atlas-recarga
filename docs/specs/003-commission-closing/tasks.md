@@ -26,6 +26,12 @@
 
 - **Depende de:** P8.3
 - **Pronto quando:** Critério 1 da SPEC-003 §8 (R$ 0,00)
+- **Passos:**
+  - Recálculo em SQL puro sobre `gold.fct_recharges` (sem `agg_pos_month` nem `rules.py`), comparado por linha e no total com `batch_lines`
+  - Totais de controle: base dos PDVs = volume aprovado do mês; base dos distribuidores = soma por distribuidor
+  - Uma linha por lote em `commission.reconciliation` (reexecutar substitui); diferença ≠ 0,00 grava `failed` e falha a task
+  - Nova task `reconcile_draft` no job `atlas_commission_draft`, depois de `calculate_draft`
+  - `scripts/check_commission_reconciliation.py` para o mantenedor conferir no `dev`
 
 ### P8.5 🤖 Flags de revisão (`spike_3x`, `fractioning_suspect`, `tier_jump`, `closed_pos`)
 
