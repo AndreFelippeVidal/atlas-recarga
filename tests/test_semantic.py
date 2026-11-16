@@ -230,3 +230,55 @@ def test_consistency_main_exit_codes(monkeypatch: pytest.MonkeyPatch) -> None:
         check, "_run", lambda *_: [["2026-10-01", "1.01", "1.00"], ["TOTAL", "1.00", "1.00"]]
     )
     assert check.main(argv) == 1
+
+
+def test_mv_commission_has_the_spec_dimensions_and_measures_and_reads_only_locked() -> None:
+    mv = yaml.safe_load((SEMANTIC / "mv_commission.yaml").read_text(encoding="utf-8"))
+    assert {d["name"] for d in mv["dimensions"]} == {
+        "reference_month",
+        "beneficiary_type",
+        "tier",
+        "uf",
+        "region",
+        "municipality_name",
+        "distributor_name",
+        "batch_id",
+    }
+    assert {m["name"] for m in mv["measures"]} == {
+        "commission_total",
+        "commission_base",
+        "effective_rate",
+        "paid_beneficiaries",
+    }
+    for field in [*mv["dimensions"], *mv["measures"]]:
+        assert field["comment"] and field["synonyms"], field["name"]
+    source = mv["source"]
+    assert "commission.locked_lines" in source and "commission.batches" in source
+    assert "b.status = 'locked'" in source  # critério 2: rascunho nunca aparece
+    ddl = amv.build_ddl("atlas_dev", "mv_commission", (SEMANTIC / "mv_commission.yaml").read_text())
+    assert "${" not in ddl and "atlas_dev.commission.locked_lines" in ddl
+
+
+def test_check_mv_commission_queries_and_lines(monkeypatch: pytest.MonkeyPatch) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "check_mv_commission", ROOT / "scripts" / "check_mv_commission.py"
+    )
+    assert spec and spec.loader
+    check = importlib.util.module_from_spec(spec)
+    sys.modules["check_mv_commission"] = check
+    spec.loader.exec_module(check)
+    leak = check.build_leak_query("atlas_dev")
+    assert "atlas_dev.semantic.mv_commission" in leak and "<> 'locked'" in leak
+    compare = check.build_compare_query("atlas_dev")
+    assert "MEASURE(commission_total)" in compare and "b.status = 'locked'" in compare
+    assert check.leak_lines([])[0].startswith("ok")
+    assert check.leak_lines([["COM-2026-11-v1", "draft"]])[0].startswith("FALHA")
+    assert check.compare_lines([["2026-10-01", "10.00", "10.0"]])[0].startswith("ok")
+    assert check.compare_lines([["2026-10-01", "10.01", "10.00"]])[0].startswith("FALHA")
+    assert check.compare_lines([])[0].startswith("FALHA")
+    argv = ["--target", "dev", "--profile", "p", "--warehouse-id", "w"]
+    monkeypatch.setattr(check, "_run", lambda *_: [])
+    assert check.main(argv) == 1  # view vazia não passa
+    answers = iter([[], [["2026-10-01", "1.00", "1.00"]]])
+    monkeypatch.setattr(check, "_run", lambda *_: next(answers))
+    assert check.main(argv) == 0

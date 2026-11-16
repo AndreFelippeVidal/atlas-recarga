@@ -27,6 +27,15 @@ Roda com o perfil de um usuário que está **só** em `atlas_readers`. Confere q
 uv run python scripts/check_readers_permissions.py --target dev --profile <perfil-do-leitor> --warehouse-id <id>
 ```
 
+## `check_mv_commission.py` (P8.11)
+
+Confere que `semantic.mv_commission` só tem lotes `locked` (rascunho nunca aparece) e que
+`MEASURE(commission_total)` por mês bate ao centavo com `locked_lines`. Só lê.
+
+```bash
+uv run python scripts/check_mv_commission.py --target dev --profile <perfil> --warehouse-id <id>
+```
+
 ## `check_commission_flags.py` (P8.5)
 
 Depois do job `atlas_commission_draft` (que inclui a task `flag_draft`), confere os flags de `commission.batch_lines`: só os quatro da SPEC-003 §5, nenhum em linha de distribuidor, `closed_pos` igual aos PDVs fechados no mês e `fractioning_suspect` igual aos PDVs com rajada no mês do lote, por consulta independente (critério 3 da §8). Só leitura.

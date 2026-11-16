@@ -14,12 +14,15 @@ SPACE: dict[str, Any] = BUNDLE["resources"]["genie_spaces"]["atlas_recarga"]["se
 HEX32 = re.compile(r"^[0-9a-f]{32}$")
 
 
-def test_space_reads_only_the_metric_view() -> None:
+def test_space_reads_only_the_metric_views() -> None:
     tables = SPACE["data_sources"]["tables"]
-    assert [t["identifier"] for t in tables] == ["${var.catalog}.semantic.mv_recharges"]
+    assert [t["identifier"] for t in tables] == [
+        "${var.catalog}.semantic.mv_commission",
+        "${var.catalog}.semantic.mv_recharges",
+    ]
     for example in SPACE["instructions"]["example_question_sqls"]:
         sql = example["sql"][0].lower()
-        assert "${var.catalog}.semantic.mv_recharges" in sql
+        assert re.search(r"\.semantic\.mv_(recharges|commission)", sql)
         assert not re.search(r"\.(gold|silver|bronze|commission)\.", sql)
         assert "measure(" in sql
 
