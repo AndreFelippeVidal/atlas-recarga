@@ -176,7 +176,10 @@ def main(argv: list[str]) -> None:
         print(f"{name} tem registros que o YAML não tem mais; recriando")
         spark.sql(f"DROP TABLE IF EXISTS {name}")
         dataset = create()
-    dataset.merge_records(records)
+    if fingerprints(_rows(dataset)) == fingerprints(records):
+        print(f"{name} já é igual ao YAML; nada a gravar")
+    else:
+        dataset.merge_records(records)
     verify_mirror(_rows(mlflow.genai.datasets.get_dataset(name=name)), records)
     print(f"ok: {len(records)} casos sincronizados em {name}")
 
