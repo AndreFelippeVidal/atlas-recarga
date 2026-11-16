@@ -19,14 +19,14 @@ import re
 import sys
 from collections.abc import Sequence
 
-from check_commission_draft import CATALOGS, _mark, _run, check_batch_id
+from check_commission_draft import CATALOGS, _mark, _run, check_any_batch_id
 from check_commission_reconciliation import check as check_reconciliation
 
 _ADJ = re.compile(r"^COM-\d{4}-\d{2}-ADJ-(\d+)$")
 
 
 def check(profile: str, warehouse_id: str, catalog: str, batch_id: str) -> list[str]:
-    check_batch_id(batch_id)
+    check_any_batch_id(batch_id)
     match = _ADJ.fullmatch(batch_id)
     if match is None:
         return [f"FALHA {batch_id} não é um lote de ajuste (COM-YYYY-MM-ADJ-n)"]

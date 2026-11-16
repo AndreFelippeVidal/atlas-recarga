@@ -17,11 +17,11 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from check_commission_draft import CATALOGS, _mark, _run, check_batch_id
+from check_commission_draft import CATALOGS, _mark, _run, check_any_batch_id
 
 
 def check(profile: str, warehouse_id: str, catalog: str, batch_id: str) -> list[str]:
-    check_batch_id(batch_id)
+    check_any_batch_id(batch_id)
     c = f"{catalog}.commission"
     try:
         rows = _run(

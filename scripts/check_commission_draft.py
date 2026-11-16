@@ -57,6 +57,16 @@ def _run(profile: str, warehouse_id: str, statement: str) -> list[list[str | Non
     return list(response.get("result", {}).get("data_array", []))
 
 
+_ANY_BATCH_ID = re.compile(r"^COM-\d{4}-(0[1-9]|1[0-2])-(?:v[1-9]\d*|ADJ-[1-9]\d*)$")
+
+
+def check_any_batch_id(value: str) -> str:
+    """Como `check_batch_id`, mas aceita também o lote de ajuste `COM-YYYY-MM-ADJ-n` (§7)."""
+    if not _ANY_BATCH_ID.fullmatch(value):
+        raise ValueError(f"batch_id inválido: {value!r}")
+    return value
+
+
 def check_batch_id(value: str) -> str:
     if not _BATCH_ID.fullmatch(value):
         raise ValueError(f"batch_id inválido: {value!r}")
