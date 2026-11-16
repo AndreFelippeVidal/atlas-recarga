@@ -8,5 +8,5 @@ Golden set e scorers do agente. Governado pela [SPEC-008](../docs/specs/008-agen
 
 ## `sync_golden_set.py` (P9.2)
 
-Job `atlas_eval_sync` (`databricks bundle run atlas_eval_sync -t dev`): sincroniza o YAML com o dataset MLflow `<catalog>.eval.agent_golden_set`. Cada caso vira `inputs = {question}` e `expectations` (id, categoria, `reference_sql`, view esperada, tolerância, comportamento); nunca o número. Idempotente (`merge_records` casa pelas `inputs`); um caso removido do YAML não sai do dataset. Confira com `scripts/check_agent_golden_set.py`.
+Job `atlas_eval_sync` (`databricks bundle run atlas_eval_sync -t dev`): sincroniza o YAML com o dataset MLflow `<catalog>.eval.agent_golden_set`. Cada caso vira `inputs = {question}` e `expectations` (id, categoria, `reference_sql`, view esperada, tolerância, comportamento); nunca o número (com o catálogo do target: `atlas_dev` no `dev`). Idempotente (`merge_records` casa pelas `inputs`); um caso removido do YAML não sai do dataset. Confira com `scripts/check_agent_golden_set.py`.
 

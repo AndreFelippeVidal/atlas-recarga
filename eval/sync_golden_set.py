@@ -5,6 +5,8 @@ catálogo do target e o caminho do YAML sincronizado pelo bundle. O dataset vive
 `<catalog>.eval.agent_golden_set`; o schema `eval` já existe (setup do workspace). Nunca se edita o
 dataset à mão: a fonte de verdade é o YAML.
 
+* A `reference_sql` do YAML usa o catálogo `atlas`; o sync troca pelo catálogo do target
+  (`atlas_dev` no `dev`), como `scripts/check_golden_set.py`: o scorer roda a SQL no catálogo certo.
 * Cada caso vira um registro `{"inputs": {"question"}, "expectations": {...}}`.
 * O registro guarda a **SQL de referência**, nunca o número: o valor esperado é recalculado a cada
   rodada sobre as metric views.
@@ -50,7 +52,11 @@ def load_cases(path: Path) -> list[dict[str, Any]]:
     return list(cases)
 
 
-def to_records(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def for_catalog(sql: str, catalog: str) -> str:
+    return sql.replace("atlas.semantic.", f"{catalog}.semantic.")
+
+
+def to_records(cases: list[dict[str, Any]], catalog: str = "atlas") -> list[dict[str, Any]]:
     """Converte os casos do YAML em registros do dataset MLflow, sem calcular nenhum valor."""
     seen: set[str] = set()
     records: list[dict[str, Any]] = []
@@ -64,7 +70,20 @@ def to_records(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
         question = case.get("question")
         if not isinstance(question, str) or not question.strip():
             raise ValueError(f"{case_id}: question ausente")
+        required = (
+            ("expected_behavior",)
+            if case["category"] == "refusal"
+            else (
+                "reference_sql",
+                "expected_source_view",
+            )
+        )
+        missing = [k for k in required if not case.get(k)]
+        if missing:
+            raise ValueError(f"{case_id}: campos ausentes {missing}")
         expectations = {k: case[k] for k in EXPECTATION_FIELDS if k in case}
+        if "reference_sql" in expectations:
+            expectations["reference_sql"] = for_catalog(expectations["reference_sql"], catalog)
         records.append({"inputs": {"question": question}, "expectations": expectations})
     return records
 
@@ -73,7 +92,7 @@ def main(argv: list[str]) -> int:
     """`argv`: catálogo e caminho do `golden_set.yaml`."""
     catalog, yaml_path = argv
     name = dataset_name(catalog)
-    records = to_records(load_cases(Path(yaml_path)))
+    records = to_records(load_cases(Path(yaml_path)), catalog)
 
     import mlflow.genai.datasets  # só existe no workspace; import tardio mantém o módulo testável
     from databricks.connect import DatabricksSession

@@ -51,6 +51,24 @@ def test_one_record_per_case_without_computed_values() -> None:
             assert expectations["expected_source_view"] == case["expected_source_view"]
 
 
+def test_reference_sql_points_to_the_target_catalog() -> None:
+    dev = sync.to_records(CASES, "atlas_dev")
+    for record in dev:
+        sql = record["expectations"].get("reference_sql")
+        if sql:
+            assert "atlas_dev.semantic." in sql
+            assert "atlas.semantic." not in sql
+    prod = sync.to_records(CASES, "atlas")
+    assert prod[0]["expectations"]["reference_sql"] == CASES[0]["reference_sql"]
+
+
+def test_required_fields_per_category() -> None:
+    with pytest.raises(ValueError):
+        sync.to_records([{"id": "X", "category": "refusal", "question": "q"}])
+    with pytest.raises(ValueError):
+        sync.to_records([{"id": "X", "category": "metric", "question": "q"}])
+
+
 def test_questions_are_unique_so_merge_does_not_collapse_cases() -> None:
     questions = [r["inputs"]["question"] for r in sync.to_records(CASES)]
     assert len(set(questions)) == len(questions)
@@ -70,7 +88,7 @@ def test_invalid_case_is_rejected(bad: dict[str, Any]) -> None:
 
 
 def test_duplicate_id_is_rejected() -> None:
-    case = {"id": "X", "category": "metric", "question": "q"}
+    case = {"id": "X", "category": "refusal", "question": "q", "expected_behavior": "refuse"}
     with pytest.raises(ValueError):
         sync.to_records([case, case])
 
