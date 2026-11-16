@@ -70,6 +70,13 @@ def check(profile: str, warehouse_id: str, catalog: str, batch_id: str) -> list[
             f"SELECT COUNT(*) FROM {c}.batch_events WHERE batch_id = '{batch_id}' "
             "AND from_status = 'approved' AND to_status = 'locked' AND role = 'system'",
         )[0][0]
+        if not header:
+            return [f"FALHA {batch_id} não existe"]
+        if header[0][0] != "locked":
+            return [
+                f"FALHA {batch_id}: status = {header[0][0]!r}, ainda não está 'locked'. Se for "
+                "'approved', repita `approve` no job atlas_commission_review (retoma o lock)"
+            ]
         volume = f"/Volumes/{catalog}/commission/remittance/{batch_id}"
         with tempfile.TemporaryDirectory() as tmp:
             csv_bytes = _download(profile, f"{volume}.csv", Path(tmp) / "r.csv")
