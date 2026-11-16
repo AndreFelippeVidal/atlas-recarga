@@ -13,5 +13,5 @@ databricks bundle run atlas_commission_draft -t dev --profile <perfil>
 uv run python scripts/check_commission_draft.py --target dev --profile <perfil> \
     --warehouse-id <id> --batch-id COM-2026-10-v1
 uv run python scripts/check_commission_flags.py --target dev --profile <perfil> \
-    --warehouse-id <id> --batch-id COM-2026-10-v1 --expect-fractioning
+    --warehouse-id <id> --batch-id COM-2026-10-v1
 ```
