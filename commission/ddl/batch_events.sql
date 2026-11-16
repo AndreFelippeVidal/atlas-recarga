@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS ${catalog}.commission.batch_events (
   event_id STRING NOT NULL COMMENT 'Identificador único do evento',
   batch_id STRING NOT NULL COMMENT 'Lote da transição',
   from_status STRING COMMENT 'Estado anterior; nulo na criação',
-  to_status STRING NOT NULL COMMENT 'Estado novo',
+  to_status STRING NOT NULL COMMENT 'Estado novo; denied marca uma tentativa negada (segregação de funções), sem mudança de estado',
   actor STRING NOT NULL COMMENT 'current_user() de quem executou a transição',
   role STRING NOT NULL COMMENT 'analyst, director, system ou demo_override',
   justification STRING COMMENT 'Texto da decisão; obrigatório (20+ caracteres) na rejeição',

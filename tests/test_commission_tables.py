@@ -159,8 +159,13 @@ def test_probe_statements_are_scoped_and_append_only() -> None:
     assert statements["drop"].startswith("DROP TABLE IF EXISTS")
 
 
-def test_bundle_declares_the_deploy_job_not_the_review_job() -> None:
+def test_bundle_declares_the_deploy_job_and_the_review_job() -> None:
     text = (ROOT / "databricks.yml").read_text(encoding="utf-8")
     assert "atlas_commission_deploy:" in text
     assert "commission/apply_ddl.py" in text
-    assert "atlas_commission_review:" not in text
+    # P8.6: o job de revisão existe, mas só uma pessoa o dispara (ADR-0010).
+    assert "atlas_commission_review:" in text
+    assert "commission/review.py" in text
+    block = text.split("atlas_commission_review:")[1].split("\ntargets:")[0]
+    assert "{{job.run_id}}" in block  # o ator vem da execução, não de parâmetro do usuário
+    assert "allow_same_approver_demo" not in block.split("tasks:")[0]  # não é parâmetro de run

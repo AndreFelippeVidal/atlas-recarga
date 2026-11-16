@@ -11,6 +11,9 @@ Targets mirror `databricks.yml`: `dev` -> catalog `atlas_dev`, `demo` -> catalog
 Schemas follow ADR-0003. Grants (P7.3, SPEC-004 §7): `atlas_readers` gets `USE CATALOG` and
 `USE SCHEMA` + `SELECT` on `semantic` only, nothing on gold/silver/bronze/commission. The
 `commission` grants come with SPEC-003. Grants need the group to exist, so they run after it.
+Membership (P8.6): `--analyst` / `--director` (repeatable, user e-mails) add people to
+`atlas_commission_analysts` / `atlas_commission_directors`, which `atlas_commission_review`
+reads to decide who may approve (SPEC-003 §4). Idempotent; nobody is added without the flag.
 """
 
 from __future__ import annotations
@@ -39,6 +42,8 @@ VOLUME_SCHEMA = "raw"
 VOLUME_NAME = "landing"
 GROUPS = ("atlas_readers", "atlas_commission_analysts", "atlas_commission_directors")
 READERS_GROUP = "atlas_readers"
+ANALYSTS_GROUP = "atlas_commission_analysts"
+DIRECTORS_GROUP = "atlas_commission_directors"
 ALREADY_EXISTS = ("already exists", "already in use", "conflict")
 MAX_POLLS = 90  # ~3 min at 2 s; a stuck statement fails instead of hanging
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -140,6 +145,43 @@ def _ensure_groups(profile: str) -> list[str]:
     return created
 
 
+_USER_EMAIL = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$")  # goes into a SCIM filter
+
+
+def _one(items: Any, what: str) -> dict[str, Any]:
+    found = [i for i in items or [] if isinstance(i, dict)]
+    if len(found) != 1:
+        raise RuntimeError(f"expected exactly one {what}, found {len(found)}")
+    return found[0]
+
+
+def ensure_members(profile: str, group: str, users: Sequence[str]) -> list[str]:
+    """Add each user (e-mail) to `group` unless already a member; return the ones added."""
+    if not users:
+        return []
+    if group not in (ANALYSTS_GROUP, DIRECTORS_GROUP):
+        raise ValueError(f"membership is only managed for the commission groups, not {group!r}")
+    for user in users:
+        if not _USER_EMAIL.fullmatch(user):
+            raise ValueError(f"invalid user e-mail: {user!r}")
+    group_ref = _one(
+        _cli(profile, ["groups", "list", "--filter", f'displayName eq "{group}"']), f"group {group}"
+    )
+    current = _cli(profile, ["groups", "get", str(group_ref["id"])]) or {}
+    member_ids = {str(m.get("value")) for m in current.get("members", []) if isinstance(m, dict)}
+    added = []
+    for user in users:
+        user_ref = _one(
+            _cli(profile, ["users", "list", "--filter", f'userName eq "{user}"']), f"user {user}"
+        )
+        if str(user_ref["id"]) in member_ids:
+            continue
+        operations = [{"op": "add", "value": {"members": [{"value": str(user_ref["id"])}]}}]
+        _cli(profile, ["groups", "patch", str(group_ref["id"])], {"Operations": operations})
+        added.append(user)
+    return added
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--target", choices=sorted(CATALOGS), required=True)
@@ -151,6 +193,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=[],
         help="principal (user e-mail, SP name or application id) that reads `semantic`; repeatable",
     )
+    parser.add_argument(
+        "--analyst",
+        action="append",
+        default=[],
+        help=f"user e-mail added to {ANALYSTS_GROUP} (may approve as analyst); repeatable",
+    )
+    parser.add_argument(
+        "--director",
+        action="append",
+        default=[],
+        help=f"user e-mail added to {DIRECTORS_GROUP} (may approve as director); repeatable",
+    )
     parser.add_argument("--dry-run", action="store_true", help="print the plan and change nothing")
     args = parser.parse_args(argv)
 
@@ -158,6 +212,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.dry_run:
         print("\n".join(f"{s};" for s in statements))
         print("\n".join(f"-- group (created if missing): {g}" for g in GROUPS))
+        print("\n".join(f"-- member of {ANALYSTS_GROUP}: {u}" for u in args.analyst))
+        print("\n".join(f"-- member of {DIRECTORS_GROUP}: {u}" for u in args.director))
         grants = build_grant_statements(CATALOGS[args.target], args.reader)
         print("\n".join(f"{s};" for s in grants))
         return 0
@@ -168,6 +224,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ok: {statement.split(' COMMENT')[0]}")
     created = _ensure_groups(args.profile)
     print(f"groups created: {', '.join(created) or 'none (already existed)'}")
+    for group, users in ((ANALYSTS_GROUP, args.analyst), (DIRECTORS_GROUP, args.director)):
+        added = ensure_members(args.profile, group, users)
+        if users:
+            print(f"{group}: added {', '.join(added) or 'none (already members)'}")
     for statement in build_grant_statements(CATALOGS[args.target], args.reader):
         _run_sql(args.profile, warehouse_id, statement)  # GRANT is idempotent in Unity Catalog
         print(f"ok: {statement}")

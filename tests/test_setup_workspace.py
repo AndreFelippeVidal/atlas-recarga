@@ -205,3 +205,68 @@ def test_main_passes_readers_to_the_grants(monkeypatch: pytest.MonkeyPatch) -> N
     argv = ["--target", "dev", "--profile", "x", "--warehouse-id", "w", "--reader", "sp-1"]
     assert setup.main(argv) == 0
     assert "GRANT USE CATALOG ON CATALOG atlas_dev TO `sp-1`" in ran
+
+
+def _membership_cli(calls: list[tuple[list[str], object]], members: list[str]) -> object:
+    def fake_cli(profile: str, args: list[str], body: object = None) -> object:
+        calls.append((args, body))
+        if args[:2] == ["groups", "list"]:
+            return [{"id": "g1", "displayName": "atlas_commission_analysts"}]
+        if args[:2] == ["groups", "get"]:
+            return {"members": [{"value": m} for m in members]}
+        if args[:2] == ["users", "list"]:
+            return [{"id": "u-" + args[-1].split('"')[1].split("@")[0]}]
+        return {}
+
+    return fake_cli
+
+
+def test_ensure_members_adds_only_missing_users(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[list[str], object]] = []
+    monkeypatch.setattr(setup, "_cli", _membership_cli(calls, ["u-ana"]))
+    added = setup.ensure_members("p", "atlas_commission_analysts", ["ana@x.com", "bia@x.com"])
+    assert added == ["bia@x.com"]
+    patches = [(a, b) for a, b in calls if a[:2] == ["groups", "patch"]]
+    assert patches == [
+        (
+            ["groups", "patch", "g1"],
+            {"Operations": [{"op": "add", "value": {"members": [{"value": "u-bia"}]}}]},
+        )
+    ]
+
+
+def test_ensure_members_without_users_touches_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[list[str], object]] = []
+    monkeypatch.setattr(setup, "_cli", _membership_cli(calls, []))
+    assert setup.ensure_members("p", "atlas_commission_analysts", []) == []
+    assert calls == []
+
+
+@pytest.mark.parametrize("bad", ["", 'x" or userName ne "', "a b@x.com", "sem-arroba"])
+def test_ensure_members_rejects_unsafe_users(bad: str) -> None:
+    with pytest.raises(ValueError, match="invalid user"):
+        setup.ensure_members("p", "atlas_commission_analysts", [bad])
+
+
+def test_membership_is_only_for_the_commission_groups() -> None:
+    with pytest.raises(ValueError, match="commission groups"):
+        setup.ensure_members("p", "atlas_readers", ["ana@x.com"])
+
+
+def test_main_adds_analysts_and_directors(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(setup, "_run_sql", lambda *_a: None)
+    monkeypatch.setattr(setup, "_ensure_groups", lambda _p: [])
+    seen: list[tuple[str, list[str]]] = []
+
+    def fake_members(_p: str, group: str, users: list[str]) -> list[str]:
+        seen.append((group, list(users)))
+        return []
+
+    monkeypatch.setattr(setup, "ensure_members", fake_members)
+    argv = ["--target", "dev", "--profile", "x", "--warehouse-id", "w"]
+    argv += ["--analyst", "ana@x.com", "--director", "dir@x.com"]
+    assert setup.main(argv) == 0
+    assert seen == [
+        ("atlas_commission_analysts", ["ana@x.com"]),
+        ("atlas_commission_directors", ["dir@x.com"]),
+    ]
