@@ -33,6 +33,14 @@ flowchart LR
 | `atlas.semantic.fn_metric_by_region(measure, level, month, uf)` | UC function SQL | Medida por `region`\|`uf`\|`municipality`\|`ddd` num mês, com `measure` validado contra uma lista fechada | `EXECUTE` |
 | `atlas.semantic.fn_compare_months(measure, month_a, month_b, level, uf)` | UC function SQL | Variação absoluta e percentual entre dois meses | `EXECUTE` |
 
+**Contrato das UC functions** (P10.1):
+- `fn_list_metrics()` devolve `(kind, name, description, synonyms)`, gerado de `semantic/mv_recharges.yaml`; só `mv_recharges` (a comissão não é consultada pelo agente).
+- `fn_metric_by_region` devolve `(level, key, label, value)`; `key` é o código da dimensão (`region`, `uf`, código IBGE ou `ddd`) e `label` o nome legível. `uf` é opcional (`NULL` = todas) e `month` é qualquer dia do mês de negócio.
+- `fn_compare_months` devolve `(level, key, label, value_a, value_b, abs_change, pct_change)`, com `abs_change = value_b - value_a` e `pct_change` em pontos percentuais com 2 casas; `pct_change` é `NULL` quando `value_a` é zero ou ausente.
+- `value` é sempre `DECIMAL(24,6)`, nunca `DOUBLE`; a escala maior que a de `DECIMAL(14,2)` existe porque o mesmo tipo carrega `avg_ticket` e `reversal_rate` (fração). Aplicar o arredondamento monetário é do consumidor.
+- `measure` fora da lista (ou `NULL`) falha com `INVALID_MEASURE`, e `level` fora de `region|uf|municipality|ddd` com `INVALID_LEVEL`, mesmo que o mês não tenha linhas. Não há SQL dinâmico.
+- Os leitores (agente, MCP, React) recebem `EXECUTE` no schema `semantic` por principal (ADR-0016), além do `SELECT`.
+
 Nenhuma outra tool existe. **Não há** tool de SQL livre, de escrita, de execução de job nem de acesso a `commission.batches`, `batch_lines` ou a qualquer schema fora de `semantic`.
 
 ## 4. Regras de comportamento (system prompt + guardrails)
