@@ -163,11 +163,12 @@ def test_main_runs_every_statement_then_groups(
     assert "groups created: atlas_readers" in capsys.readouterr().out
 
 
-def test_readers_get_select_only_on_semantic() -> None:
+def test_readers_get_select_and_execute_only_on_semantic() -> None:
     grants = setup.build_grant_statements("atlas_dev")
     assert grants == [
         "GRANT USE CATALOG ON CATALOG atlas_dev TO `atlas_readers`",
         "GRANT USE SCHEMA, SELECT ON SCHEMA atlas_dev.semantic TO `atlas_readers`",
+        "GRANT EXECUTE ON SCHEMA atlas_dev.semantic TO `atlas_readers`",
     ]
     for layer in ("raw", "bronze", "silver", "gold", "commission", "eval", "observability"):
         assert not any(f"atlas_dev.{layer}" in g for g in grants)
@@ -185,8 +186,8 @@ def test_dry_run_lists_the_grants(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_each_reader_principal_gets_the_grants_directly() -> None:
     grants = setup.build_grant_statements("atlas_dev", ["5846127f-3d8e-4597-8b69-6e5c58359b0e"])
-    assert len(grants) == 4
-    assert grants[2] == (
+    assert len(grants) == 6
+    assert grants[3] == (
         "GRANT USE CATALOG ON CATALOG atlas_dev TO `5846127f-3d8e-4597-8b69-6e5c58359b0e`"
     )
     assert not any("gold" in g or "commission" in g for g in grants)

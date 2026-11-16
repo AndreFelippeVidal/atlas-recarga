@@ -80,6 +80,8 @@ def build_grant_statements(catalog: str, readers: Sequence[str] = ()) -> list[st
         statements += [
             f"GRANT USE CATALOG ON CATALOG {catalog} TO `{principal}`",
             f"GRANT USE SCHEMA, SELECT ON SCHEMA {catalog}.semantic TO `{principal}`",
+            # as fn_* do agente (SPEC-005 §3): EXECUTE, nada além de semantic
+            f"GRANT EXECUTE ON SCHEMA {catalog}.semantic TO `{principal}`",
         ]
     return statements
 
