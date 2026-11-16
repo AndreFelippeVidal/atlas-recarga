@@ -31,7 +31,13 @@ NOT_APPLICABLE = "n/a"
 
 _SOURCE_BLOCK = re.compile(r"^\s*\**Fonte:", re.IGNORECASE | re.MULTILINE)
 # Número em PT-BR: "1.234.567,89", "1234,5", "12", "-3,2". O ponto só é milhar em grupos de 3.
-_NUMBER = re.compile(r"-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+(?:,\d+)?")
+_NUM = r"-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+(?:,\d+)?"
+_NUMBER = re.compile(_NUM)
+# Número "principal": o primeiro com `R$` ou `%` (é o valor); senão o primeiro que não seja ano
+# (1900-2099) nem ordinal ("1º", "2ª").
+_MARKED_NUMBER = re.compile(rf"R\$\s*({_NUM})|({_NUM})\s*%")
+_YEAR = re.compile(r"(?:19|20)\d{2}")
+_ORDINAL = re.compile(r"[ºª°]")
 
 
 @dataclass(frozen=True)
@@ -67,24 +73,58 @@ def parse_ptbr_number(token: str) -> float:
 
 
 def extract_main_number(text: str) -> float | None:
-    """O primeiro número da resposta, fora do bloco `Fonte:`. `None` se não houver."""
-    match = _NUMBER.search(strip_source_block(text))
-    return parse_ptbr_number(match.group()) if match else None
+    """O número principal da resposta, fora do bloco `Fonte:`; `None` se não houver.
+
+    Prioridade: o primeiro valor com `R$` ou `%`; senão o primeiro número que não seja ano nem
+    ordinal. Escalas por extenso ("1,2 milhão") não são interpretadas.
+    """
+    body = strip_source_block(text)
+    marked = _MARKED_NUMBER.search(body)
+    if marked:
+        return parse_ptbr_number(marked.group(1) or marked.group(2))
+    for match in _NUMBER.finditer(body):
+        token = match.group()
+        if _YEAR.fullmatch(token) or _ORDINAL.match(body[match.end() : match.end() + 1]):
+            continue
+        return parse_ptbr_number(token)
+    return None
+
+
+_QUALIFIED_FN = re.compile(r"atlas(?:_[a-z0-9_]+)?\.semantic\.(fn_[a-z_]+)")
+
+
+def normalize_tool_name(raw: object) -> str:
+    """`fn_x`, `atlas.semantic.fn_x()` e `atlas_dev.semantic.fn_x` viram `fn_x`.
+
+    Qualificado só vale em `atlas*.semantic`; qualquer outro prefixo (`evil.fn_x`) fica intacto
+    e portanto fora da lista fechada.
+    """
+    name = str(raw).strip().removesuffix("()")
+    match = _QUALIFIED_FN.fullmatch(name)
+    return match.group(1) if match else name
 
 
 def tool_names(trace: Any) -> list[str]:
-    """Nomes normalizados dos spans TOOL: `atlas.semantic.fn_x()` e `fn_x` viram `fn_x`."""
-    names = []
+    """Nomes normalizados dos spans TOOL do trace."""
+    return [normalize_tool_name(span.name) for span in trace.search_spans(span_type="TOOL")]
+
+
+# Tools que só descrevem o catálogo: citar a view no retorno delas não é consultar a view.
+_CATALOG_ONLY_TOOLS = frozenset({"fn_list_metrics"})
+
+
+def _consulted_view(trace: Any, view: str) -> bool:
+    """Alguma tool de dados citou `view` como identificador inteiro (não `mv_x_daily`)."""
+    pattern = re.compile(rf"(?<![a-z0-9_]){re.escape(view.lower())}(?![a-z0-9_])")
     for span in trace.search_spans(span_type="TOOL"):
-        names.append(str(span.name).strip().removesuffix("()").rsplit(".", 1)[-1])
-    return names
-
-
-def _tool_payloads(trace: Any) -> list[str]:
-    return [
-        json.dumps({"i": span.inputs, "o": span.outputs}, ensure_ascii=False, default=str).lower()
-        for span in trace.search_spans(span_type="TOOL")
-    ]
+        if normalize_tool_name(span.name) in _CATALOG_ONLY_TOOLS:
+            continue
+        payload = json.dumps(
+            {"i": span.inputs, "o": span.outputs}, ensure_ascii=False, default=str
+        ).lower()
+        if pattern.search(payload):
+            return True
+    return False
 
 
 def check_numeric_match(outputs: Any, expectations: dict[str, Any]) -> Result:
@@ -120,7 +160,7 @@ def check_cites_metric_view(outputs: Any, trace: Any, expectations: dict[str, An
         return Result(False, "expectations sem `expected_source_view`")
     if not _SOURCE_BLOCK.search(answer_text(outputs)):
         return Result(False, "a resposta não tem o bloco `Fonte:`")
-    if not any(str(view).lower() in payload for payload in _tool_payloads(trace)):
+    if not _consulted_view(trace, str(view)):
         return Result(False, f"nenhuma tool do trace consultou {view}")
     return Result(True, f"bloco `Fonte:` presente e uma tool consultou {view}")
 
@@ -130,7 +170,8 @@ def check_read_only_tools(trace: Any, allowed: frozenset[str] = ALLOWED_TOOLS) -
     outside = sorted({name for name in used if name not in allowed})
     if outside:
         return Result(False, f"tools fora da lista fechada: {outside}")
-    return Result(True, f"{len(used)} chamada(s), todas na lista fechada")
+    note = "" if used else " (trace sem spans TOOL: confira a instrumentação)"
+    return Result(True, f"{len(used)} chamada(s), todas na lista fechada{note}")
 
 
 def check_no_tool_on_refusal(trace: Any, expectations: dict[str, Any]) -> Result:
@@ -140,7 +181,7 @@ def check_no_tool_on_refusal(trace: Any, expectations: dict[str, Any]) -> Result
     used = tool_names(trace)
     if used:
         return Result(False, f"recusa com tool chamada: {used}")
-    return Result(True, "nenhuma tool chamada")
+    return Result(True, "nenhuma tool chamada (trace sem spans TOOL)")
 
 
 def build_scorers() -> Sequence[Any]:

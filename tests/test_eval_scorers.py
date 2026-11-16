@@ -51,6 +51,9 @@ FONTE = "\nFonte: semantic.mv_recharges · gross_revenue · recharge_month = 202
         ("Queda de -3,2%", -3.2),
         ("R$ 950,00" + FONTE, 950.0),
         ("A receita foi R$ 1.000,00." + FONTE, 1000.0),
+        ("Em outubro de 2026, a receita foi R$ 1.000,00", 1000.0),
+        ("No 1º trimestre subiu 4,2%", 4.2),
+        ("Em 2026 foram 350 PDVs", 350.0),
     ],
 )
 def test_extract_main_number(text: str, expected: float) -> None:
@@ -165,3 +168,20 @@ def test_build_scorers_wraps_checks_with_mlflow(monkeypatch: pytest.MonkeyPatch)
     assert cites(outputs="1" + FONTE, expectations=exp, trace=genie_trace()).value is True
     assert read_only(trace=FakeTrace([FakeSpan("run_sql")])).value is False
     assert no_tool(expectations={"category": "refusal"}, trace=FakeTrace()).value is True
+
+
+def test_tool_name_must_be_qualified_in_semantic() -> None:
+    assert scorers.normalize_tool_name("atlas_dev.semantic.fn_list_metrics()") == "fn_list_metrics"
+    evil = FakeTrace([FakeSpan("evil.fn_list_metrics")])
+    assert scorers.check_read_only_tools(evil).passed is False
+    assert "sem spans TOOL" in scorers.check_read_only_tools(FakeTrace()).rationale
+
+
+def test_cites_ignores_catalog_tool_and_similar_view_names() -> None:
+    exp = {"category": "metric", "expected_source_view": "mv_recharges"}
+    only_list = FakeTrace([FakeSpan("fn_list_metrics", None, {"views": ["mv_recharges"]})])
+    assert scorers.check_cites_metric_view("1" + FONTE, only_list, exp).passed is False
+    similar = FakeTrace([FakeSpan("ask_genie", None, "FROM semantic.mv_recharges_daily")])
+    assert scorers.check_cites_metric_view("1" + FONTE, similar, exp).passed is False
+    data = FakeTrace([FakeSpan("fn_metric_by_region", None, {"source": "semantic.mv_recharges"})])
+    assert scorers.check_cites_metric_view("1" + FONTE, data, exp).passed is True
