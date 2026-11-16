@@ -255,6 +255,11 @@ def test_mv_commission_has_the_spec_dimensions_and_measures_and_reads_only_locke
     source = mv["source"]
     assert "commission.locked_lines" in source and "commission.batches" in source
     assert "b.status = 'locked'" in source  # critério 2: rascunho nunca aparece
+    assert "JOIN ${catalog}.commission.batches b ON b.batch_id = l.batch_id AND" in source
+    measures = {m["name"]: m["expr"] for m in mv["measures"]}
+    assert "FILTER (WHERE beneficiary_type = 'pos')" in measures["commission_base"]
+    assert "FILTER (WHERE beneficiary_type = 'pos')" in measures["effective_rate"]
+    assert "NULLIF(MEASURE(commission_base), 0)" in measures["effective_rate"]
     ddl = amv.build_ddl("atlas_dev", "mv_commission", (SEMANTIC / "mv_commission.yaml").read_text())
     assert "${" not in ddl and "atlas_dev.commission.locked_lines" in ddl
 

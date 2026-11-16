@@ -1442,6 +1442,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "q_c_reference_month",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "reference_month",
+                      "expression": "`reference_month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -1453,6 +1466,11 @@
                     "fieldName": "recharge_month",
                     "displayName": "Mês",
                     "queryName": "q_recharge_month"
+                  },
+                  {
+                    "fieldName": "reference_month",
+                    "displayName": "Mês",
+                    "queryName": "q_c_reference_month"
                   }
                 ]
               },
@@ -1485,6 +1503,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "q_c_region",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -1496,6 +1527,11 @@
                     "fieldName": "region",
                     "displayName": "Região",
                     "queryName": "q_region"
+                  },
+                  {
+                    "fieldName": "region",
+                    "displayName": "Região",
+                    "queryName": "q_c_region"
                   }
                 ]
               },
@@ -1528,6 +1564,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "q_c_uf",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "uf",
+                      "expression": "`uf`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -1539,6 +1588,11 @@
                     "fieldName": "uf",
                     "displayName": "UF",
                     "queryName": "q_uf"
+                  },
+                  {
+                    "fieldName": "uf",
+                    "displayName": "UF",
+                    "queryName": "q_c_uf"
                   }
                 ]
               },

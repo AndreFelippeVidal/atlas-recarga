@@ -70,7 +70,15 @@ def test_global_filters_month_region_uf(dash: dict[str, Any]) -> None:
         for item in page["layout"]
         for f in item["widget"]["spec"]["encodings"]["fields"]
     }
-    assert fields == FILTER_FIELDS
+    assert fields == FILTER_FIELDS | {"reference_month"}
+    # os filtros alcançam a página Comissão (SPEC-004 §6): mês, região e UF em ds_commission
+    commission_fields = {
+        q["query"]["fields"][0]["name"]
+        for item in page["layout"]
+        for q in item["widget"]["queries"]
+        if q["query"]["datasetName"] == "ds_commission"
+    }
+    assert commission_fields == {"reference_month", "region", "uf"}
 
 
 def test_fields_exist_in_metric_view(dash: dict[str, Any]) -> None:

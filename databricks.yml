@@ -127,6 +127,7 @@ resources:
                 - ""
                 - "## CONSTRAINTS"
                 - "- Comissão é a medida commission_total de mv_commission (base: commission_base; taxa efetiva: effective_rate; beneficiários: paid_beneficiaries). Só existem lotes travados; rascunhos não aparecem. O mês fica em reference_month."
+                - "- commission_base e effective_rate são só dos PDVs. Linhas de distribuidor não têm uf, region, municipality_name nem tier: por UF, região ou faixa a soma fica menor que commission_total; diga isso. Lotes COM-AAAA-MM-ADJ-n são ajustes (diferenças, podem ser negativas)."
                 - "- Responda só com dados de mv_recharges e mv_commission; outro assunto está fora do escopo deste Space."
                 - "- Use MEASURE() para toda medida; nunca recalcule receita, ticket ou taxa à mão."
                 - ""

@@ -1,7 +1,7 @@
 # atlas.semantic.mv_commission (SPEC-004 §4). Definição única das métricas de comissão.
 # Fonte: commission.locked_lines com batches, SÓ lotes `locked` (rascunho nunca aparece).
 # Lotes de ajuste ADJ entram como linhas de diferença (podem ser negativas): a soma por mês é o
-# valor final pago. `${catalog}` é trocado em semantic/apply_metric_views.py.
+# valor final pago. Base e taxa efetiva só de PDV (a base do distribuidor repete o volume dos PDVs). `${catalog}` é trocado em semantic/apply_metric_views.py.
 version: 1.1
 source: >-
   SELECT l.batch_id, b.reference_month, l.beneficiary_type, l.beneficiary_id,
@@ -64,8 +64,10 @@ measures:
         type: exact
         places: 2
   - name: commission_base
-    expr: SUM(base_amount_brl)
-    comment: "Base de cálculo em reais (BRL): volume aprovado sobre o qual a taxa incide."
+    expr: SUM(base_amount_brl) FILTER (WHERE beneficiary_type = 'pos')
+    comment: >-
+      Base de cálculo em reais (BRL): volume aprovado dos PDVs sobre o qual a taxa incide. Só
+      linhas de PDV; a base do distribuidor repete o volume dos PDVs dele e não entra.
     synonyms: [base de cálculo]
     format:
       type: currency
@@ -74,8 +76,10 @@ measures:
         type: exact
         places: 2
   - name: effective_rate
-    expr: MEASURE(commission_total) / MEASURE(commission_base)
-    comment: "Taxa efetiva: comissão paga dividida pela base (fração de 0 a 1)."
+    expr: SUM(commission_brl) FILTER (WHERE beneficiary_type = 'pos') / NULLIF(MEASURE(commission_base), 0)
+    comment: >-
+      Taxa efetiva dos PDVs: comissão paga aos PDVs dividida pela base dos PDVs (fração de 0 a 1);
+      não inclui a comissão de distribuidor.
     synonyms: [taxa efetiva]
     format:
       type: percentage
