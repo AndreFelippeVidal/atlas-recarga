@@ -29,6 +29,7 @@ LEVELS: dict[str, tuple[str, str]] = {
     "municipality": ("municipality_ibge_code", "municipality_name"),
     "ddd": ("ddd", "ddd"),
 }
+GUARD_KEY = "__guard__"  # chave da linha sentinela que força a validação (nunca sai da função)
 VALUE_TYPE = "DECIMAL(24, 6)"  # nunca DOUBLE/FLOAT (tech-stack, Proibido)
 
 
@@ -99,7 +100,9 @@ def build_metric_by_region(catalog: str, definition: dict[str, Any]) -> str:
     union = "\n    UNION ALL\n".join(branches)
     # CAST por ramo: um CASE com tipos mistos promoveria tudo a DOUBLE antes do CAST final
     pick = "\n".join(f"        WHEN {_lit(m)} THEN CAST({m} AS {VALUE_TYPE})" for m in measures)
-    # `ok` força a validação mesmo sem linhas: `raise_error` roda uma vez, na subconsulta.
+    # A guarda precisa ser avaliada mesmo sem linhas (mês vazio, nível inválido): um CROSS JOIN com
+    # ela é podado quando o outro lado é vazio e o erro some. A linha sentinela abaixo sempre
+    # existe e o filtro final a avalia (verificado no dev), então `raise_error` dispara sempre.
     guard = (
         "(SELECT CASE\n"
         f"        WHEN {fq}.measure IS NULL OR {fq}.measure NOT IN ({_in_list(measures)})\n"
@@ -121,11 +124,16 @@ def build_metric_by_region(catalog: str, definition: dict[str, Any]) -> str:
         "Somente leitura.'\n"
         "RETURN\n"
         f"WITH guard AS {guard},\n"
-        f"all_measures AS (\n{union}\n)\n"
-        f"SELECT a.level, a.key, a.label, CASE {fq}.measure\n{pick}\n"
+        f"all_measures AS (\n{union}\n),\n"
+        f"picked AS (\n  SELECT a.level, a.key, a.label, CASE {fq}.measure\n{pick}\n"
         "        END AS value\n"
-        "FROM all_measures a CROSS JOIN guard g\n"
-        f"WHERE g.ok = 1 AND a.level = {fq}.level"
+        f"  FROM all_measures a WHERE a.level = {fq}.level\n)\n"
+        "SELECT level, key, label, value FROM (\n"
+        "  SELECT level, key, label, value FROM picked\n"
+        "  UNION ALL\n"
+        f"  SELECT CAST(NULL AS STRING), CASE WHEN ok = 1 THEN '{GUARD_KEY}' END,\n"
+        f"         CAST(NULL AS STRING), CAST(NULL AS {VALUE_TYPE}) FROM guard\n"
+        f") WHERE key IS DISTINCT FROM '{GUARD_KEY}'"
     )
 
 

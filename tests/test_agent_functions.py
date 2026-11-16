@@ -98,6 +98,15 @@ def test_compare_months_reuses_by_region_and_guards_division_by_zero() -> None:
     assert "FULL OUTER JOIN" in ddl
 
 
+def test_guard_is_a_sentinel_row_evaluated_even_when_the_result_is_empty() -> None:
+    # um CROSS JOIN com a guarda é podado com o outro lado vazio e o `raise_error` some
+    # (visto no dev: nível inválido e mês vazio não falhavam)
+    ddl = _ddl()["fn_metric_by_region"]
+    assert "CROSS JOIN" not in ddl
+    assert "UNION ALL\n  SELECT CAST(NULL AS STRING), CASE WHEN ok = 1 THEN '__guard__' END" in ddl
+    assert ddl.rstrip().endswith("WHERE key IS DISTINCT FROM '__guard__'")
+
+
 def test_compare_months_joins_null_keys_and_rounds_the_percentage() -> None:
     ddl = _ddl()["fn_compare_months"]
     assert "ON a.key <=> b.key" in ddl
