@@ -34,7 +34,9 @@ dimensions:
     synonyms: [hora, horário, horário de pico]
   - name: region
     expr: dim_pos.dim_municipality.region
-    comment: Região do Brasil do município do PDV (Norte, Nordeste, Centro-Oeste, Sudeste, Sul).
+    comment: >-
+      Código da região do Brasil do município do PDV: N (Norte), NE (Nordeste), CO (Centro-Oeste),
+      SE (Sudeste) ou S (Sul). Filtre sempre pelo código, nunca pelo nome.
     synonyms: [região]
   - name: uf
     expr: dim_pos.dim_municipality.uf

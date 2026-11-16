@@ -38,7 +38,9 @@ dimensions:
     synonyms: [estado, UF]
   - name: region
     expr: region
-    comment: Região do município do PDV (Norte, Nordeste, Centro-Oeste, Sudeste, Sul); vazia para distribuidor.
+    comment: >-
+      Código da região do município do PDV: N (Norte), NE (Nordeste), CO (Centro-Oeste), SE (Sudeste)
+      ou S (Sul); vazio para distribuidor. Filtre sempre pelo código, nunca pelo nome.
     synonyms: [região]
   - name: municipality_name
     expr: municipality_name
