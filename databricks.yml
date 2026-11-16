@@ -9,6 +9,7 @@
 # P8.6: job `atlas_commission_review` (uma transição por execução; só uma pessoa dispara, nunca um agente).
 # P8.7: a aprovação final também trava o lote e grava a remessa; o job de deploy cria o Volume `commission.remittance`.
 # P8.8: dashboard `commission_review` (lê só commission.*; filtro por lote) e notebook commission/commission_review.py.
+# P9.2: job `atlas_eval_sync` (golden set do YAML para <catalog>.eval.agent_golden_set).
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml).
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
@@ -199,6 +200,26 @@ resources:
             parameters:
               - ${var.catalog}
               - ${workspace.file_path}/semantic
+
+    atlas_eval_sync:
+      name: atlas_eval_sync
+      description: "Sincroniza eval/golden_set.yaml com o dataset MLflow <catalog>.eval.agent_golden_set (SPEC-008 §3). Sob demanda e idempotente: rode depois de mudar o YAML. Não roda o agente nem a avaliação."
+      max_concurrent_runs: 1
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "mlflow[databricks]>=3.9.0"
+              - pyyaml
+      tasks:
+        - task_key: sync_golden_set
+          environment_key: default
+          spark_python_task:
+            python_file: eval/sync_golden_set.py
+            parameters:
+              - ${var.catalog}
+              - ${workspace.file_path}/eval/golden_set.yaml
 
     atlas_commission_deploy:
       name: atlas_commission_deploy
