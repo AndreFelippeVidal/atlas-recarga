@@ -61,7 +61,7 @@ Guardrails no Unity Gateway. O S0.1 só mostrou que `rate_limits` e `service_pol
 - `mlflow.langchain.autolog()` com tracing ligado; experiment `/Shared/atlas/agent`. Trace tables no UC em `atlas.observability.agent_*` (declaradas como recursos do App).
 - Cada trace guarda as tags `user`, `app_version`, `prompt_version`, `llm_service`.
 - O uso do LLM aparece em `system.ai_gateway.usage` (`service_type = 'MODEL_SERVICE'`), com atraso de minutos a cerca de 1 hora (S0.2). Alertas quase em tempo real vêm do trace, não da `usage`.
-- A atribuição por agente é pelo `requester` (service principal do App) e por `invocation_metadata.source = 'DATABRICKS_APPS'`; não há coluna com o nome do App. Se o agente puder enviar `request_tags` na chamada ao LLM, elas dimensionam o uso por agente; isso **não foi validado** e fica para a P10.2, junto com: o `ask_genie` via `genie_one_mcp` aparecer como `MCP_SERVICE`, e o span de cada tool chegar ao experiment a partir de um App.
+- A atribuição por agente é pelo `requester` (service principal do App) e por `invocation_metadata.source = 'DATABRICKS_APPS'`; não há coluna com o nome do App. Se o agente puder enviar `request_tags` na chamada ao LLM, elas dimensionam o uso por agente; isso **não foi validado** (a P10.2 deixou o envio como opt-in, `ATLAS_LLM_REQUEST_TAGS`, desligado) e fica para a P10.3, junto com: o `ask_genie` via `genie_one_mcp` aparecer como `MCP_SERVICE`, e o span de cada tool chegar ao experiment a partir de um App. Na P10.2 o App não repassa o e-mail do usuário em cabeçalho; a tag `user` do trace vem de `current_user.me()` com o `x-forwarded-access-token`.
 - **Qualidade:** avaliada e monitorada conforme a SPEC-008.
 
 ## 6. Falhas
