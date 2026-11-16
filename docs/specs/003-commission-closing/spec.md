@@ -81,6 +81,12 @@ stateDiagram-v2
 ## 7. Correção depois do lock
 Um lote `locked` nunca é alterado. Um erro descoberto depois gera um **lote de ajuste** `COM-YYYY-MM-ADJ-n` com linhas de diferença (positivas ou negativas), que passa pelo mesmo fluxo completo de estados e aprovações.
 
+- **Identificação:** sem coluna nova. O ajuste é identificado pelo `batch_id`; em `batches`, `version` = `n` e `reference_month` = o mês corrigido. `n` é o maior `n` já usado no mês mais 1 (rejeitado também conta, para o `batch_id` nunca repetir).
+- **Disparo:** o job `atlas_commission_draft` recebe o parâmetro `adjust_batch_id` (um lote `locked` do mês a corrigir). Com ele, o job cria o ajuste em `draft`, reconcilia e segue pelo `atlas_commission_review` sem mudar a máquina de estados nem a segregação de funções. Recusa se o mês já tem um ajuste em andamento (nem `locked` nem `rejected`).
+- **Cálculo:** recalcula o mês com as regras de §2 sobre o gold atual e grava, por beneficiário, só a diferença contra a soma das `locked_lines` de todos os lotes `locked` do mês (original e ajustes anteriores). `base_amount_brl` e `commission_brl` da linha são essa diferença (podem ser negativas); `tier` e `rate` são os do recálculo (ou os da última linha travada, se o beneficiário deixou de ter volume). Beneficiário sem diferença não gera linha; sem nenhuma diferença, nenhum lote nasce. Sem IA, sem entrada manual de valores.
+- **Reconciliação:** a mesma tabela `reconciliation`, mas a conferência SQL independente vale para o **acumulado**: `locked_lines` do mês + linhas do ajuste = recálculo em SQL sobre `fct_recharges`, diferença R$ 0,00. Os flags de §5 não se aplicam ao ajuste.
+- **Lock e remessa:** iguais aos de um lote normal; a remessa traz as diferenças (valores negativos incluídos).
+
 ## 8. Critérios de aceite
 - **Dado** o dataset padrão, **quando** o rascunho é calculado, **então** a reconciliação dá diferença R$ 0,00 em 100% das linhas.
 - **Dado** um PDV com R$ 4.999,99, **então** fica em Bronze com 2% (R$ 100,00); **dado** R$ 5.000,00, **então** fica em Prata com 3% (R$ 150,00).
