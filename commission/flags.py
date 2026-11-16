@@ -34,7 +34,8 @@ FLAG_ORDER = ("spike_3x", "fractioning_suspect", "tier_jump", "closed_pos")
 
 FLAGS_SQL = """
 WITH batch AS (
-  SELECT reference_month AS ref FROM {catalog}.commission.batches WHERE batch_id = :batch_id
+  SELECT reference_month AS ref FROM {catalog}.commission.batches
+  WHERE batch_id = :batch_id AND status = 'draft'
 ),
 volume AS (
   SELECT f.pos_id, f.recharge_month AS month, SUM(f.amount_brl) AS base
@@ -88,6 +89,7 @@ computed AS (
       CASE WHEN cl.pos_id IS NOT NULL THEN 'closed_pos' END
     ), x -> x IS NOT NULL) AS flags
   FROM {catalog}.commission.batch_lines l
+  CROSS JOIN batch
   LEFT JOIN cur c ON c.pos_id = l.beneficiary_id
   LEFT JOIN history h ON h.pos_id = l.beneficiary_id
   LEFT JOIN prev pr ON pr.pos_id = l.beneficiary_id
@@ -98,13 +100,11 @@ computed AS (
 """
 
 APPLY_SQL = (
-    FLAGS_SQL  # noqa: S608  (só `catalog` validado por check_identifier entra no SQL)
+    FLAGS_SQL
     + """
 MERGE INTO {catalog}.commission.batch_lines t
 USING computed s
 ON t.batch_id = :batch_id AND t.beneficiary_type = 'pos' AND t.beneficiary_id = s.beneficiary_id
-  AND EXISTS (SELECT 1 FROM {catalog}.commission.batches b
-              WHERE b.batch_id = :batch_id AND b.status = 'draft')
 WHEN MATCHED THEN UPDATE SET t.flags = s.flags
 """
 )

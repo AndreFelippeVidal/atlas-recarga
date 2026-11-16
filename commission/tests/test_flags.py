@@ -18,6 +18,13 @@ def test_sql_reads_only_gold_and_writes_only_batch_lines() -> None:
     assert ":batch_id" in sql and "{" not in sql
 
 
+def test_merge_condition_has_no_subquery_and_only_draft_batches_feed_it() -> None:
+    sql = flags.flags_sql("atlas_dev")
+    on_clause = sql[sql.index("MERGE INTO") :]
+    assert "SELECT" not in on_clause.upper().split("USING", 1)[1]  # Delta recusa subquery no ON
+    assert "AND status = 'draft'" in sql and "CROSS JOIN batch" in sql
+
+
 def test_sql_has_the_four_flags() -> None:
     sql = flags.flags_sql("atlas_dev")
     for name in flags.FLAG_ORDER:
