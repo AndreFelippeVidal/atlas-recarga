@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 mlflow.langchain.autolog()
 logging.getLogger("mlflow.utils.autologging_utils").setLevel(logging.ERROR)
 
+USER_HEADERS = ("x-forwarded-email", "x-forwarded-preferred-username", "x-forwarded-user")
 CONFIG = load_config()  # falha no start se ATLAS_* for inválida
 
 # Provisório: o system prompt completo (Fonte:, recusa, último mês fechado) é a P10.4.
@@ -41,7 +42,13 @@ def build_agent(config: AgentConfig = CONFIG):
 
 
 def _tag_trace(request: ResponsesAgentRequest) -> None:
-    user = get_request_headers().get("x-forwarded-email")
+    headers = {k.lower(): v for k, v in get_request_headers().items()}
+    user = next(
+        (headers[h] for h in USER_HEADERS if headers.get(h)),
+        None,
+    )
+    if user is None:  # só os nomes, nunca os valores (tokens passam por aqui)
+        logger.warning("sem cabeçalho de usuário; recebidos: %s", sorted(headers))
     metadata = {}
     if session_id := get_session_id(request):
         metadata["mlflow.trace.session"] = session_id
