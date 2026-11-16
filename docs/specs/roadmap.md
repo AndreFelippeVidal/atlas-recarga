@@ -145,7 +145,7 @@ _Escrever o teste antes do agente: golden set e scorers prontos._
 
 _Agente somente leitura, via Unity Gateway, com tracing, aprovado no golden set._
 
-- [ ] **P10.1** 🤖 UC functions `fn_list_metrics`, `fn_metric_by_region`, `fn_compare_months` — _pronto quando:_ Retornos batem com as metric views; `measure` inválido gera erro · depende de P7.1
+- [x] **P10.1** 🤖 UC functions `fn_list_metrics`, `fn_metric_by_region`, `fn_compare_months` — _pronto quando:_ Retornos batem com as metric views; `measure` inválido gera erro (#65) — DDL gerado de `mv_recharges.yaml` pela task `apply_agent_functions`; a conferência no `dev` fica com o mantenedor via `scripts/check_agent_functions.py` · depende de P7.1
 - [ ] **P10.2** 🤖 Esqueleto do App `atlas-agent` a partir do template oficial, LLM via Unity Gateway — _pronto quando:_ Responde "olá"; o trace aparece no experiment; uso em `system.ai_gateway.usage` · depende de P3.8
 - [ ] **P10.3** 🤖 Tools: `ask_genie` + UC functions (lista fechada) — _pronto quando:_ Uma pergunta simples do golden set acerta · depende de P10.1, P10.2
 - [ ] **P10.4** 🤖 System prompt: citação `Fonte:`, recusa, último mês fechado, PT-BR — _pronto quando:_ Os casos de recusa do golden set passam · depende de P10.3
