@@ -21,6 +21,8 @@
 
 - **Depende de:** P10.1, P10.2
 - **Pronto quando:** Uma pergunta simples do golden set acerta
+- **Passos:**
+  - Validar o que a SPEC-005 §5 deixou pendente: `request_tags` na chamada ao LLM (ligar `ATLAS_LLM_REQUEST_TAGS=1` e conferir a coluna `request_tags` da `usage`; se o formato do `extra_params` for inválido, corrigir ou remover o opt-in), `ask_genie` aparecer como `MCP_SERVICE` na `usage` e o span de cada tool chegar ao experiment a partir do App
 
 ### P10.4 🤖 System prompt: citação `Fonte:`, recusa, último mês fechado, PT-BR
 
@@ -33,6 +35,8 @@
 
 - **Depende de:** P10.2
 - **Pronto quando:** 429 testado; política de PII ativa
+- **Passos:**
+  - Na P10.2 um turno chegou a 143.841 tokens (65.285 de saída; histórico reenviado mais raciocínio do `gpt-oss-120b`): dimensionar o spend cap com isso e avaliar limitar `max_tokens` e o histórico enviado
 
 ### P10.6 🤖 Avaliação offline completa: acurácia ≥ 90%
 

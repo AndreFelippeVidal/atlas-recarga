@@ -24,6 +24,9 @@ atlas-cli = { workspace = true }
 line-length = 100
 target-version = "py312"
 
+# Vendorizados do template oficial databricks/app-templates (agent-langgraph); não editar.
+extend-exclude = ["apps/agent/scripts", "apps/agent/agent_server/utils.py", "apps/agent/agent_server/start_server.py"]
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 
@@ -31,14 +34,16 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 "tests/**" = ["S101"]
 "cli/tests/**" = ["S101"]  # assert is the point of tests
 "commission/tests/**" = ["S101"]
+"apps/agent/tests/**" = ["S101"]
 # DDL/consultas montados só com identificadores validados e listas fechadas (SPEC-005 §3)
 "semantic/apply_functions.py" = ["S608"]
 "scripts/check_agent_functions.py" = ["S608"]
+"scripts/check_agent_skeleton.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_golden_set.py", "scripts/check_agent_golden_set.py", "eval/sync_golden_set.py", "eval/scorers.py", "scripts/check_commission_append_only.py", "scripts/check_commission_draft.py", "scripts/check_commission_reconciliation.py", "scripts/check_commission_review.py", "cli/src", "cli/tests", "commission"]
+files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_golden_set.py", "scripts/check_agent_golden_set.py", "eval/sync_golden_set.py", "eval/scorers.py", "scripts/check_commission_append_only.py", "scripts/check_commission_draft.py", "scripts/check_commission_reconciliation.py", "scripts/check_commission_review.py", "cli/src", "cli/tests", "scripts/check_agent_skeleton.py", "commission", "apps/agent/agent_server/config.py", "apps/agent/tests"]
 
 [[tool.mypy.overrides]]
 module = ["pyarrow", "pyarrow.*"]
@@ -49,6 +54,6 @@ module = ["pyspark", "pyspark.*", "mlflow", "mlflow.*", "databricks.connect"]
 ignore_missing_imports = true  # só existe no workspace; o import é feito dentro de main()
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "cli/tests", "commission/tests"]
-pythonpath = ["."]
+testpaths = ["tests", "cli/tests", "commission/tests", "apps/agent/tests"]
+pythonpath = [".", "apps/agent"]
 addopts = "-q"

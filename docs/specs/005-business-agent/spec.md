@@ -22,7 +22,7 @@ flowchart LR
 
 - **Runtime:** Databricks App `atlas-agent`, autorado com Mosaic AI Agent Framework (LangGraph + `databricks-langchain`) a partir do template oficial de agente em Apps, que já inclui uma chat UI.
 - **LLM:** variável `ATLAS_LLM_SERVICE`. O Spike S0.1 não encontrou model service Claude em `system.ai` na Free Edition (404). O valor provisório é `system.ai.gpt-oss-120b`, sempre com o nome de **três partes** (o nome curto cai no endpoint legado e dá 403). Chamado via `ChatDatabricks(model=..., use_ai_gateway=True)`. Trocar por Claude, se um dia existir, é só mudar a variável e reexecutar o golden set (SPEC-008).
-- **Registro no Unity Gateway como agent service:** não. O Spike S0.2 mostrou que o App com nome `agent-*` é listado na aba Agents, mas sem uso nativo por agente (só métricas do App) e sem tipo de agente na `usage`. O App se chama `agent-…` para ser listado (a P10.2 confirma o nome final); a governança e a medição ficam na camada do LLM (ADR-0007).
+- **Registro no Unity Gateway como agent service:** não. O Spike S0.2 mostrou que o App com nome `agent-*` é listado na aba Agents, mas sem uso nativo por agente (só métricas do App) e sem tipo de agente na `usage`. O App se chama `agent-atlas` (nome final confirmado na P10.2) para ser listado; a governança e a medição ficam na camada do LLM (ADR-0007).
 
 ## 3. Ferramentas (lista fechada)
 
@@ -61,7 +61,7 @@ Guardrails no Unity Gateway. O S0.1 só mostrou que `rate_limits` e `service_pol
 - `mlflow.langchain.autolog()` com tracing ligado; experiment `/Shared/atlas/agent`. Trace tables no UC em `atlas.observability.agent_*` (declaradas como recursos do App).
 - Cada trace guarda as tags `user`, `app_version`, `prompt_version`, `llm_service`.
 - O uso do LLM aparece em `system.ai_gateway.usage` (`service_type = 'MODEL_SERVICE'`), com atraso de minutos a cerca de 1 hora (S0.2). Alertas quase em tempo real vêm do trace, não da `usage`.
-- A atribuição por agente é pelo `requester` (service principal do App) e por `invocation_metadata.source = 'DATABRICKS_APPS'`; não há coluna com o nome do App. Se o agente puder enviar `request_tags` na chamada ao LLM, elas dimensionam o uso por agente; isso **não foi validado** e fica para a P10.2, junto com: o `ask_genie` via `genie_one_mcp` aparecer como `MCP_SERVICE`, e o span de cada tool chegar ao experiment a partir de um App.
+- A atribuição por agente é pelo `requester` (service principal do App) e por `invocation_metadata.source = 'DATABRICKS_APPS'`; não há coluna com o nome do App. Se o agente puder enviar `request_tags` na chamada ao LLM, elas dimensionam o uso por agente; isso **não foi validado** (a P10.2 deixou o envio como opt-in, `ATLAS_LLM_REQUEST_TAGS`, desligado) e fica para a P10.3, junto com: o `ask_genie` via `genie_one_mcp` aparecer como `MCP_SERVICE`, e o span de cada tool chegar ao experiment a partir de um App. Na P10.2 o App não repassa o e-mail do usuário em cabeçalho; a tag `user` do trace vem de `current_user.me()` com o `x-forwarded-access-token`.
 - **Qualidade:** avaliada e monitorada conforme a SPEC-008.
 
 ## 6. Falhas
@@ -71,7 +71,7 @@ Guardrails no Unity Gateway. O S0.1 só mostrou que `rate_limits` e `service_pol
 | Genie indisponível ou com timeout > 30s | Tenta a UC function equivalente; se não houver, responde "não consegui consultar agora" e nunca estima |
 | Rate limit (429) do gateway | Mensagem "limite de uso atingido, tente em 1 minuto"; o trace marca `error_type = rate_limited` |
 | SQL warehouse parado (cold start) | Uma nova tentativa após 20s; se falhar de novo, avisa o usuário |
-| App parado (auto-stop de 24h) | Runbook do README: `databricks apps start atlas-agent` (ADR-0009) |
+| App parado (auto-stop de 24h) | Runbook do README: `databricks apps start agent-atlas` (ADR-0009) |
 
 ## 7. Critérios de aceite
 - **Dado** o golden set (SPEC-008), **então** a acurácia é ≥ 90% e 100% das respostas numéricas têm o bloco `Fonte:`.

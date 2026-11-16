@@ -136,6 +136,44 @@ resources:
                 - "- Valores em reais com 2 casas decimais; taxas em percentual com 2 casas."
                 - "- Sempre informe o mês ou período usado."
 
+  # P10.2: App do agente (SPEC-005). O prefixo `agent-` lista o App em AI Gateway > Agents (S0.2).
+  # Sem tools ainda (P10.3). O service principal do App precisa de acesso ao model service
+  # system.ai.gpt-oss-120b no Unity Gateway; permissão de serving endpoint não vale (S0.1) e é
+  # concedida pelo mantenedor no workspace (ver apps/agent/README.md).
+  experiments:
+    atlas_agent:
+      name: /Shared/atlas/agent
+
+  apps:
+    agent_atlas:
+      name: agent-atlas
+      description: "Agente de negócio do Atlas Recarga (somente leitura; LLM via Unity Gateway)"
+      source_code_path: ./apps/agent
+      config:
+        command: ["uv", "run", "start-app"]
+        env:
+          - name: MLFLOW_TRACKING_URI
+            value: "databricks"
+          - name: MLFLOW_REGISTRY_URI
+            value: "databricks-uc"
+          - name: API_PROXY
+            value: "http://localhost:8000/invocations"
+          - name: CHAT_APP_PORT
+            value: "3000"
+          - name: CHAT_PROXY_TIMEOUT_SECONDS
+            value: "300"
+          - name: MLFLOW_EXPERIMENT_ID
+            value_from: "experiment"
+          - name: ATLAS_GATEWAY_MODE
+            value: "unity"
+          - name: ATLAS_LLM_SERVICE
+            value: "system.ai.gpt-oss-120b"
+      resources:
+        - name: experiment
+          experiment:
+            experiment_id: ${resources.experiments.atlas_agent.id}
+            permission: CAN_EDIT
+
   pipelines:
     atlas_medallion:
       name: atlas_medallion
