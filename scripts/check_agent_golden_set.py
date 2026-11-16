@@ -6,8 +6,8 @@ O dataset só existe no workspace, então o **mantenedor** roda este script no `
     uv run python scripts/check_agent_golden_set.py --target dev --profile andrevidal \\
         --warehouse-id <id>
 
-Só lê. Falha (saída 1) se a tabela não existir, não tiver versão ou tiver menos linhas que os
-casos de `eval/golden_set.yaml`.
+Só lê. Falha (saída 1) se a tabela não existir, não tiver versão ou não tiver exatamente
+tantas linhas quanto os casos de `eval/golden_set.yaml` (o job já confere ids e conteúdo).
 """
 
 from __future__ import annotations
@@ -15,15 +15,17 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
-from check_golden_set import CATALOGS, _run, load_cases  # mesmo diretório: scripts/
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # importável de qualquer diretório
+from check_golden_set import CATALOGS, _run, load_cases
 
 
 def check_counts(expected: int, actual: int, version: int | None) -> str:
     """Uma linha de relatório: `ok ...` ou `FALHA ...`."""
     if version is None:
         return "FALHA: a tabela não tem versão (DESCRIBE HISTORY vazio)"
-    if actual < expected:
+    if actual != expected:
         return f"FALHA: {actual} linhas no dataset, o YAML tem {expected} casos"
     return f"ok    {actual} linhas (YAML: {expected} casos), versão {version}"
 

@@ -67,6 +67,19 @@ def test_required_fields_per_category() -> None:
         sync.to_records([{"id": "X", "category": "refusal", "question": "q"}])
     with pytest.raises(ValueError):
         sync.to_records([{"id": "X", "category": "metric", "question": "q"}])
+    metric = {
+        "id": "X",
+        "category": "metric",
+        "question": "q",
+        "reference_sql": "SELECT MEASURE(m) FROM atlas.semantic.mv_recharges",
+        "expected_source_view": "mv_recharges",
+    }
+    with pytest.raises(ValueError, match="tolerance_pct"):
+        sync.to_records([metric])
+    with pytest.raises(ValueError, match="forbidden_tools"):
+        sync.to_records(
+            [{"id": "X", "category": "refusal", "question": "q", "expected_behavior": "refuse"}]
+        )
 
 
 def test_questions_are_unique_so_merge_does_not_collapse_cases() -> None:
@@ -107,6 +120,7 @@ def test_check_counts() -> None:
     check = _load("check_agent_golden_set", "scripts/check_agent_golden_set.py")
     assert check.check_counts(30, 30, 1).startswith("ok")
     assert check.check_counts(30, 29, 1).startswith("FALHA")
+    assert check.check_counts(30, 31, 1).startswith("FALHA")  # órfã ou duplicada
     assert check.check_counts(30, 30, None).startswith("FALHA")
 
 
@@ -116,3 +130,74 @@ def test_dataset_is_linked_to_the_agent_experiment() -> None:
     assert "experiment_id=[experiment.experiment_id]" in (
         ROOT / "eval" / "sync_golden_set.py"
     ).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT 1 FROM atlas.gold.fct_recharges",
+        "SELECT 1 FROM atlas.semantic.mv_recharges JOIN atlas.silver.recharges USING (id)",
+        "SELECT 1 FROM other.semantic.mv_recharges",
+        "SELECT 1",
+    ],
+)
+def test_reference_sql_must_read_only_atlas_semantic(sql: str) -> None:
+    with pytest.raises(ValueError):
+        sync.check_reads_only_semantic("X", sql)
+
+
+def test_for_catalog_respects_identifier_boundary() -> None:
+    sql = "SELECT 1 FROM my_atlas.semantic.x, atlas.semantic.mv_recharges"
+    assert sync.for_catalog(sql, "atlas_dev") == (
+        "SELECT 1 FROM my_atlas.semantic.x, atlas_dev.semantic.mv_recharges"
+    )
+
+
+def _row(case: dict[str, Any]) -> dict[str, Any]:
+    record: dict[str, Any] = sync.to_records([case])[0]
+    return record
+
+
+def test_mirror_detects_stale_rows_but_allows_additions() -> None:
+    desired = sync.to_records(CASES)
+    assert not sync.has_stale_rows([], desired)  # só faltam linhas: o merge soma
+    assert not sync.has_stale_rows(desired[:5], desired)
+    edited = {**CASES[0], "question": "pergunta com outra redação?"}
+    assert sync.has_stale_rows([_row(edited), *desired[1:]], desired)  # editada: sobra a antiga
+    extra = _row({**CASES[1], "id": "GS-999", "question": "outra pergunta?"})
+    assert sync.has_stale_rows([*desired, extra], desired)  # removida do YAML
+    changed = {**CASES[0], "tolerance_pct": 9.9}
+    assert sync.has_stale_rows([_row(changed), *desired[1:]], desired)  # campo mudou
+
+
+def test_mirror_ignores_extra_fields_and_json_strings() -> None:
+    import json
+
+    desired = sync.to_records(CASES)
+    stored = [
+        {
+            "inputs": json.dumps(r["inputs"]),
+            "expectations": json.dumps({**r["expectations"], "extra": 1}),
+        }
+        for r in desired
+    ]
+    assert not sync.has_stale_rows(stored, desired)
+    sync.verify_mirror(stored, desired)
+
+
+def test_verify_mirror_fails_on_divergence() -> None:
+    desired = sync.to_records(CASES)
+    with pytest.raises(RuntimeError):
+        sync.verify_mirror(desired[:-1], desired)
+    with pytest.raises(RuntimeError):
+        sync.verify_mirror([*desired[:-1], desired[0]], desired)  # duplicada no lugar de uma
+
+
+def test_is_not_found_only_for_missing_dataset() -> None:
+    class Coded(Exception):
+        error_code = "RESOURCE_DOES_NOT_EXIST"
+
+    assert sync.is_not_found(Coded("x"))
+    assert sync.is_not_found(RuntimeError("Table does not exist"))
+    assert not sync.is_not_found(PermissionError("PERMISSION_DENIED: no access"))
+    assert not sync.is_not_found(ConnectionError("timeout"))
