@@ -26,6 +26,8 @@ import yaml  # type: ignore[import-untyped]
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 DATASET_SCHEMA = "eval"
 DATASET_TABLE = "agent_golden_set"
+# O dataset gerenciado exige um experiment; o mesmo do agente (SPEC-005 §3), criado se faltar.
+EXPERIMENT_NAME = "/Shared/atlas/agent"
 CATEGORIES = frozenset({"metric", "comparison", "refusal"})
 # Campos do YAML (SPEC-008 §3) que viram expectations; `question` vai em inputs.
 EXPECTATION_FIELDS = (
@@ -96,13 +98,18 @@ def main(argv: list[str]) -> int:
 
     import mlflow.genai.datasets  # só existe no workspace; import tardio mantém o módulo testável
     from databricks.connect import DatabricksSession
+    from databricks.sdk import WorkspaceClient
 
     DatabricksSession.builder.remote(serverless=True).getOrCreate()  # exigido pelo MLflow
+    WorkspaceClient().workspace.mkdirs(str(Path(EXPERIMENT_NAME).parent))
+    experiment = mlflow.set_experiment(EXPERIMENT_NAME)  # cria se não existir
     try:
         dataset = mlflow.genai.datasets.get_dataset(name=name)
     except Exception as error:  # o MLflow não tem exceção própria de "não achei"
         print(f"dataset {name} não encontrado ({type(error).__name__}); criando")
-        dataset = mlflow.genai.datasets.create_dataset(uc_table_name=name)
+        dataset = mlflow.genai.datasets.create_dataset(
+            uc_table_name=name, experiment_id=[experiment.experiment_id]
+        )
     dataset.merge_records(records)
     print(f"ok: {len(records)} casos sincronizados em {name}")
     return 0

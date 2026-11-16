@@ -108,3 +108,11 @@ def test_check_counts() -> None:
     assert check.check_counts(30, 30, 1).startswith("ok")
     assert check.check_counts(30, 29, 1).startswith("FALHA")
     assert check.check_counts(30, 30, None).startswith("FALHA")
+
+
+def test_dataset_is_linked_to_the_agent_experiment() -> None:
+    # O MLflow gerenciado rejeita create_dataset sem experiment.
+    assert sync.EXPERIMENT_NAME == "/Shared/atlas/agent"
+    assert "experiment_id=[experiment.experiment_id]" in (
+        ROOT / "eval" / "sync_golden_set.py"
+    ).read_text(encoding="utf-8")
