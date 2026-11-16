@@ -66,9 +66,9 @@ stateDiagram-v2
 1. **Duas implementações independentes:** o cálculo principal em PySpark e um recálculo em SQL puro sobre `gold.fct_recharges`, sem passar por `agg_pos_month`. A diferença por linha e no total deve ser **R$ 0,00**.
 2. **Totais de controle:** a soma de `base_amount_brl` das linhas de PDV é igual ao volume aprovado do mês em `fct_recharges`, e a soma dos distribuidores bate com a soma por distribuidor.
 3. **Flags para revisão humana** (não bloqueiam; ficam destacados no relatório):
-   - `spike_3x`: comissão do PDV > 3× a média dos 3 meses anteriores.
-   - `fractioning_suspect`: mais de 20 recargas de R$ 10 ao mesmo `subscriber_id` em < 10 min.
-   - `tier_jump`: subiu 2 ou mais faixas em relação ao mês anterior.
+   - `spike_3x`: comissão do PDV > 3× a média dos 3 meses anteriores (a média usa os 3 meses de calendário anteriores ao de referência, só os que têm linha do PDV; sem nenhum, não sinaliza).
+   - `fractioning_suspect`: mais de 20 recargas de R$ 10 ao mesmo `subscriber_id` em < 10 min (janela sobre `gold.fct_recharges.recharge_ts_utc`, só recargas `approved`; o flag vai na linha do PDV; rajada que cruza a virada do mês não é vista).
+   - `tier_jump`: subiu 2 ou mais faixas em relação ao mês anterior (PDV sem linha no mês anterior não sinaliza).
    - `closed_pos`: PDV fechado no mês.
 4. O relatório é um notebook/dashboard `commission_review` por `batch_id`, com totais, top 20 maiores linhas, linhas com flag e comparação com o mês anterior.
 
@@ -81,7 +81,7 @@ Um lote `locked` nunca é alterado. Um erro descoberto depois gera um **lote de 
 ## 8. Critérios de aceite
 - **Dado** o dataset padrão, **quando** o rascunho é calculado, **então** a reconciliação dá diferença R$ 0,00 em 100% das linhas.
 - **Dado** um PDV com R$ 4.999,99, **então** fica em Bronze com 2% (R$ 100,00); **dado** R$ 5.000,00, **então** fica em Prata com 3% (R$ 150,00).
-- **Dado** o cenário `fractioning`, **então** os 3 PDVs aparecem com `fractioning_suspect`.
+- **Dado** o cenário `fractioning` (3 rajadas, cada uma num dia e mês diferentes), **então** cada PDV aparece com `fractioning_suspect` no lote do mês da sua rajada, e em nenhum outro.
 - **Dado** um lote `under_review`, **quando** a mesma pessoa tenta aprovar como analista e como diretora, **então** a segunda transição falha com `SEGREGATION_OF_DUTIES_VIOLATION` e é registrada em `batch_events`.
 - **Dado** um lote `locked`, **quando** qualquer processo tenta um `UPDATE` ou `DELETE` em `locked_lines` ou `batch_events`, **então** o Delta rejeita a operação (append-only).
 - **Dado** uma rejeição sem justificativa, **então** a transição falha com `JUSTIFICATION_REQUIRED`.

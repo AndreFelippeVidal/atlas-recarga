@@ -40,7 +40,7 @@ Transformar os arquivos de landing em tabelas **bronze → silver → gold** no 
 | `gold.dim_municipality` | município | `municipality_ibge_code`, `municipality_name`, `uf`, `region`, `ddd`, `population` |
 | `gold.dim_pos` | PDV | `pos_id`, `pos_type`, `distributor_id`, `municipality_ibge_code`, `opened_date`, `closed_date` |
 | `gold.dim_distributor` | distribuidor | `distributor_id`, `distributor_name`, `hq_uf` |
-| `gold.fct_recharges` | recarga | `recharge_id`, `recharge_date`, `recharge_month` (DATE, 1º dia), `recharge_hour_local`, `pos_id`, `amount_brl`, `status`, `subscriber_id` |
+| `gold.fct_recharges` | recarga | `recharge_id`, `recharge_ts_utc` (TIMESTAMP, instante da recarga em UTC; a comissão usa na janela do flag `fractioning_suspect`), `recharge_date`, `recharge_month` (DATE, 1º dia), `recharge_hour_local`, `pos_id`, `amount_brl`, `status`, `subscriber_id` |
 | `gold.agg_pos_month` | PDV × mês | `pos_id`, `recharge_month`, `approved_amount_brl`, `approved_count`, `reversed_count`, `distinct_subscribers`. Base da comissão (SPEC-003) |
 
 Regras de `gold.agg_pos_month`:

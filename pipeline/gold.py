@@ -63,6 +63,7 @@ DIM_POS: list[Column] = [
 
 FCT_RECHARGES: list[Column] = [
     ("recharge_id", "STRING", "Identificador único da recarga. Chave primária."),
+    ("recharge_ts_utc", "TIMESTAMP", "Instante da recarga, em UTC."),
     (
         "recharge_date",
         "DATE",
