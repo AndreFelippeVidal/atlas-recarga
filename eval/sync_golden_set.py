@@ -90,7 +90,7 @@ def to_records(cases: list[dict[str, Any]], catalog: str = "atlas") -> list[dict
     return records
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str]) -> None:
     """`argv`: catálogo e caminho do `golden_set.yaml`."""
     catalog, yaml_path = argv
     name = dataset_name(catalog)
@@ -112,8 +112,8 @@ def main(argv: list[str]) -> int:
         )
     dataset.merge_records(records)
     print(f"ok: {len(records)} casos sincronizados em {name}")
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    # sem sys.exit: no serverless, `SystemExit` (até com 0) marca a task como falha
+    main(sys.argv[1:])
