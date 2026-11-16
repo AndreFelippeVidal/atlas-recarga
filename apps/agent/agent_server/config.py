@@ -62,6 +62,6 @@ def load_config(env: Mapping[str, str] | None = None) -> AgentConfig:
         gateway_mode=mode,
         llm_service=service,
         app_version=e.get("ATLAS_APP_VERSION", "dev").strip() or "dev",
-        prompt_version=e.get("ATLAS_PROMPT_VERSION", "p10.2-skeleton").strip(),
+        prompt_version=e.get("ATLAS_PROMPT_VERSION", "p10.2-skeleton").strip() or "p10.2-skeleton",
         send_request_tags=e.get("ATLAS_LLM_REQUEST_TAGS", "0").strip() in ("1", "true"),
     )

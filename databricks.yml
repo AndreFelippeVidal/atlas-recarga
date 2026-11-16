@@ -172,7 +172,7 @@ resources:
         - name: experiment
           experiment:
             experiment_id: ${resources.experiments.atlas_agent.id}
-            permission: CAN_MANAGE
+            permission: CAN_EDIT
 
   pipelines:
     atlas_medallion:
