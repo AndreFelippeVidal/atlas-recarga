@@ -22,7 +22,7 @@ flowchart LR
 
 - **Runtime:** Databricks App `atlas-agent`, autorado com Mosaic AI Agent Framework (LangGraph + `databricks-langchain`) a partir do template oficial de agente em Apps, que já inclui uma chat UI.
 - **LLM:** variável `ATLAS_LLM_SERVICE`. O Spike S0.1 não encontrou model service Claude em `system.ai` na Free Edition (404). O valor provisório é `system.ai.gpt-oss-120b`, sempre com o nome de **três partes** (o nome curto cai no endpoint legado e dá 403). Chamado via `ChatDatabricks(model=..., use_ai_gateway=True)`. Trocar por Claude, se um dia existir, é só mudar a variável e reexecutar o golden set (SPEC-008).
-- **Registro no Unity Gateway como agent service:** não. O Spike S0.2 mostrou que o App com nome `agent-*` é listado na aba Agents, mas sem uso nativo por agente (só métricas do App) e sem tipo de agente na `usage`. O App se chama `agent-…` para ser listado (a P10.2 confirma o nome final); a governança e a medição ficam na camada do LLM (ADR-0007).
+- **Registro no Unity Gateway como agent service:** não. O Spike S0.2 mostrou que o App com nome `agent-*` é listado na aba Agents, mas sem uso nativo por agente (só métricas do App) e sem tipo de agente na `usage`. O App se chama `agent-atlas` (nome final confirmado na P10.2) para ser listado; a governança e a medição ficam na camada do LLM (ADR-0007).
 
 ## 3. Ferramentas (lista fechada)
 
@@ -71,7 +71,7 @@ Guardrails no Unity Gateway. O S0.1 só mostrou que `rate_limits` e `service_pol
 | Genie indisponível ou com timeout > 30s | Tenta a UC function equivalente; se não houver, responde "não consegui consultar agora" e nunca estima |
 | Rate limit (429) do gateway | Mensagem "limite de uso atingido, tente em 1 minuto"; o trace marca `error_type = rate_limited` |
 | SQL warehouse parado (cold start) | Uma nova tentativa após 20s; se falhar de novo, avisa o usuário |
-| App parado (auto-stop de 24h) | Runbook do README: `databricks apps start atlas-agent` (ADR-0009) |
+| App parado (auto-stop de 24h) | Runbook do README: `databricks apps start agent-atlas` (ADR-0009) |
 
 ## 7. Critérios de aceite
 - **Dado** o golden set (SPEC-008), **então** a acurácia é ≥ 90% e 100% das respostas numéricas têm o bloco `Fonte:`.
