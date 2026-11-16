@@ -8,6 +8,7 @@
 # P8.5: o mesmo job ganha a task `flag_draft` (flags de revisão em commission.batch_lines).
 # P8.6: job `atlas_commission_review` (uma transição por execução; só uma pessoa dispara, nunca um agente).
 # P8.7: a aprovação final também trava o lote e grava a remessa; o job de deploy cria o Volume `commission.remittance`.
+# P8.8: dashboard `commission_review` (lê só commission.*; filtro por lote) e notebook commission/commission_review.py.
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml).
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
@@ -33,6 +34,14 @@ resources:
       # Os datasets usam nomes curtos (mv_recharges); o catálogo muda por target (SPEC-004 §6).
       dataset_catalog: ${var.catalog}
       dataset_schema: semantic
+
+    commission_review:
+      display_name: "Atlas — Revisão de Comissão"
+      file_path: semantic/dashboards/commission_review.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      # Relatório do próprio domínio (SPEC-003 §5.4): lê commission.*, não consome semantic.
+      dataset_catalog: ${var.catalog}
+      dataset_schema: commission
 
   genie_spaces:
     atlas_recarga:

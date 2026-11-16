@@ -1,0 +1,1140 @@
+{
+  "datasets": [
+    {
+      "name": "ds_totals",
+      "displayName": "Totais e reconciliação",
+      "queryLines": [
+        "SELECT b.batch_id,\n",
+        "       b.status,\n",
+        "       b.reference_month,\n",
+        "       b.demo_mode,\n",
+        "       b.total_pos_brl,\n",
+        "       b.total_distributor_brl,\n",
+        "       COALESCE(n.pos_lines, 0) AS pos_lines,\n",
+        "       COALESCE(n.distributor_lines, 0) AS distributor_lines,\n",
+        "       COALESCE(n.flagged_lines, 0) AS flagged_lines,\n",
+        "       r.status AS reconciliation_status,\n",
+        "       r.lines_compared,\n",
+        "       r.max_line_diff_brl,\n",
+        "       r.total_diff_brl,\n",
+        "       r.pos_control_diff_brl,\n",
+        "       r.distributor_control_diff_brl\n",
+        "FROM batches b\n",
+        "LEFT JOIN (\n",
+        "  SELECT batch_id,\n",
+        "         COUNT_IF(beneficiary_type = 'pos') AS pos_lines,\n",
+        "         COUNT_IF(beneficiary_type = 'distributor') AS distributor_lines,\n",
+        "         COUNT_IF(size(flags) > 0) AS flagged_lines\n",
+        "  FROM batch_lines\n",
+        "  GROUP BY batch_id\n",
+        ") n ON n.batch_id = b.batch_id\n",
+        "LEFT JOIN (\n",
+        "  SELECT *\n",
+        "  FROM reconciliation\n",
+        "  QUALIFY row_number() OVER (PARTITION BY batch_id ORDER BY checked_at_utc DESC) = 1\n",
+        ") r ON r.batch_id = b.batch_id\n"
+      ]
+    },
+    {
+      "name": "ds_top20",
+      "displayName": "Top 20 maiores linhas",
+      "queryLines": [
+        "SELECT batch_id,\n",
+        "       rnk,\n",
+        "       beneficiary_type,\n",
+        "       beneficiary_id,\n",
+        "       tier,\n",
+        "       base_amount_brl,\n",
+        "       rate,\n",
+        "       commission_brl,\n",
+        "       array_join(COALESCE(flags, array()), ', ') AS flags\n",
+        "FROM (\n",
+        "  SELECT l.*,\n",
+        "         row_number() OVER (\n",
+        "           PARTITION BY batch_id\n",
+        "           ORDER BY commission_brl DESC, beneficiary_type, beneficiary_id\n",
+        "         ) AS rnk\n",
+        "  FROM batch_lines l\n",
+        ")\n",
+        "WHERE rnk <= 20\n",
+        "ORDER BY batch_id, rnk\n"
+      ]
+    },
+    {
+      "name": "ds_flagged",
+      "displayName": "Linhas com flag",
+      "queryLines": [
+        "SELECT batch_id,\n",
+        "       beneficiary_type,\n",
+        "       beneficiary_id,\n",
+        "       tier,\n",
+        "       base_amount_brl,\n",
+        "       commission_brl,\n",
+        "       array_join(flags, ', ') AS flags\n",
+        "FROM batch_lines\n",
+        "WHERE size(flags) > 0\n",
+        "ORDER BY batch_id, commission_brl DESC, beneficiary_id\n"
+      ]
+    },
+    {
+      "name": "ds_flag_counts",
+      "displayName": "Flags por tipo",
+      "queryLines": [
+        "SELECT batch_id,\n",
+        "       flag,\n",
+        "       COUNT(*) AS lines\n",
+        "FROM (SELECT batch_id, explode(flags) AS flag FROM batch_lines)\n",
+        "GROUP BY batch_id, flag\n",
+        "ORDER BY batch_id, flag\n"
+      ]
+    },
+    {
+      "name": "ds_previous_totals",
+      "displayName": "Totais contra o mês anterior",
+      "queryLines": [
+        "-- Lote anterior = último lote locked do mês civil anterior (maior versão; lotes ADJ não contam).\n",
+        "WITH previous AS (\n",
+        "  SELECT b.batch_id, p.batch_id AS previous_batch_id\n",
+        "  FROM batches b\n",
+        "  JOIN batches p\n",
+        "    ON p.reference_month = add_months(b.reference_month, -1)\n",
+        "   AND p.status = 'locked'\n",
+        "   AND p.batch_id NOT LIKE '%-ADJ-%'\n",
+        "  QUALIFY row_number() OVER (PARTITION BY b.batch_id ORDER BY p.version DESC) = 1\n",
+        ")\n",
+        "SELECT b.batch_id,\n",
+        "       pv.previous_batch_id,\n",
+        "       b.total_pos_brl,\n",
+        "       p.total_pos_brl AS previous_total_pos_brl,\n",
+        "       b.total_distributor_brl,\n",
+        "       p.total_distributor_brl AS previous_total_distributor_brl\n",
+        "FROM batches b\n",
+        "LEFT JOIN previous pv ON pv.batch_id = b.batch_id\n",
+        "LEFT JOIN batches p ON p.batch_id = pv.previous_batch_id\n"
+      ]
+    },
+    {
+      "name": "ds_previous_pos",
+      "displayName": "PDVs contra o mês anterior",
+      "queryLines": [
+        "-- Os 50 PDVs com maior mudança de comissão contra o último lote locked do mês anterior\n",
+        "-- (a mesma definição de `previous_totals.sql`). Sem lote anterior, não há linhas.\n",
+        "WITH previous AS (\n",
+        "  SELECT b.batch_id, p.batch_id AS previous_batch_id\n",
+        "  FROM batches b\n",
+        "  JOIN batches p\n",
+        "    ON p.reference_month = add_months(b.reference_month, -1)\n",
+        "   AND p.status = 'locked'\n",
+        "   AND p.batch_id NOT LIKE '%-ADJ-%'\n",
+        "  QUALIFY row_number() OVER (PARTITION BY b.batch_id ORDER BY p.version DESC) = 1\n",
+        "),\n",
+        "compared AS (\n",
+        "  SELECT l.batch_id,\n",
+        "         pv.previous_batch_id,\n",
+        "         l.beneficiary_id,\n",
+        "         l.tier,\n",
+        "         o.tier AS previous_tier,\n",
+        "         l.commission_brl,\n",
+        "         o.commission_brl AS previous_commission_brl,\n",
+        "         l.commission_brl - COALESCE(o.commission_brl, 0) AS change_brl,\n",
+        "         array_join(COALESCE(l.flags, array()), ', ') AS flags\n",
+        "  FROM batch_lines l\n",
+        "  JOIN previous pv ON pv.batch_id = l.batch_id\n",
+        "  LEFT JOIN batch_lines o\n",
+        "    ON o.batch_id = pv.previous_batch_id\n",
+        "   AND o.beneficiary_type = 'pos'\n",
+        "   AND o.beneficiary_id = l.beneficiary_id\n",
+        "  WHERE l.beneficiary_type = 'pos'\n",
+        ")\n",
+        "SELECT *\n",
+        "FROM compared\n",
+        "QUALIFY row_number() OVER (\n",
+        "  PARTITION BY batch_id ORDER BY abs(change_brl) DESC, beneficiary_id\n",
+        ") <= 50\n",
+        "ORDER BY batch_id, abs(change_brl) DESC, beneficiary_id\n"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "review",
+      "displayName": "Revisão do lote",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "rv-title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Revisão do lote de comissão\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-sub",
+            "multilineTextboxSpec": {
+              "lines": [
+                "**Escolha um lote** no filtro Lote: sem lote selecionado, os cartões somam todos os lotes. Somente leitura: este relatório não aprova nem altera nada (SPEC-003 §5). Dados sintéticos."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-total-pos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_totals",
+                  "fields": [
+                    {
+                      "name": "sum(total_pos_brl)",
+                      "expression": "SUM(`total_pos_brl`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_pos_brl)",
+                  "displayName": "Comissão de PDVs",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "BRL",
+                    "decimalPlaces": {
+                      "type": "fixed",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Comissão de PDVs"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-total-dist",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_totals",
+                  "fields": [
+                    {
+                      "name": "sum(total_distributor_brl)",
+                      "expression": "SUM(`total_distributor_brl`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_distributor_brl)",
+                  "displayName": "Comissão de distribuidores",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "BRL",
+                    "decimalPlaces": {
+                      "type": "fixed",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Comissão de distribuidores"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-pos-lines",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_totals",
+                  "fields": [
+                    {
+                      "name": "sum(pos_lines)",
+                      "expression": "SUM(`pos_lines`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(pos_lines)",
+                  "displayName": "Linhas de PDV",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Linhas de PDV"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-flagged",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_totals",
+                  "fields": [
+                    {
+                      "name": "sum(flagged_lines)",
+                      "expression": "SUM(`flagged_lines`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(flagged_lines)",
+                  "displayName": "Linhas com flag",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Linhas com flag"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-state",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_totals",
+                  "fields": [
+                    {
+                      "name": "batch_id",
+                      "expression": "`batch_id`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "reference_month",
+                      "expression": "`reference_month`"
+                    },
+                    {
+                      "name": "reconciliation_status",
+                      "expression": "`reconciliation_status`"
+                    },
+                    {
+                      "name": "lines_compared",
+                      "expression": "`lines_compared`"
+                    },
+                    {
+                      "name": "max_line_diff_brl",
+                      "expression": "`max_line_diff_brl`"
+                    },
+                    {
+                      "name": "total_diff_brl",
+                      "expression": "`total_diff_brl`"
+                    },
+                    {
+                      "name": "pos_control_diff_brl",
+                      "expression": "`pos_control_diff_brl`"
+                    },
+                    {
+                      "name": "distributor_control_diff_brl",
+                      "expression": "`distributor_control_diff_brl`"
+                    },
+                    {
+                      "name": "demo_mode",
+                      "expression": "`demo_mode`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "batch_id",
+                    "displayName": "Lote"
+                  },
+                  {
+                    "fieldName": "status",
+                    "displayName": "Status"
+                  },
+                  {
+                    "fieldName": "reference_month",
+                    "displayName": "Mês"
+                  },
+                  {
+                    "fieldName": "reconciliation_status",
+                    "displayName": "Reconciliação"
+                  },
+                  {
+                    "fieldName": "lines_compared",
+                    "displayName": "Linhas comparadas",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "max_line_diff_brl",
+                    "displayName": "Maior diferença por linha",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "total_diff_brl",
+                    "displayName": "Diferença no total",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "pos_control_diff_brl",
+                    "displayName": "Controle PDV",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "distributor_control_diff_brl",
+                    "displayName": "Controle distribuidor",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "demo_mode",
+                    "displayName": "Modo demo"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Estado e reconciliação (R$ 0,00 esperado em todas as diferenças)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-top-h",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Top 20 maiores linhas\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-top20",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_top20",
+                  "fields": [
+                    {
+                      "name": "rnk",
+                      "expression": "`rnk`"
+                    },
+                    {
+                      "name": "beneficiary_type",
+                      "expression": "`beneficiary_type`"
+                    },
+                    {
+                      "name": "beneficiary_id",
+                      "expression": "`beneficiary_id`"
+                    },
+                    {
+                      "name": "tier",
+                      "expression": "`tier`"
+                    },
+                    {
+                      "name": "base_amount_brl",
+                      "expression": "`base_amount_brl`"
+                    },
+                    {
+                      "name": "rate",
+                      "expression": "`rate`"
+                    },
+                    {
+                      "name": "commission_brl",
+                      "expression": "`commission_brl`"
+                    },
+                    {
+                      "name": "flags",
+                      "expression": "`flags`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "rnk",
+                    "displayName": "#",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "beneficiary_type",
+                    "displayName": "Tipo"
+                  },
+                  {
+                    "fieldName": "beneficiary_id",
+                    "displayName": "Beneficiário"
+                  },
+                  {
+                    "fieldName": "tier",
+                    "displayName": "Faixa"
+                  },
+                  {
+                    "fieldName": "base_amount_brl",
+                    "displayName": "Base (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "rate",
+                    "displayName": "Taxa",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "commission_brl",
+                    "displayName": "Comissão (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "flags",
+                    "displayName": "Flags"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Top 20 por comissão"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-flag-help",
+            "multilineTextboxSpec": {
+              "lines": [
+                "**O que significam os flags** (só destacam para a revisão humana; não bloqueiam):\n- `spike_3x`: comissão do PDV maior que 3 vezes a média dos 3 meses anteriores\n- `fractioning_suspect`: mais de 20 recargas de R$ 10 do mesmo assinante em < 10 min\n- `tier_jump`: PDV subiu 2 ou mais faixas em relação ao mês anterior\n- `closed_pos`: PDV fechado dentro do mês\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "flag-counts",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_flag_counts",
+                  "fields": [
+                    {
+                      "name": "flag",
+                      "expression": "`flag`"
+                    },
+                    {
+                      "name": "sum(lines)",
+                      "expression": "SUM(`lines`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "flag",
+                  "displayName": "Flag",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(lines)",
+                      "displayName": "Linhas"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Linhas por flag"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 4,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-flagged-lines",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_flagged",
+                  "fields": [
+                    {
+                      "name": "beneficiary_id",
+                      "expression": "`beneficiary_id`"
+                    },
+                    {
+                      "name": "tier",
+                      "expression": "`tier`"
+                    },
+                    {
+                      "name": "base_amount_brl",
+                      "expression": "`base_amount_brl`"
+                    },
+                    {
+                      "name": "commission_brl",
+                      "expression": "`commission_brl`"
+                    },
+                    {
+                      "name": "flags",
+                      "expression": "`flags`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "beneficiary_id",
+                    "displayName": "PDV"
+                  },
+                  {
+                    "fieldName": "tier",
+                    "displayName": "Faixa"
+                  },
+                  {
+                    "fieldName": "base_amount_brl",
+                    "displayName": "Base (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "commission_brl",
+                    "displayName": "Comissão (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "flags",
+                    "displayName": "Flags"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Linhas com flag (spike_3x, fractioning_suspect, tier_jump, closed_pos)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 20,
+            "width": 8,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-prev-h",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Comparação com o mês anterior\nLote de referência: o último `locked` do mês anterior (sem ele, colunas vazias)."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 27,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-prev-totals",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_previous_totals",
+                  "fields": [
+                    {
+                      "name": "previous_batch_id",
+                      "expression": "`previous_batch_id`"
+                    },
+                    {
+                      "name": "total_pos_brl",
+                      "expression": "`total_pos_brl`"
+                    },
+                    {
+                      "name": "previous_total_pos_brl",
+                      "expression": "`previous_total_pos_brl`"
+                    },
+                    {
+                      "name": "total_distributor_brl",
+                      "expression": "`total_distributor_brl`"
+                    },
+                    {
+                      "name": "previous_total_distributor_brl",
+                      "expression": "`previous_total_distributor_brl`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "previous_batch_id",
+                    "displayName": "Lote anterior"
+                  },
+                  {
+                    "fieldName": "total_pos_brl",
+                    "displayName": "PDVs (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "previous_total_pos_brl",
+                    "displayName": "PDVs anterior (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "total_distributor_brl",
+                    "displayName": "Distribuidores (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "previous_total_distributor_brl",
+                    "displayName": "Distribuidores anterior (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Totais contra o lote anterior"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 29,
+            "width": 12,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "rv-prev-pos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_previous_pos",
+                  "fields": [
+                    {
+                      "name": "beneficiary_id",
+                      "expression": "`beneficiary_id`"
+                    },
+                    {
+                      "name": "previous_tier",
+                      "expression": "`previous_tier`"
+                    },
+                    {
+                      "name": "tier",
+                      "expression": "`tier`"
+                    },
+                    {
+                      "name": "previous_commission_brl",
+                      "expression": "`previous_commission_brl`"
+                    },
+                    {
+                      "name": "commission_brl",
+                      "expression": "`commission_brl`"
+                    },
+                    {
+                      "name": "change_brl",
+                      "expression": "`change_brl`"
+                    },
+                    {
+                      "name": "flags",
+                      "expression": "`flags`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "beneficiary_id",
+                    "displayName": "PDV"
+                  },
+                  {
+                    "fieldName": "previous_tier",
+                    "displayName": "Faixa anterior"
+                  },
+                  {
+                    "fieldName": "tier",
+                    "displayName": "Faixa"
+                  },
+                  {
+                    "fieldName": "previous_commission_brl",
+                    "displayName": "Comissão anterior (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "commission_brl",
+                    "displayName": "Comissão (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "change_brl",
+                    "displayName": "Mudança (R$)",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "BRL",
+                      "decimalPlaces": {
+                        "type": "fixed",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "flags",
+                    "displayName": "Flags"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "50 PDVs com maior mudança de comissão"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 32,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ]
+    },
+    {
+      "name": "filters",
+      "displayName": "Filtros",
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layout": [
+        {
+          "widget": {
+            "name": "f-batch",
+            "queries": [
+              {
+                "name": "q_batch",
+                "query": {
+                  "datasetName": "ds_totals",
+                  "fields": [
+                    {
+                      "name": "batch_id",
+                      "expression": "`batch_id`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "batch_id",
+                    "displayName": "Lote",
+                    "queryName": "q_batch"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Lote (batch_id)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        }
+      ]
+    }
+  ]
+}
