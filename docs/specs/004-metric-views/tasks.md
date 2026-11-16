@@ -31,3 +31,10 @@
 
 - **Depende de:** P7.1
 - **Pronto quando:** Critério 5 da SPEC-004 §8
+
+### P7.6 🤝 Descrever `region` como código (N, NE, CO, SE, S) no COMMENT do gold e nas metric views
+
+- **Depende de:** P7.5
+- **Pronto quando:** O COMMENT de `dim_municipality.region` e o comment da dimensão `region` em `mv_recharges` e `mv_commission` listam os códigos; `check_mv_recharges.py` e `check_mv_commission.py` continuam ok no `dev`
+- **Contexto:** o dado guarda `N`, `NE`, `CO`, `SE` e `S` (`data/reference/municipalities_ibge.csv`), mas os textos diziam "Norte, Nordeste…". Um filtro por nome (`region = 'Sul'`) volta nulo ou 0. Achado na P9.1 (#61).
+- **Passos:** (1) corrigir os três textos; (2) o mantenedor roda o job do pipeline (para o COMMENT do gold) e `atlas_semantic_deploy` no `dev`; (3) conferir com os scripts acima.
