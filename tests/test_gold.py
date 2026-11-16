@@ -87,6 +87,7 @@ def test_gold_columns_follow_the_spec() -> None:
     assert names["DIM_DISTRIBUTOR"] == ["distributor_id", "distributor_name", "hq_uf"]
     assert names["FCT_RECHARGES"] == [
         "recharge_id",
+        "recharge_ts_utc",
         "recharge_date",
         "recharge_month",
         "recharge_hour_local",

@@ -84,6 +84,7 @@ def test_join_aliases_are_not_a_prefix_of_a_fact_column() -> None:
     # `pos` seria prefixo de `pos_id` (INVALID_EXTRACT_BASE_FIELD_TYPE no workspace)
     fact_columns = {
         "recharge_id",
+        "recharge_ts_utc",
         "recharge_date",
         "recharge_month",
         "recharge_hour_local",
