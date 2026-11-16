@@ -97,3 +97,11 @@ def test_for_catalog_swaps_only_the_semantic_catalog() -> None:
 )
 def test_check_value(rows: list[list[str | None]], prefix: str) -> None:
     assert check.check_value("GS-001", rows).startswith(prefix)
+
+
+def test_region_filters_use_ibge_region_codes() -> None:
+    # `region` é gravado como código (data/reference/municipalities_ibge.csv), não como nome
+    valid = {"N", "NE", "CO", "SE", "S"}
+    for case in SQL_CASES:
+        for value in re.findall(r"\bregion = '(\w+)'", case["reference_sql"]):
+            assert value in valid, f"{case['id']}: região {value!r} não é um código IBGE"

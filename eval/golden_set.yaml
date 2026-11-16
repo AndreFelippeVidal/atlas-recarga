@@ -89,7 +89,7 @@
   reference_sql: |
     SELECT MEASURE(gross_revenue) AS value
     FROM atlas.semantic.mv_recharges
-    WHERE region = 'Nordeste' AND recharge_month = DATE'2026-10-01'
+    WHERE region = 'NE' AND recharge_month = DATE'2026-10-01'
   expected_source_view: mv_recharges
   tolerance_pct: 0.5
 - id: GS-011
@@ -98,7 +98,7 @@
   reference_sql: |
     SELECT MEASURE(recharge_count) AS value
     FROM atlas.semantic.mv_recharges
-    WHERE region = 'Sul' AND recharge_month = DATE'2026-10-01'
+    WHERE region = 'S' AND recharge_month = DATE'2026-10-01'
   expected_source_view: mv_recharges
   tolerance_pct: 0.5
 - id: GS-012
@@ -107,7 +107,7 @@
   reference_sql: |
     SELECT MEASURE(avg_ticket) AS value
     FROM atlas.semantic.mv_recharges
-    WHERE region = 'Norte' AND recharge_month = DATE'2026-10-01'
+    WHERE region = 'N' AND recharge_month = DATE'2026-10-01'
   expected_source_view: mv_recharges
   tolerance_pct: 0.5
 - id: GS-013
@@ -231,7 +231,7 @@
     WITH m AS (
       SELECT recharge_month AS ref_month, MEASURE(gross_revenue) AS v
       FROM atlas.semantic.mv_recharges
-      WHERE recharge_month IN (DATE'2026-10-01', DATE'2026-09-01') AND region = 'Sudeste'
+      WHERE recharge_month IN (DATE'2026-10-01', DATE'2026-09-01') AND region = 'SE'
       GROUP BY recharge_month
     )
     SELECT (MAX(v) FILTER (WHERE ref_month = DATE'2026-10-01') - MAX(v) FILTER (WHERE ref_month = DATE'2026-09-01')) * 1 AS value
