@@ -683,6 +683,22 @@
         },
         {
           "widget": {
+            "name": "rv-flag-help",
+            "multilineTextboxSpec": {
+              "lines": [
+                "**O que significam os flags** (só destacam para a revisão humana; não bloqueiam):\n- `spike_3x`: comissão do PDV maior que 3 vezes a média dos 3 meses anteriores\n- `fractioning_suspect`: mais de 20 recargas de R$ 10 do mesmo assinante em < 10 min\n- `tier_jump`: PDV subiu 2 ou mais faixas em relação ao mês anterior\n- `closed_pos`: PDV fechado dentro do mês\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
             "name": "flag-counts",
             "queries": [
               {
@@ -737,7 +753,7 @@
           },
           "position": {
             "x": 0,
-            "y": 16,
+            "y": 20,
             "width": 4,
             "height": 7
           }
@@ -827,7 +843,7 @@
           },
           "position": {
             "x": 4,
-            "y": 16,
+            "y": 20,
             "width": 8,
             "height": 7
           }
@@ -843,7 +859,7 @@
           },
           "position": {
             "x": 0,
-            "y": 23,
+            "y": 27,
             "width": 12,
             "height": 2
           }
@@ -949,7 +965,7 @@
           },
           "position": {
             "x": 0,
-            "y": 25,
+            "y": 29,
             "width": 12,
             "height": 3
           }
@@ -1063,7 +1079,7 @@
           },
           "position": {
             "x": 0,
-            "y": 28,
+            "y": 32,
             "width": 12,
             "height": 8
           }

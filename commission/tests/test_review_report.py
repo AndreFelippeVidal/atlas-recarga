@@ -218,3 +218,15 @@ def test_catalogs_match_the_bundle_targets() -> None:
     bundle = yaml.safe_load((ROOT / "databricks.yml").read_text(encoding="utf-8"))
     targets = {t["variables"]["catalog"] for t in bundle["targets"].values()}
     assert targets == set(rr.CATALOGS)
+
+
+def test_flag_glossary_covers_every_flag_in_dashboard_and_notebook(dash: dict[str, Any]) -> None:
+    from commission import flags
+
+    assert tuple(rr.FLAG_MEANING) == flags.FLAG_ORDER
+    (help_widget,) = [w for w in _widgets(dash) if w["name"] == "rv-flag-help"]
+    shown = "".join(help_widget["multilineTextboxSpec"]["lines"])
+    notebook = (ROOT / "commission" / "commission_review.py").read_text(encoding="utf-8")
+    for flag, meaning in rr.FLAG_MEANING.items():
+        assert f"`{flag}`: {meaning}" in shown
+        assert f"`{flag}`: {meaning}" in notebook

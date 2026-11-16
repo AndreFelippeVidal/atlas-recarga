@@ -25,6 +25,19 @@ SQL_DIR = Path(__file__).parent / "review_sql"
 _BATCH_ID = re.compile(r"COM-\d{4}-\d{2}-(?:v\d+|ADJ-\d+)")
 CATALOGS = frozenset({"atlas_dev", "atlas"})  # os catálogos do databricks.yml (dev, demo)
 
+# O que cada flag significa (SPEC-003 §5.3). Só destaque para a revisão humana: nada é bloqueado.
+FLAG_MEANING: dict[str, str] = {
+    "spike_3x": "comissão do PDV maior que 3 vezes a média dos 3 meses anteriores",
+    "fractioning_suspect": "mais de 20 recargas de R$ 10 do mesmo assinante em < 10 min",
+    "tier_jump": "PDV subiu 2 ou mais faixas em relação ao mês anterior",
+    "closed_pos": "PDV fechado dentro do mês",
+}
+FLAG_HELP = (
+    "**O que significam os flags** (só destacam para a revisão humana; não bloqueiam):\n"
+    + "\n".join(f"- `{flag}`: {text}" for flag, text in FLAG_MEANING.items())
+    + "\n"
+)
+
 # (nome do dataset, título, arquivo .sql)
 DATASETS: tuple[tuple[str, str, str], ...] = (
     ("ds_totals", "Totais e reconciliação", "totals"),
@@ -194,7 +207,7 @@ def _flag_bar() -> dict[str, Any]:
                 "frame": {"showTitle": True, "title": "Linhas por flag"},
             },
         },
-        "position": {"x": 0, "y": 16, "width": 4, "height": 7},
+        "position": {"x": 0, "y": 20, "width": 4, "height": 7},
     }
 
 
@@ -298,6 +311,7 @@ def build_dashboard() -> dict[str, Any]:
             12,
             6,
         ),
+        _text("rv-flag-help", FLAG_HELP, 16, 4),
         _flag_bar(),
         _table(
             "rv-flagged-lines",
@@ -311,7 +325,7 @@ def build_dashboard() -> dict[str, Any]:
                 ("flags", "Flags", None),
             ],
             4,
-            16,
+            20,
             8,
             7,
         ),
@@ -319,7 +333,7 @@ def build_dashboard() -> dict[str, Any]:
             "rv-prev-h",
             "### Comparação com o mês anterior\n"
             "Lote de referência: o último `locked` do mês anterior (sem ele, colunas vazias).",
-            23,
+            27,
             2,
         ),
         _table(
@@ -334,7 +348,7 @@ def build_dashboard() -> dict[str, Any]:
                 ("previous_total_distributor_brl", "Distribuidores anterior (R$)", _BRL),
             ],
             0,
-            25,
+            29,
             12,
             3,
         ),
@@ -352,7 +366,7 @@ def build_dashboard() -> dict[str, Any]:
                 ("flags", "Flags", None),
             ],
             0,
-            28,
+            32,
             12,
             8,
         ),

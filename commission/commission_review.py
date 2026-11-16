@@ -44,6 +44,11 @@ display(frames["ds_top20"])  # type: ignore[name-defined]  # noqa: F821
 
 # MAGIC %md
 # MAGIC ## Flags
+# MAGIC Só destacam para a revisão humana; não bloqueiam.
+# MAGIC - `spike_3x`: comissão do PDV maior que 3 vezes a média dos 3 meses anteriores
+# MAGIC - `fractioning_suspect`: mais de 20 recargas de R$ 10 do mesmo assinante em < 10 min
+# MAGIC - `tier_jump`: PDV subiu 2 ou mais faixas em relação ao mês anterior
+# MAGIC - `closed_pos`: PDV fechado dentro do mês
 
 # COMMAND ----------
 
