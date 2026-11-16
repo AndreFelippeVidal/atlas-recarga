@@ -36,6 +36,18 @@ Confere que `semantic.mv_commission` só tem lotes `locked` (rascunho nunca apar
 uv run python scripts/check_mv_commission.py --target dev --profile <perfil> --warehouse-id <id>
 ```
 
+## `check_agent_functions.py` (P10.1)
+
+Confere as UC functions do agente: `fn_metric_by_region` igual a `MEASURE()` direto na
+`mv_recharges` (7 medidas x 4 níveis), `fn_compare_months` igual à diferença das consultas diretas,
+`fn_list_metrics` com as 7 medidas e 10 dimensões, e `INVALID_MEASURE`/`INVALID_LEVEL` para
+valores fora da lista. Só lê.
+
+```bash
+uv run python scripts/check_agent_functions.py --target dev --profile <perfil> --warehouse-id <id> \
+    --month 2026-10-01 --previous-month 2026-09-01
+```
+
 ## `check_golden_set.py` (P9.1)
 
 Roda cada `reference_sql` de `eval/golden_set.yaml` no workspace e confere que devolve 1 valor

@@ -31,6 +31,9 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 "tests/**" = ["S101"]
 "cli/tests/**" = ["S101"]  # assert is the point of tests
 "commission/tests/**" = ["S101"]
+# DDL/consultas montados só com identificadores validados e listas fechadas (SPEC-005 §3)
+"semantic/apply_functions.py" = ["S608"]
+"scripts/check_agent_functions.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.12"

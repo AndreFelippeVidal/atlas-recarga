@@ -16,3 +16,13 @@ databricks bundle deploy -t dev --profile <perfil>      # agora o Genie encontra
 ```
 
 Depois da primeira vez, um deploy basta. A mesma ordem vale para `-t demo` (runbook da P13).
+
+## UC functions do agente (P10.1)
+
+O job `atlas_semantic_deploy` tem uma segunda task, `apply_agent_functions`
+(`semantic/apply_functions.py`), que cria `fn_list_metrics`, `fn_metric_by_region` e
+`fn_compare_months` em `<catalog>.semantic` depois das metric views (SPEC-005 §3). O DDL é gerado
+do `mv_recharges.yaml`: medidas, dimensões e descrições têm uma definição só. Medida ou nível fora
+da lista falha com `INVALID_MEASURE` ou `INVALID_LEVEL`. Os leitores recebem `EXECUTE` em
+`semantic` (`setup_workspace.py`); conferência no `dev` com `scripts/check_agent_functions.py`. O `EXECUTE` só vale depois de rodar
+`scripts/setup_workspace.py` de novo (com `--reader` por principal, ADR-0016).

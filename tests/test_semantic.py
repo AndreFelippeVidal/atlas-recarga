@@ -143,7 +143,8 @@ def test_semantic_deploy_job_in_bundle_passes_catalog_and_synced_directory() -> 
     bundle = yaml.safe_load((ROOT / "databricks.yml").read_text(encoding="utf-8"))
     job = bundle["resources"]["jobs"]["atlas_semantic_deploy"]
     assert "schedule" not in job  # sob demanda
-    (task,) = job["tasks"]
+    task = job["tasks"][0]  # a segunda task (P10.1) aplica as UC functions
+    assert task["task_key"] == "apply_metric_views"
     assert task["spark_python_task"]["python_file"] == "semantic/apply_metric_views.py"
     assert task["spark_python_task"]["parameters"] == [
         "${var.catalog}",
