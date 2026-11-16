@@ -22,3 +22,4 @@ Formato [MADR](https://adr.github.io/madr/). Cada ADR registra o contexto, **pel
 | [0016](0016-uc-grants-per-principal.md) | Grants no Unity Catalog por principal, não por grupo de workspace | proposto |
 | [0017](0017-uc-objects-in-bundle.md) | Schemas, Volume e grants do UC declarados no bundle; catálogo e grupos em bootstrap | proposto |
 | [0018](0018-commission-review-report-source.md) | O relatório de revisão da comissão lê `commission.*`, não a camada semântica | proposto |
+| [0019](0019-agent-chat-ui-from-template.md) | Chat UI do `agent-atlas` vem do template oficial, clonada na subida | proposto |

@@ -15,7 +15,7 @@
 | Orquestração | Lakeflow Jobs | — | 0002 | `atlas_daily`, `atlas_commission_review`, `atlas_agent_monitoring` |
 | Camada semântica | UC metric views (`WITH METRICS LANGUAGE YAML`) | YAML `version: 1.1` | 0005 | Fonte de verdade em `semantic/*.yaml` |
 | BI | AI/BI Dashboards + Genie Space | — | 0005 | Só sobre metric views |
-| Agente | Mosaic AI Agent Framework: LangGraph + `databricks-langchain` em Databricks App | MLflow ≥ 3.x | 0006 | `ChatDatabricks(use_ai_gateway=True)` |
+| Agente | Mosaic AI Agent Framework: LangGraph + `databricks-langchain` em Databricks App | MLflow ≥ 3.x | 0006, 0019 | `ChatDatabricks(use_ai_gateway=True)`; chat UI do template oficial, clonada na subida (ADR-0019) |
 | Governança de IA | Unity Gateway (model service; agent service em Beta) · plano B: AI Gateway clássico | — | 0007 | Alternável por `ATLAS_GATEWAY_MODE` |
 | Avaliação | MLflow 3 GenAI (`mlflow.genai.evaluate`, scorers, production monitoring) | MLflow ≥ 3.x | 0013 | Golden set em `atlas.eval` |
 | MCP | FastMCP (Streamable HTTP) em Databricks App + MLflow tracing manual (spans só com atributos) | FastMCP ≥ 2.x · MLflow ≥ 3.x | 0008 | Path `/mcp`; rate limit e auditoria no App (SPEC-006 §6) |
