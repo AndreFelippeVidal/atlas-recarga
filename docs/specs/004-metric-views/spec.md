@@ -51,7 +51,12 @@ Metric views via `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML AS $$ ..
 
 | Dimensões | Medidas |
 |---|---|
-| `reference_month`, `beneficiary_type`, `tier`, `uf`, `region`, `municipality_name`, `distributor_name`, `batch_id` | `commission_total` (`SUM(commission_brl)`), `commission_base` (`SUM(base_amount_brl)`), `effective_rate` (`commission_total / commission_base`), `paid_beneficiaries` (`COUNT(DISTINCT beneficiary_id)`) |
+| `reference_month`, `beneficiary_type`, `tier`, `uf`, `region`, `municipality_name`, `distributor_name`, `batch_id` | `commission_total` (`SUM(commission_brl)`), `commission_base` (`SUM(base_amount_brl)` só das linhas de PDV), `effective_rate` (`commission_total` das linhas de PDV / `commission_base`), `paid_beneficiaries` (`COUNT(DISTINCT beneficiary_id)`) |
+
+Regras desta view:
+- **Base só de PDV.** A base de uma linha de distribuidor é o volume dos PDVs dele (SPEC-003 §2); somá-la com a dos PDVs contaria o mesmo volume duas vezes. Por isso `commission_base` e `effective_rate` consideram só `beneficiary_type = 'pos'`; `commission_total` soma PDV e distribuidor.
+- **Dimensões geográficas e `tier` só existem para PDV.** Nas linhas de distribuidor `uf`, `region`, `municipality_name` e `tier` são vazios, então um ranking por UF ou região soma menos que `commission_total`. `distributor_name` é o próprio distribuidor ou o que atende o PDV.
+- **Todos os lotes `locked` entram**, inclusive os de ajuste `ADJ` (linhas de diferença, possivelmente negativas; original + ajustes = valor final pago) e os de `demo_mode = true`. `batch_id` é a forma de separá-los.
 
 ## 5. Comparações temporais
 A variação mês contra mês **não** vira medida no MVP. O consumidor consulta dois períodos e calcula. Motivo: manter as definições simples e auditáveis. As medidas com janela (`window`) da v1.1 serão avaliadas depois do golden set.
