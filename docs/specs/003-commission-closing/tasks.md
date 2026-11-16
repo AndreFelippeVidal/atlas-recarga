@@ -49,6 +49,10 @@
 
 - **Depende de:** P8.6
 - **Pronto quando:** Critério 7 da SPEC-003 §8
+- **Passos:**
+  - Volume `commission.remittance` por DDL em `commission/ddl/volumes/`, aplicado pelo `atlas_commission_deploy`
+  - `commission/lock.py` chamado por `review.py` na aprovação final; retomada por `approve` em lote `approved`
+  - Testes com spark falso (ordem, retomada, divergência) e `scripts/check_commission_lock.py` para o mantenedor
 
 ### P8.8 🤖 Dashboard/notebook `commission_review`
 

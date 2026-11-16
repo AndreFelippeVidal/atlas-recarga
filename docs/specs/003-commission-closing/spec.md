@@ -57,9 +57,9 @@ stateDiagram-v2
 | `under_review → analyst_approved` | Membro de `atlas_commission_analysts` | Ter visualizado o relatório de reconciliação e os flags |
 | `analyst_approved → approved` | Membro de `atlas_commission_directors` | **Ator diferente do analista** (segregação de funções) |
 | `* → rejected` | Analista ou diretora | `justification` com ≥ 20 caracteres |
-| `approved → locked` | Sistema | Copia para `locked_lines`, gera a remessa e grava o sha256 |
+| `approved → locked` | Sistema | Copia para `locked_lines`, gera a remessa e grava o sha256. Roda **na mesma execução** da aprovação final (ver abaixo) |
 
-**As transições são executadas pelo job parametrizado `atlas_commission_review`** (`batch_id`, `decision`, `justification`), disparado manualmente por uma pessoa. `decision` é `submit` (`draft → under_review`, a transição do "Sistema", que exige a reconciliação `passed`), `approve` ou `reject`; cada execução faz uma transição. O ator é quem disparou a execução (o job roda como o dono do bundle, então `current_user()` não serve) e o papel vem do pertencimento aos grupos `atlas_commission_*`. Uma tentativa negada por segregação de funções fica em `batch_events` com `to_status = 'denied'` e não conta como aprovação. A versão `vN+1` depois de uma rejeição ainda não tem task (o rascunho só cria a `v1`). Nenhum agente, MCP ou app tem permissão de executar esse job (ver SPEC-005 §4 e ADR-0010).
+**As transições são executadas pelo job parametrizado `atlas_commission_review`** (`batch_id`, `decision`, `justification`), disparado manualmente por uma pessoa. `decision` é `submit` (`draft → under_review`, a transição do "Sistema", que exige a reconciliação `passed`), `approve` ou `reject`; cada execução faz uma transição, exceto a aprovação final da diretora, que faz `analyst_approved → approved` e em seguida o lock `approved → locked` (evento com `actor = 'system'`, `role = 'system'`). O lock confere que `batch_lines` soma `total_pos_brl` e `total_distributor_brl`, grava a remessa, copia para `locked_lines` só se o lote ainda não tem linhas lá, confere que as duas tabelas são iguais, grava `remittance_sha256` e só então muda o status. Se a execução cair depois de `approved`, repetir `approve` num lote `approved` (grupo `atlas_commission_directors`) completa o lock, sem nova aprovação; se cair com o status já `locked` e sem o evento, o evento é registrado à mão (mesmo padrão das demais transições). O ator é quem disparou a execução (o job roda como o dono do bundle, então `current_user()` não serve) e o papel vem do pertencimento aos grupos `atlas_commission_*`. Uma tentativa negada por segregação de funções fica em `batch_events` com `to_status = 'denied'` e não conta como aprovação. A versão `vN+1` depois de uma rejeição ainda não tem task (o rascunho só cria a `v1`). Nenhum agente, MCP ou app tem permissão de executar esse job (ver SPEC-005 §4 e ADR-0010).
 
 ## 5. Reconciliação (antes de qualquer humano ver o lote)
 
@@ -73,7 +73,7 @@ stateDiagram-v2
 4. O relatório é um notebook/dashboard `commission_review` por `batch_id`, com totais, top 20 maiores linhas, linhas com flag e comparação com o mês anterior.
 
 ## 6. Remessa simulada
-`/Volumes/atlas/commission/remittance/<batch_id>.csv` (`beneficiary_type, beneficiary_id, commission_brl`) + `<batch_id>.sha256`. **Nada é enviado para fora do workspace.**
+`/Volumes/<catalog>/commission/remittance/<batch_id>.csv` (Volume `commission.remittance`, criado pelo `atlas_commission_deploy` a partir de `commission/ddl/volumes/`; `<catalog>` é `atlas` no `demo`) (`beneficiary_type, beneficiary_id, commission_brl`) + `<batch_id>.sha256`. **Nada é enviado para fora do workspace.**
 
 ## 7. Correção depois do lock
 Um lote `locked` nunca é alterado. Um erro descoberto depois gera um **lote de ajuste** `COM-YYYY-MM-ADJ-n` com linhas de diferença (positivas ou negativas), que passa pelo mesmo fluxo completo de estados e aprovações.

@@ -90,7 +90,6 @@ def test_exactly_20_characters_is_enough() -> None:
         ("draft", "approve"),
         ("draft", "reject"),
         ("under_review", "submit"),
-        ("approved", "approve"),
         ("approved", "reject"),
         ("rejected", "approve"),
         ("locked", "reject"),

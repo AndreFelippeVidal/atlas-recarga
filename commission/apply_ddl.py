@@ -3,7 +3,7 @@
 Roda como `spark_python_task` serverless no job `atlas_commission_deploy` (databricks.yml), que
 recebe o catálogo do target e o diretório `commission/ddl` sincronizado pelo bundle. Idempotente:
 `CREATE TABLE IF NOT EXISTS` (não altera colunas de uma tabela existente; só reafirma o
-`appendOnly`). **Só cria tabelas**; não calcula nem aprova nada.
+`appendOnly`). **Só cria tabelas e o Volume da remessa**; não calcula nem aprova nada.
 
 * Um arquivo por tabela, uma instrução por arquivo; o nome do arquivo é o nome da tabela.
 * Só `${catalog}` é trocado, depois de validado; nada de SQL livre.
@@ -22,6 +22,7 @@ CATALOG_PLACEHOLDER = "${catalog}"
 SCHEMA = "commission"
 TABLES = ("batches", "batch_lines", "batch_events", "locked_lines", "reconciliation")
 APPEND_ONLY_TABLES = frozenset({"batch_events", "locked_lines"})
+VOLUMES = ("remittance",)  # `commission/ddl/volumes/<nome>.sql`; a remessa simulada (P8.7)
 
 
 def check_identifier(value: str, what: str) -> str:
@@ -36,6 +37,23 @@ def load_definitions(directory: Path) -> list[tuple[str, str]]:
     if set(found) != set(TABLES):
         raise ValueError(f"esperado {sorted(TABLES)} em {directory}, achei {sorted(found)}")
     return [(name, found[name].read_text(encoding="utf-8")) for name in TABLES]
+
+
+def load_volume_definitions(directory: Path) -> list[tuple[str, str]]:
+    """`(nome do Volume, texto do SQL)` de `<directory>/volumes`, na ordem de `VOLUMES`."""
+    folder = directory / "volumes"
+    found = {check_identifier(p.stem, "volume name"): p for p in folder.glob("*.sql")}
+    if set(found) != set(VOLUMES):
+        raise ValueError(f"esperado {sorted(VOLUMES)} em {folder}, achei {sorted(found)}")
+    return [(name, found[name].read_text(encoding="utf-8")) for name in VOLUMES]
+
+
+def build_volume_ddl(catalog: str, name: str, sql_text: str) -> str:
+    check_identifier(name, "volume name")
+    body = build_ddl(catalog, name, sql_text)
+    if not body.startswith(f"CREATE VOLUME IF NOT EXISTS {catalog}.{SCHEMA}.{name}"):
+        raise ValueError(f"{name}: esperado CREATE VOLUME IF NOT EXISTS {catalog}.{SCHEMA}.{name}")
+    return body
 
 
 def build_ddl(catalog: str, name: str, sql_text: str) -> str:
@@ -67,6 +85,9 @@ def main(catalog: str, directory: str) -> None:
         if name in APPEND_ONLY_TABLES:
             spark.sql(build_append_only_alter(catalog, name))
         print(f"aplicada: {catalog}.{SCHEMA}.{name}")
+    for name, sql_text in load_volume_definitions(Path(directory)):
+        spark.sql(build_volume_ddl(catalog, name, sql_text))
+        print(f"aplicado (volume): {catalog}.{SCHEMA}.{name}")
 
 
 if __name__ == "__main__":
