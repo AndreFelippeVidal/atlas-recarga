@@ -55,3 +55,36 @@ def test_thresholds_follow_the_spec() -> None:
 def test_rejects_bad_catalog(catalog: str) -> None:
     with pytest.raises(ValueError):
         flags.flags_sql(catalog)
+
+
+class _Rows:
+    def __init__(self, row: dict[str, str] | None) -> None:
+        self._row = row
+
+    def first(self) -> dict[str, str] | None:
+        return self._row
+
+
+class _FakeSpark:
+    def __init__(self, row: dict[str, str] | None) -> None:
+        self.row = row
+        self.statements: list[str] = []
+
+    def sql(self, statement: str, args: dict[str, str] | None = None) -> _Rows:
+        self.statements.append(statement)
+        return _Rows(self.row)
+
+
+def test_flag_draft_refuses_missing_batch() -> None:
+    spark = _FakeSpark(None)
+    with pytest.raises(RuntimeError, match="não existe"):
+        flags.flag_draft(spark, "atlas_dev", "COM-2026-10-v1")
+    assert not any("MERGE" in s for s in spark.statements)
+
+
+@pytest.mark.parametrize("status", ["under_review", "approved", "locked"])
+def test_flag_draft_refuses_batch_that_is_not_draft(status: str) -> None:
+    spark = _FakeSpark({"status": status})
+    with pytest.raises(RuntimeError, match="só se marca um draft"):
+        flags.flag_draft(spark, "atlas_dev", "COM-2026-10-v1")
+    assert not any("MERGE" in s for s in spark.statements)
