@@ -4,6 +4,11 @@
       "name": "ds_recharges",
       "displayName": "mv_recharges",
       "asset_name": "mv_recharges"
+    },
+    {
+      "name": "ds_commission",
+      "displayName": "mv_commission",
+      "asset_name": "mv_commission"
     }
   ],
   "pages": [
@@ -1110,6 +1115,312 @@
       ]
     },
     {
+      "name": "comissao",
+      "displayName": "Comissão",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "co-title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Comissão\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "co-sub",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Só lotes travados (locked); ajustes entram como diferença. Fonte: mv_commission."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "co-total",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "measure(commission_total)",
+                      "expression": "MEASURE(`commission_total`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(commission_total)",
+                  "displayName": "Comissão paga",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "BRL",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Comissão paga"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "co-rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "measure(effective_rate)",
+                      "expression": "MEASURE(`effective_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(effective_rate)",
+                  "displayName": "Taxa efetiva",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Taxa efetiva"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "co-benef",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "measure(paid_beneficiaries)",
+                      "expression": "MEASURE(`paid_beneficiaries`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(paid_beneficiaries)",
+                  "displayName": "Beneficiários pagos",
+                  "format": {
+                    "type": "number",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Beneficiários pagos"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "co-tier",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "tier",
+                      "expression": "`tier`"
+                    },
+                    {
+                      "name": "measure(commission_total)",
+                      "expression": "MEASURE(`commission_total`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "tier",
+                  "displayName": "Faixa",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "value"
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(commission_total)",
+                      "displayName": "Comissão"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Comissão por Faixa"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "co-month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "reference_month",
+                      "expression": "`reference_month`"
+                    },
+                    {
+                      "name": "measure(commission_total)",
+                      "expression": "MEASURE(`commission_total`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "reference_month",
+                  "displayName": "Mês",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "value"
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "measure(commission_total)",
+                      "displayName": "Comissão"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Comissão por Mês"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 5,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ]
+    },
+    {
       "name": "filters",
       "displayName": "Filtros",
       "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
@@ -1131,6 +1442,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "q_c_reference_month",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "reference_month",
+                      "expression": "`reference_month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -1142,6 +1466,11 @@
                     "fieldName": "recharge_month",
                     "displayName": "Mês",
                     "queryName": "q_recharge_month"
+                  },
+                  {
+                    "fieldName": "reference_month",
+                    "displayName": "Mês",
+                    "queryName": "q_c_reference_month"
                   }
                 ]
               },
@@ -1174,6 +1503,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "q_c_region",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -1185,6 +1527,11 @@
                     "fieldName": "region",
                     "displayName": "Região",
                     "queryName": "q_region"
+                  },
+                  {
+                    "fieldName": "region",
+                    "displayName": "Região",
+                    "queryName": "q_c_region"
                   }
                 ]
               },
@@ -1217,6 +1564,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "q_c_uf",
+                "query": {
+                  "datasetName": "ds_commission",
+                  "fields": [
+                    {
+                      "name": "uf",
+                      "expression": "`uf`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -1228,6 +1588,11 @@
                     "fieldName": "uf",
                     "displayName": "UF",
                     "queryName": "q_uf"
+                  },
+                  {
+                    "fieldName": "uf",
+                    "displayName": "UF",
+                    "queryName": "q_c_uf"
                   }
                 ]
               },

@@ -1,7 +1,7 @@
 # Declarative Automation Bundle do Atlas Recarga (SPEC-002 §2, tech-stack "Deploy").
 # P5.1: esqueleto. P5.2: catálogo, schemas e Volume (scripts/setup_workspace.py).
 # P7.4: dashboard `atlas_visao_comercial` (AI/BI sobre atlas.semantic.mv_recharges).
-# P7.5: Genie Space `atlas_recarga` (só mv_recharges; mv_commission entra na P8.11).
+# P7.5: Genie Space `atlas_recarga`. P8.11: fontes mv_recharges e mv_commission (página Comissão no dashboard).
 # P8.2: job `atlas_commission_deploy` (tabelas de commission.*; não executa o review).
 # P8.3: job `atlas_commission_draft` (cria o rascunho COM-YYYY-MM-v1; não aprova nada).
 # P8.4: o mesmo job ganha a task `reconcile_draft` (SQL independente; grava commission.reconciliation).
@@ -46,7 +46,7 @@ resources:
   genie_spaces:
     atlas_recarga:
       title: "Atlas Recarga"
-      description: "Perguntas em português sobre as recargas da rede Eaí? Telecom (dados sintéticos). Fonte única: a metric view mv_recharges, com receita, quantidade, ticket médio, PDVs ativos e taxa de estorno por região, UF, DDD, tipo de PDV e distribuidor."
+      description: "Perguntas em português sobre as recargas da rede Eaí? Telecom (dados sintéticos). Fontes: as metric views mv_recharges (receita, quantidade, ticket médio, PDVs ativos e taxa de estorno por região, UF, DDD, tipo de PDV e distribuidor) e mv_commission (comissão paga dos lotes travados)."
       warehouse_id: ${var.warehouse_id}
       parent_path: /Workspace/Users/${workspace.current_user.userName}/atlas_genie
       serialized_space:
@@ -65,6 +65,7 @@ resources:
               question: ["Qual o ticket médio por tipo de PDV em outubro?"]
         data_sources:
           tables:
+            - identifier: ${var.catalog}.semantic.mv_commission
             - identifier: ${var.catalog}.semantic.mv_recharges
               column_configs:
                 - column_name: distributor_name
@@ -115,7 +116,7 @@ resources:
             - id: "0000000000000000000000000000001f"
               content:
                 - "## PURPOSE"
-                - "- Responder, em português, sobre recargas de celular da Eaí? Telecom (dados sintéticos), usando só a metric view mv_recharges."
+                - "- Responder, em português, sobre recargas de celular da Eaí? Telecom (dados sintéticos), usando só as metric views mv_recharges e mv_commission."
                 - ""
                 - "## DISAMBIGUATION"
                 - "- Receita, faturamento e volume significam a medida gross_revenue; ticket médio é avg_ticket; taxa de estorno é reversal_rate."
@@ -125,7 +126,9 @@ resources:
                 - "- Para variação contra o mês anterior, consulte os dois meses e calcule a diferença na consulta; não existe medida de variação."
                 - ""
                 - "## CONSTRAINTS"
-                - "- Responda só com dados de mv_recharges; se a pergunta pedir comissão ou outro assunto, diga que está fora do escopo deste Space."
+                - "- Comissão é a medida commission_total de mv_commission (base: commission_base; taxa efetiva: effective_rate; beneficiários: paid_beneficiaries). Só existem lotes travados; rascunhos não aparecem. O mês fica em reference_month."
+                - "- commission_base e effective_rate são só dos PDVs. Linhas de distribuidor não têm uf, region, municipality_name nem tier: por UF, região ou faixa a soma fica menor que commission_total; diga isso. Lotes COM-AAAA-MM-ADJ-n são ajustes (diferenças, podem ser negativas)."
+                - "- Responda só com dados de mv_recharges e mv_commission; outro assunto está fora do escopo deste Space."
                 - "- Use MEASURE() para toda medida; nunca recalcule receita, ticket ou taxa à mão."
                 - ""
                 - "## Instructions you must follow when providing summaries"

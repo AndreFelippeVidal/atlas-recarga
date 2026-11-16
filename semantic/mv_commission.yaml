@@ -1,0 +1,97 @@
+# atlas.semantic.mv_commission (SPEC-004 §4). Definição única das métricas de comissão.
+# Fonte: commission.locked_lines com batches, SÓ lotes `locked` (rascunho nunca aparece).
+# Lotes de ajuste ADJ entram como linhas de diferença (podem ser negativas): a soma por mês é o
+# valor final pago. Base e taxa efetiva só de PDV (a base do distribuidor repete o volume dos PDVs). `${catalog}` é trocado em semantic/apply_metric_views.py.
+version: 1.1
+source: >-
+  SELECT l.batch_id, b.reference_month, l.beneficiary_type, l.beneficiary_id,
+         l.base_amount_brl, l.tier, l.commission_brl,
+         m.uf, m.region, m.municipality_name, d.distributor_name
+  FROM ${catalog}.commission.locked_lines l
+  JOIN ${catalog}.commission.batches b ON b.batch_id = l.batch_id AND b.status = 'locked'
+  LEFT JOIN ${catalog}.gold.dim_pos p
+    ON l.beneficiary_type = 'pos' AND p.pos_id = l.beneficiary_id
+  LEFT JOIN ${catalog}.gold.dim_municipality m
+    ON m.municipality_ibge_code = p.municipality_ibge_code
+  LEFT JOIN ${catalog}.gold.dim_distributor d
+    ON d.distributor_id = CASE WHEN l.beneficiary_type = 'distributor'
+                               THEN l.beneficiary_id ELSE p.distributor_id END
+comment: >-
+  Comissão paga da rede Eaí? Telecom (dados sintéticos). Só lotes travados (locked); os ajustes
+  pós-lock entram como linhas de diferença. Grão: linha de comissão (PDV ou distribuidor) do lote.
+dimensions:
+  - name: reference_month
+    expr: reference_month
+    comment: Mês de referência da comissão (primeiro dia do mês civil, America/Sao_Paulo).
+    synonyms: [mês, mês de referência]
+  - name: beneficiary_type
+    expr: beneficiary_type
+    comment: Tipo do beneficiário da comissão, pos (PDV) ou distributor (distribuidor).
+    synonyms: [tipo de beneficiário]
+  - name: tier
+    expr: tier
+    comment: Faixa do PDV (bronze, silver, gold, diamond); vazia para distribuidor.
+    synonyms: [faixa]
+  - name: uf
+    expr: uf
+    comment: Sigla da UF do município do PDV; vazia para distribuidor.
+    synonyms: [estado, UF]
+  - name: region
+    expr: region
+    comment: Região do município do PDV (Norte, Nordeste, Centro-Oeste, Sudeste, Sul); vazia para distribuidor.
+    synonyms: [região]
+  - name: municipality_name
+    expr: municipality_name
+    comment: Nome do município do PDV; vazio para distribuidor.
+    synonyms: [município, cidade]
+  - name: distributor_name
+    expr: distributor_name
+    comment: Nome do distribuidor (o próprio beneficiário, ou o que atende o PDV).
+    synonyms: [distribuidor]
+  - name: batch_id
+    expr: batch_id
+    comment: Lote travado (COM-YYYY-MM-vN, ou COM-YYYY-MM-ADJ-n no ajuste).
+    synonyms: [lote]
+measures:
+  - name: commission_total
+    expr: SUM(commission_brl)
+    comment: "Comissão paga em reais (BRL): soma das comissões das linhas dos lotes travados."
+    synonyms: [comissão, comissão paga]
+    format:
+      type: currency
+      currency_code: BRL
+      decimal_places:
+        type: exact
+        places: 2
+  - name: commission_base
+    expr: SUM(base_amount_brl) FILTER (WHERE beneficiary_type = 'pos')
+    comment: >-
+      Base de cálculo em reais (BRL): volume aprovado dos PDVs sobre o qual a taxa incide. Só
+      linhas de PDV; a base do distribuidor repete o volume dos PDVs dele e não entra.
+    synonyms: [base de cálculo]
+    format:
+      type: currency
+      currency_code: BRL
+      decimal_places:
+        type: exact
+        places: 2
+  - name: effective_rate
+    expr: SUM(commission_brl) FILTER (WHERE beneficiary_type = 'pos') / NULLIF(MEASURE(commission_base), 0)
+    comment: >-
+      Taxa efetiva dos PDVs: comissão paga aos PDVs dividida pela base dos PDVs (fração de 0 a 1);
+      não inclui a comissão de distribuidor.
+    synonyms: [taxa efetiva]
+    format:
+      type: percentage
+      decimal_places:
+        type: max
+        places: 2
+  - name: paid_beneficiaries
+    expr: COUNT(DISTINCT beneficiary_id)
+    comment: Beneficiários (PDVs e distribuidores) distintos com comissão nos lotes travados.
+    synonyms: [beneficiários, PDVs pagos]
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
