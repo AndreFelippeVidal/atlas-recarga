@@ -19,6 +19,8 @@ Regras e jobs do fechamento de comissão. Governado pela [SPEC-003](../docs/spec
 
 Erros: `SEGREGATION_OF_DUTIES_VIOLATION` (a tentativa fica em `batch_events` com `to_status = 'denied'`, que não conta como aprovação), `JUSTIFICATION_REQUIRED`, `INVALID_TRANSITION`, `RECONCILIATION_NOT_PASSED`, `ROLE_NOT_ALLOWED`. O ator é o `creator_user_name` da execução (o job roda como o dono do bundle, então `current_user()` não serve) e os grupos vêm da API SCIM. `allow_same_approver_demo=true` (SPEC-003 §9) grava `role = 'demo_override'` e `batches.demo_mode = true`.
 
+**Quem pode aprovar:** os grupos `atlas_commission_*` nascem vazios. Adicione pessoas com `uv run python scripts/setup_workspace.py --target dev --profile <perfil> --analyst <e-mail> --director <e-mail>` (repetíveis, idempotente; só mexe nesses dois grupos).
+
 Fora desta task: o lock e a remessa (P8.7) e a versão `vN+1` depois de uma rejeição (o rascunho só cria a `v1`).
 
 ```bash
