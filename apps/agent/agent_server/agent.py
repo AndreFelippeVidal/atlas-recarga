@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncGenerator
+from functools import lru_cache
 
 import mlflow
 from databricks_langchain import ChatDatabricks
@@ -17,7 +18,11 @@ from mlflow.types.responses import (
 )
 
 from agent_server.config import AgentConfig, load_config
-from agent_server.utils import get_session_id, process_agent_astream_events
+from agent_server.utils import (
+    get_session_id,
+    get_user_workspace_client,
+    process_agent_astream_events,
+)
 
 logger = logging.getLogger(__name__)
 mlflow.langchain.autolog()
@@ -41,14 +46,23 @@ def build_agent(config: AgentConfig = CONFIG):
     return create_agent(model=build_llm(config), tools=[], system_prompt=SYSTEM_PROMPT)
 
 
+@lru_cache(maxsize=256)
+def _user_from_token(token: str) -> str | None:
+    """Quem é o dono do token OAuth do usuário (o App não repassa o e-mail em cabeçalho)."""
+    try:
+        return get_user_workspace_client().current_user.me().user_name
+    except Exception:
+        logger.warning("não consegui resolver o usuário pelo token", exc_info=False)
+        return None
+
+
 def _tag_trace(request: ResponsesAgentRequest) -> None:
     headers = {k.lower(): v for k, v in get_request_headers().items()}
-    user = next(
-        (headers[h] for h in USER_HEADERS if headers.get(h)),
-        None,
-    )
+    user = next((headers[h] for h in USER_HEADERS if headers.get(h)), None)
+    if user is None and (token := headers.get("x-forwarded-access-token")):
+        user = _user_from_token(token)
     if user is None:  # só os nomes, nunca os valores (tokens passam por aqui)
-        logger.warning("sem cabeçalho de usuário; recebidos: %s", sorted(headers))
+        logger.warning("sem identidade do usuário; cabeçalhos recebidos: %s", sorted(headers))
     metadata = {}
     if session_id := get_session_id(request):
         metadata["mlflow.trace.session"] = session_id
