@@ -177,13 +177,16 @@ def create_adjustment(spark: Any, catalog: str, adjust_batch_id: str) -> str:
     c = f"{catalog}.commission"
 
     header = spark.sql(
-        f"SELECT status FROM {c}.batches WHERE batch_id = :b",  # noqa: S608
+        f"SELECT status, reference_month FROM {c}.batches WHERE batch_id = :b",  # noqa: S608
         args={"b": adjust_batch_id},
     ).first()
     if header is None:
         raise RuntimeError(f"{adjust_batch_id} não existe")
     if header["status"] != "locked":
         raise RuntimeError(f"{adjust_batch_id} está em {header['status']}; só se ajusta um locked")
+
+    if header["reference_month"] != month:
+        raise RuntimeError(f"{adjust_batch_id}: o mês do cabeçalho não bate com o do batch_id")
 
     month_batches = spark.sql(
         f"SELECT batch_id, status FROM {c}.batches WHERE reference_month = :m",  # noqa: S608
@@ -202,7 +205,8 @@ def create_adjustment(spark: Any, catalog: str, adjust_batch_id: str) -> str:
     locked_rows = spark.sql(
         "SELECT l.beneficiary_type, l.beneficiary_id, l.base_amount_brl, l.tier, l.rate, "  # noqa: S608
         f"l.commission_brl FROM {c}.locked_lines l JOIN {c}.batches b USING (batch_id) "
-        "WHERE b.reference_month = :m AND b.status = 'locked' ORDER BY b.created_at_utc",
+        "WHERE b.reference_month = :m AND b.status = 'locked' "
+        "ORDER BY b.created_at_utc, b.batch_id",
         args={"m": month},
     ).collect()
     locked = net_locked(

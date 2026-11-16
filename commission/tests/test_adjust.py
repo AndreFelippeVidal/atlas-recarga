@@ -208,6 +208,13 @@ def test_job_passes_adjust_batch_id_to_the_three_tasks() -> None:
     assert len(re.findall(r"job\.parameters\.adjust_batch_id", job)) == 3
 
 
-def test_locked_lines_are_never_updated_by_the_adjustment_module() -> None:
-    source = (ROOT / "commission" / "adjust.py").read_text(encoding="utf-8")
+@pytest.mark.parametrize("module", ["adjust", "reconcile", "flags"])
+def test_locked_lines_are_never_updated_by_these_modules(module: str) -> None:
+    source = (ROOT / "commission" / f"{module}.py").read_text(encoding="utf-8")
     assert not re.search(r"(UPDATE|DELETE FROM)\s+\S*locked_lines", source)
+
+
+def test_sql_reconciliation_is_checked_in_the_workspace() -> None:
+    """O SQL do acumulado só roda no Spark; `scripts/check_commission_adjust.py` o confere."""
+    script = (ROOT / "scripts" / "check_commission_adjust.py").read_text(encoding="utf-8")
+    assert "check_reconciliation" in script and "ADJ" in script
