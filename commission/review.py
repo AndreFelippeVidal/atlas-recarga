@@ -13,7 +13,9 @@ Sem IA: só regras.
 | reject   | under_review        | rejected          | analista; justificativa ≥ 20 caracteres |
 | reject   | analyst_approved    | rejected          | diretora; justificativa ≥ 20 caracteres |
 
-O lock e a remessa (`approved -> locked`) são da P8.7. A versão `vN+1` depois de uma rejeição
+O lock e a remessa (`approved -> locked`, P8.7) rodam na **mesma execução** da aprovação final
+(`commission/lock.py`); se a execução cair entre os dois, repetir `approve` num lote `approved`
+completa o lock (papel `system`, sem nova aprovação). A versão `vN+1` depois de uma rejeição
 também não nasce aqui: o rascunho só cria a `v1` (ver README).
 
 **Ator.** O job roda como o dono do bundle, então `current_user()` não é quem decidiu. O ator
@@ -126,6 +128,9 @@ def decide(state: BatchState, request: Request) -> Transition:
         return Transition(status, "rejected", role, text)
 
     # approve
+    if status == "approved":  # retomada de um lock interrompido: não é uma nova aprovação
+        _require_group(request, "director")
+        return Transition("approved", "locked", "system")
     role = _role_for_review_status(status, "approve")
     _require_group(request, role)
     if status == "under_review":
@@ -183,6 +188,10 @@ def _require_group(request: Request, role: str) -> None:
 
 def _draft() -> Any:
     return importlib.import_module("commission.draft")
+
+
+def _lock() -> Any:
+    return importlib.import_module("commission.lock")
 
 
 def load_state(spark: Any, catalog: str, batch_id: str) -> BatchState:
@@ -273,6 +282,10 @@ def review(
         if err.audit is not None:  # a tentativa negada fica na trilha
             append_event(spark, catalog, batch_id, request.actor, err.audit)
         raise
+    lock = _lock()
+    if transition.to_status == "locked":  # retomada: o lock inteiro roda de novo
+        _complete_lock(spark, catalog, batch_id, transition, lock)
+        return transition
     # Status primeiro, com compare-and-set: um evento só existe para uma transição aplicada
     # (um evento órfão num log append-only não se corrige e inflaria a contagem de aprovações).
     apply_status(spark, catalog, batch_id, transition)
@@ -283,7 +296,22 @@ def review(
             f"{batch_id} foi para {transition.to_status}, mas o evento NÃO foi gravado; "
             f"registre manualmente o evento de {request.actor} antes de seguir"
         ) from err
+    if transition.to_status == "approved":
+        _complete_lock(spark, catalog, batch_id, Transition("approved", "locked", "system"), lock)
     return transition
+
+
+def _complete_lock(spark: Any, catalog: str, batch_id: str, t: Transition, lock: Any) -> None:
+    """Remessa, `locked_lines`, hash, `approved -> locked` e o evento do sistema."""
+    lock.lock_batch(spark, catalog, batch_id)
+    apply_status(spark, catalog, batch_id, t)
+    try:
+        append_event(spark, catalog, batch_id, "system", t)
+    except Exception as err:
+        raise RuntimeError(
+            f"{batch_id} foi para locked, mas o evento NÃO foi gravado; registre manualmente "
+            "o evento approved -> locked (system) antes de seguir"
+        ) from err
 
 
 def main(

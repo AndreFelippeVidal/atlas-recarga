@@ -7,6 +7,7 @@
 # P8.4: o mesmo job ganha a task `reconcile_draft` (SQL independente; grava commission.reconciliation).
 # P8.5: o mesmo job ganha a task `flag_draft` (flags de revisão em commission.batch_lines).
 # P8.6: job `atlas_commission_review` (uma transição por execução; só uma pessoa dispara, nunca um agente).
+# P8.7: a aprovação final também trava o lote e grava a remessa; o job de deploy cria o Volume `commission.remittance`.
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml).
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
 # O host e a autenticação não ficam aqui: use `--profile <nome>` localmente e
@@ -189,7 +190,7 @@ resources:
 
     atlas_commission_deploy:
       name: atlas_commission_deploy
-      description: "Cria as tabelas de <catalog>.commission a partir de commission/ddl/*.sql (SPEC-003 §3). Sob demanda e idempotente; não calcula nem aprova lotes."
+      description: "Cria as tabelas e o Volume da remessa de <catalog>.commission a partir de commission/ddl (SPEC-003 §3 e §6). Sob demanda e idempotente; não calcula nem aprova lotes."
       max_concurrent_runs: 1
       environments:
         - environment_key: default
@@ -249,7 +250,7 @@ resources:
 
     atlas_commission_review:
       name: atlas_commission_review
-      description: "Uma transição da máquina de estados do lote de comissão por execução (SPEC-003 §4): submit (draft -> under_review), approve (analista, depois diretora, atores distintos) ou reject (justificativa de 20+ caracteres). Disparo manual por uma pessoa; nenhum agente, MCP ou app executa este job (ADR-0010). Não faz o lock (P8.7)."
+      description: "Uma transição da máquina de estados do lote de comissão por execução (SPEC-003 §4): submit (draft -> under_review), approve (analista, depois diretora, atores distintos) ou reject (justificativa de 20+ caracteres). Disparo manual por uma pessoa; nenhum agente, MCP ou app executa este job (ADR-0010). A aprovação final faz o lock e a remessa simulada na mesma execução (P8.7)."
       max_concurrent_runs: 1
       parameters:
         - name: batch_id
