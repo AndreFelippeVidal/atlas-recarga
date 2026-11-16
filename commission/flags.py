@@ -165,6 +165,8 @@ def flag_draft(spark: Any, catalog: str, batch_id: str) -> dict[str, int]:
         raise RuntimeError(f"{batch_id} não existe; rode o rascunho antes")
     if header["status"] != "draft":
         raise RuntimeError(f"{batch_id} está em {header['status']}; só se marca um draft")
+    if _adjust().is_adjustment(batch_id):  # SPEC-003 §7: os flags não se aplicam ao ajuste
+        return {flag: 0 for flag in FLAG_ORDER}
 
     spark.sql(flags_sql(catalog), args={"batch_id": batch_id})
     rows = spark.sql(SUMMARY_SQL.format(catalog=catalog), args={"batch_id": batch_id}).collect()
@@ -173,7 +175,11 @@ def flag_draft(spark: Any, catalog: str, batch_id: str) -> dict[str, int]:
     return counts
 
 
-def main(catalog: str, root: str, reference_month: str = "") -> None:
+def _adjust() -> Any:
+    return importlib.import_module("commission.adjust")
+
+
+def main(catalog: str, root: str, reference_month: str = "", adjust_batch_id: str = "") -> None:
     from datetime import datetime
 
     from pyspark.sql import SparkSession  # só existe no workspace
@@ -182,13 +188,18 @@ def main(catalog: str, root: str, reference_month: str = "") -> None:
         sys.path.insert(0, root)  # raiz do bundle, onde mora o pacote `commission`
 
     draft = _draft()
-    month = draft.resolve_reference_month(reference_month, datetime.now(draft.SAO_PAULO))
-    batch_id = draft.batch_id_for(month)  # o job do rascunho só cria a v1
     spark: Any = SparkSession.builder.getOrCreate()
+    if adjust_batch_id.strip():
+        batch_id = _adjust().latest_adjustment_id(
+            spark, catalog, _adjust().month_of(adjust_batch_id.strip())
+        )
+    else:
+        month = draft.resolve_reference_month(reference_month, datetime.now(draft.SAO_PAULO))
+        batch_id = draft.batch_id_for(month)  # o job do rascunho só cria a v1
     counts = flag_draft(spark, catalog, batch_id)
     print(f"flags gravados em {batch_id}: " + ", ".join(f"{k}={v}" for k, v in counts.items()))
 
 
 if __name__ == "__main__":
     # sem sys.exit: no serverless, `SystemExit` (até com 0) marca a task como falha
-    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "")
+    main(*sys.argv[1:5])

@@ -31,7 +31,7 @@ from zoneinfo import ZoneInfo
 ZERO = Decimal("0.00")
 
 # Faixas da SPEC-003 §2, repetidas de propósito (ver docstring do módulo).
-RECOMPUTE_SQL = """
+_EXPECTED_CTES = """
 WITH batch AS (
   SELECT batch_id, reference_month, total_pos_brl, total_distributor_brl
   FROM {catalog}.commission.batches
@@ -62,7 +62,11 @@ expected AS (
   JOIN {catalog}.gold.dim_pos p ON p.pos_id = v.pos_id
   GROUP BY p.distributor_id
 ),
-actual AS (
+"""
+
+RECOMPUTE_SQL = (
+    _EXPECTED_CTES  # noqa: S608 (só `{catalog}`, validado em `recompute_sql`)
+    + """actual AS (
   SELECT beneficiary_type, beneficiary_id, base_amount_brl, commission_brl
   FROM {catalog}.commission.batch_lines
   WHERE batch_id = :batch_id
@@ -90,6 +94,63 @@ SELECT
                              WHERE beneficiary_type = 'distributor'), 0) AS DECIMAL(14,2))
      FROM actual WHERE beneficiary_type = 'distributor') AS distributor_control_diff_brl
 """
+)
+
+
+# Lote de ajuste (SPEC-003 §7): o "realizado" é o acumulado do mês, isto é, as `locked_lines` dos
+# lotes `locked` do mês mais as linhas (diferenças) do ajuste. Esse acumulado tem de igualar o
+# recálculo independente sobre `fct_recharges`. O total usa o cabeçalho do ajuste, então um
+# cabeçalho que não soma as linhas também reprova.
+ADJUSTMENT_SQL = (
+    _EXPECTED_CTES  # noqa: S608 (idem)
+    + """actual AS (
+  SELECT beneficiary_type, beneficiary_id,
+         SUM(base_amount_brl) AS base_amount_brl, SUM(commission_brl) AS commission_brl
+  FROM (
+    SELECT l.beneficiary_type, l.beneficiary_id, l.base_amount_brl, l.commission_brl
+    FROM {catalog}.commission.locked_lines l
+    JOIN {catalog}.commission.batches h ON h.batch_id = l.batch_id
+    JOIN batch b ON h.reference_month = b.reference_month
+    WHERE h.status = 'locked' AND l.batch_id <> :batch_id
+    UNION ALL
+    SELECT beneficiary_type, beneficiary_id, base_amount_brl, commission_brl
+    FROM {catalog}.commission.batch_lines
+    WHERE batch_id = :batch_id
+  )
+  GROUP BY beneficiary_type, beneficiary_id
+),
+locked_total AS (
+  SELECT COALESCE(SUM(l.commission_brl), 0) AS commission_brl
+  FROM {catalog}.commission.locked_lines l
+  JOIN {catalog}.commission.batches h ON h.batch_id = l.batch_id
+  JOIN batch b ON h.reference_month = b.reference_month
+  WHERE h.status = 'locked' AND l.batch_id <> :batch_id
+),
+cmp AS (
+  SELECT
+    ABS(COALESCE(a.commission_brl, 0) - COALESCE(e.commission_brl, 0)) AS commission_diff,
+    ABS(COALESCE(a.base_amount_brl, 0) - COALESCE(e.base_amount_brl, 0)) AS base_diff
+  FROM actual a
+  FULL OUTER JOIN expected e
+    ON a.beneficiary_type = e.beneficiary_type AND a.beneficiary_id = e.beneficiary_id
+)
+SELECT
+  (SELECT COUNT(*) FROM cmp) AS lines_compared,
+  (SELECT CAST(COALESCE(MAX(GREATEST(commission_diff, base_diff)), 0) AS DECIMAL(14,2))
+     FROM cmp) AS max_line_diff_brl,
+  (SELECT CAST((SELECT commission_brl FROM locked_total)
+                 + COALESCE(MAX(b.total_pos_brl + b.total_distributor_brl), 0)
+                 - COALESCE((SELECT SUM(commission_brl) FROM expected), 0) AS DECIMAL(14,2))
+     FROM batch b) AS total_diff_brl,
+  (SELECT CAST(COALESCE(SUM(base_amount_brl), 0)
+                 - COALESCE((SELECT SUM(base) FROM pos_volume), 0) AS DECIMAL(14,2))
+     FROM actual WHERE beneficiary_type = 'pos') AS pos_control_diff_brl,
+  (SELECT CAST(COALESCE(SUM(base_amount_brl), 0)
+                 - COALESCE((SELECT SUM(base_amount_brl) FROM expected
+                             WHERE beneficiary_type = 'distributor'), 0) AS DECIMAL(14,2))
+     FROM actual WHERE beneficiary_type = 'distributor') AS distributor_control_diff_brl
+"""
+)
 
 
 @dataclass(frozen=True)
@@ -119,11 +180,11 @@ def decide_status(result: Result) -> str:
     return "passed" if all(d == ZERO for d in diffs) else "failed"
 
 
-def recompute_sql(catalog: str) -> str:
+def recompute_sql(catalog: str, adjustment: bool = False) -> str:
     """SQL da reconciliação para `catalog` (já validado como identificador)."""
     draft = _draft()
     draft.check_identifier(catalog, "catalog name")
-    return RECOMPUTE_SQL.format(catalog=catalog)
+    return (ADJUSTMENT_SQL if adjustment else RECOMPUTE_SQL).format(catalog=catalog)
 
 
 def _draft() -> Any:
@@ -155,7 +216,8 @@ def reconcile(spark: Any, catalog: str, batch_id: str) -> Result:
     if header["status"] != "draft":
         raise RuntimeError(f"{batch_id} está em {header['status']}; só se reconcilia um draft")
 
-    row = spark.sql(recompute_sql(catalog), args={"batch_id": batch_id}).first()
+    is_adjustment = importlib.import_module("commission.adjust").is_adjustment(batch_id)
+    row = spark.sql(recompute_sql(catalog, is_adjustment), args={"batch_id": batch_id}).first()
     if row is None:  # a consulta sempre devolve uma linha; defensivo
         raise RuntimeError("a consulta de reconciliação não devolveu resultado")
     result = Result(
@@ -208,20 +270,26 @@ def reconcile(spark: Any, catalog: str, batch_id: str) -> Result:
     return result
 
 
-def main(catalog: str, root: str, reference_month: str = "") -> None:
+def main(catalog: str, root: str, reference_month: str = "", adjust_batch_id: str = "") -> None:
     from pyspark.sql import SparkSession  # só existe no workspace
 
     if root not in sys.path:
         sys.path.insert(0, root)  # raiz do bundle, onde mora o pacote `commission`
 
     draft = _draft()
-    month = draft.resolve_reference_month(reference_month, datetime.now(draft.SAO_PAULO))
-    batch_id = draft.batch_id_for(month)  # o job do rascunho só cria a v1
     spark: Any = SparkSession.builder.getOrCreate()
+    if adjust_batch_id.strip():  # SPEC-003 §7: reconcilia o ajuste mais novo do mês
+        adjust = importlib.import_module("commission.adjust")
+        batch_id = adjust.latest_adjustment_id(
+            spark, catalog, adjust.month_of(adjust_batch_id.strip())
+        )
+    else:
+        month = draft.resolve_reference_month(reference_month, datetime.now(draft.SAO_PAULO))
+        batch_id = draft.batch_id_for(month)  # o job do rascunho só cria a v1
     result = reconcile(spark, catalog, batch_id)
     print(f"reconciliação passed: {batch_id} ({result.lines_compared} linhas, diferença R$ 0,00)")
 
 
 if __name__ == "__main__":
     # sem sys.exit: no serverless, `SystemExit` (até com 0) marca a task como falha
-    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "")
+    main(*sys.argv[1:5])

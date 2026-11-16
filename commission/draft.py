@@ -8,6 +8,7 @@ P8.4). Os flags vêm da task seguinte (`flags.py`, P8.5); não aprova.
 
 * Mês de referência: o mês civil anterior ao de hoje em America/Sao_Paulo, ou o informado
   (`YYYY-MM`, nunca o mês corrente nem um futuro).
+* Com `adjust_batch_id`, em vez do rascunho nasce o lote de ajuste `ADJ-n` (`adjust.py`, §7).
 * Só nasce a versão `v1`. Se `COM-YYYY-MM-v1` já existe, recusa: nada é sobrescrito.
   Versão `vN+1` nasce de uma rejeição (P8.6).
 * PDV fechado no mês: o gold só tem recarga até `closed_date` (SPEC-001: PDV só recebe recarga
@@ -20,6 +21,7 @@ P8.4). Os flags vêm da task seguinte (`flags.py`, P8.5); não aprova.
 
 from __future__ import annotations
 
+import importlib
 import re
 import sys
 from datetime import date, datetime
@@ -263,17 +265,22 @@ def create_draft(spark: Any, catalog: str, reference_month: str = "") -> str:
     return batch_id
 
 
-def main(catalog: str, root: str, reference_month: str = "") -> None:
+def main(catalog: str, root: str, reference_month: str = "", adjust_batch_id: str = "") -> None:
     from pyspark.sql import SparkSession  # só existe no workspace
 
     if root not in sys.path:
         sys.path.insert(0, root)  # raiz do bundle, onde mora o pacote `commission`
 
     spark: Any = SparkSession.builder.getOrCreate()
+    if adjust_batch_id.strip():  # SPEC-003 §7: lote de ajuste de um lote já travado
+        adjust = importlib.import_module("commission.adjust")
+        batch_id = adjust.create_adjustment(spark, catalog, adjust_batch_id.strip())
+        print(f"ajuste criado: {batch_id}")
+        return
     batch_id = create_draft(spark, catalog, reference_month)
     print(f"rascunho criado: {batch_id}")
 
 
 if __name__ == "__main__":
     # sem sys.exit: no serverless, `SystemExit` (até com 0) marca a task como falha
-    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "")
+    main(*sys.argv[1:5])
