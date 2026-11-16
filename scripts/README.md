@@ -36,6 +36,15 @@ Confere que `semantic.mv_commission` só tem lotes `locked` (rascunho nunca apar
 uv run python scripts/check_mv_commission.py --target dev --profile <perfil> --warehouse-id <id>
 ```
 
+## `check_golden_set.py` (P9.1)
+
+Roda cada `reference_sql` de `eval/golden_set.yaml` no workspace e confere que devolve 1 valor
+numérico. Só lê.
+
+```bash
+uv run python scripts/check_golden_set.py --target dev --profile <perfil> --warehouse-id <id>
+```
+
 ## `check_commission_flags.py` (P8.5)
 
 Depois do job `atlas_commission_draft` (que inclui a task `flag_draft`), confere os flags de `commission.batch_lines`: só os quatro da SPEC-003 §5, nenhum em linha de distribuidor, `closed_pos` igual aos PDVs fechados no mês e `fractioning_suspect` igual aos PDVs com rajada no mês do lote, por consulta independente (critério 3 da §8). Só leitura.
