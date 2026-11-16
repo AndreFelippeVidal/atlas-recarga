@@ -29,10 +29,10 @@ uv run python scripts/check_readers_permissions.py --target dev --profile <perfi
 
 ## `check_commission_flags.py` (P8.5)
 
-Depois do job `atlas_commission_draft` (que inclui a task `flag_draft`), confere os flags de `commission.batch_lines`: só os quatro da SPEC-003 §5, nenhum em linha de distribuidor, `closed_pos` igual aos PDVs fechados no mês e ao menos 3 PDVs com `fractioning_suspect` (critério 3 da §8). Só leitura.
+Depois do job `atlas_commission_draft` (que inclui a task `flag_draft`), confere os flags de `commission.batch_lines`: só os quatro da SPEC-003 §5, nenhum em linha de distribuidor, `closed_pos` igual aos PDVs fechados no mês e, com `--expect-fractioning`, ao menos 3 PDVs com `fractioning_suspect` (critério 3 da §8). Só leitura.
 
 ```bash
-uv run python scripts/check_commission_flags.py --target dev --profile <perfil> --warehouse-id <id> --batch-id COM-2026-10-v1
+uv run python scripts/check_commission_flags.py --target dev --profile <perfil> --warehouse-id <id> --batch-id COM-2026-10-v1 --expect-fractioning
 ```
 
 ## `check_commission_reconciliation.py` (P8.4)

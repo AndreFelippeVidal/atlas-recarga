@@ -4,11 +4,12 @@ Depois do job `atlas_commission_draft` (que agora inclui `flag_draft`), o **mant
 só com leitura:
 
     uv run python scripts/check_commission_flags.py --target dev \\
-        --profile <perfil> --warehouse-id <id> --batch-id COM-2026-10-v1
+        --profile <perfil> --warehouse-id <id> --batch-id COM-2026-10-v1 --expect-fractioning
 
 Confere em `commission.batch_lines`: só valores do conjunto de flags da SPEC; nenhum flag em
-linha de distribuidor; `closed_pos` = PDVs com linha e `closed_date` no mês; e, no cenário
-`fractioning`, pelo menos 3 PDVs com `fractioning_suspect` (critério 3 da SPEC-003 §8).
+linha de distribuidor; `closed_pos` = PDVs com linha e `closed_date` no mês; e, com
+`--expect-fractioning` (dataset com o cenário `fractioning`), pelo menos 3 PDVs com
+`fractioning_suspect` (critério 3 da SPEC-003 §8).
 Imprime a contagem por flag. Sai com 0 ou 1.
 """
 
@@ -24,7 +25,13 @@ from check_commission_draft import CATALOGS, _mark, _run, check_batch_id
 ALLOWED = ("spike_3x", "fractioning_suspect", "tier_jump", "closed_pos")
 
 
-def check(profile: str, warehouse_id: str, catalog: str, batch_id: str) -> list[str]:
+def check(
+    profile: str,
+    warehouse_id: str,
+    catalog: str,
+    batch_id: str,
+    expect_fractioning: bool = False,
+) -> list[str]:
     check_batch_id(batch_id)
     c = f"{catalog}.commission"
     lines = f"{c}.batch_lines"
@@ -58,16 +65,15 @@ def check(profile: str, warehouse_id: str, catalog: str, batch_id: str) -> list[
     unknown = sorted(set(counts) - set(ALLOWED))
     out = [
         _mark(not unknown, f"{batch_id}: só flags da SPEC (desconhecidos: {unknown or 'nenhum'})"),
-        _mark(on_distributor == "0", f"linhas de distribuidor com flag: {on_distributor}"),
+        _mark(int(on_distributor or 0) == 0, f"linhas de distribuidor com flag: {on_distributor}"),
         _mark(
-            counts.get("closed_pos", "0") == closed_expected,
+            int(counts.get("closed_pos") or 0) == int(closed_expected or 0),
             f"closed_pos = {counts.get('closed_pos', '0')} (esperado {closed_expected})",
         ),
-        _mark(
-            int(counts.get("fractioning_suspect", "0")) >= 3,
-            f"fractioning_suspect = {counts.get('fractioning_suspect', '0')} (esperado >= 3)",
-        ),
     ]
+    if expect_fractioning:
+        found = int(counts.get("fractioning_suspect") or 0)
+        out.append(_mark(found >= 3, f"fractioning_suspect = {found} (esperado >= 3)"))
     out.extend(f"info  {flag} = {counts.get(flag, '0')}" for flag in ALLOWED)
     return out
 
@@ -78,8 +84,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--profile", required=True, help="perfil da CLI do Databricks (explícito)")
     parser.add_argument("--warehouse-id", required=True)
     parser.add_argument("--batch-id", required=True, help="ex.: COM-2026-10-v1")
+    parser.add_argument(
+        "--expect-fractioning",
+        action="store_true",
+        help="dataset com o cenário `fractioning`: exige >= 3 PDVs com fractioning_suspect",
+    )
     args = parser.parse_args(argv)
-    out = check(args.profile, args.warehouse_id, CATALOGS[args.target], args.batch_id)
+    out = check(
+        args.profile,
+        args.warehouse_id,
+        CATALOGS[args.target],
+        args.batch_id,
+        args.expect_fractioning,
+    )
     print("\n".join(out))
     return 1 if any(line.startswith("FALHA") for line in out) else 0
 

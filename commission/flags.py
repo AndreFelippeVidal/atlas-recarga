@@ -98,11 +98,13 @@ computed AS (
 """
 
 APPLY_SQL = (
-    FLAGS_SQL
+    FLAGS_SQL  # noqa: S608  (só `catalog` validado por check_identifier entra no SQL)
     + """
 MERGE INTO {catalog}.commission.batch_lines t
 USING computed s
 ON t.batch_id = :batch_id AND t.beneficiary_type = 'pos' AND t.beneficiary_id = s.beneficiary_id
+  AND EXISTS (SELECT 1 FROM {catalog}.commission.batches b
+              WHERE b.batch_id = :batch_id AND b.status = 'draft')
 WHEN MATCHED THEN UPDATE SET t.flags = s.flags
 """
 )
@@ -125,14 +127,13 @@ def _rules() -> Any:
 
 def _tier_expr(field: str) -> str:
     """`CASE` SQL sobre `base`, gerado de `rules.TIERS` (índice da faixa ou taxa)."""
-    tiers = sorted(_rules().TIERS, key=lambda t: t.floor, reverse=True)
+    ascending = sorted(_rules().TIERS, key=lambda t: t.floor)
     parts = []
-    for tier in tiers[:-1]:
-        idx = sorted(_rules().TIERS, key=lambda t: t.floor).index(tier)
+    for idx in range(len(ascending) - 1, 0, -1):  # da faixa mais alta para a segunda
+        tier = ascending[idx]
         value = idx if field == "index" else tier.rate
         parts.append(f"WHEN base >= {tier.floor} THEN {value}")
-    last = tiers[-1]
-    otherwise = 0 if field == "index" else last.rate
+    otherwise = 0 if field == "index" else ascending[0].rate
     return "CASE " + " ".join(parts) + f" ELSE {otherwise} END"
 
 
