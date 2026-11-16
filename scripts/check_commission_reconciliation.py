@@ -4,7 +4,7 @@ Depois do job `atlas_commission_draft` (que agora inclui `reconcile_draft`), o *
 roda, só com leitura:
 
     uv run python scripts/check_commission_reconciliation.py --target dev \\
-        --profile andrevidal --warehouse-id <id> --batch-id COM-2026-10-v1
+        --profile <perfil> --warehouse-id <id> --batch-id COM-2026-10-v1
 
 Confere em `commission.reconciliation`: exatamente 1 linha do lote, `status = 'passed'`, todas as
 diferenças em 0.00 e `lines_compared` = linhas do lote em `batch_lines`. Sai com 0 ou 1.

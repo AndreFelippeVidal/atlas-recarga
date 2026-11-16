@@ -76,7 +76,6 @@ cmp AS (
     ON a.beneficiary_type = e.beneficiary_type AND a.beneficiary_id = e.beneficiary_id
 )
 SELECT
-  (SELECT COUNT(*) FROM batch) AS batch_found,
   (SELECT COUNT(*) FROM cmp) AS lines_compared,
   (SELECT CAST(COALESCE(MAX(GREATEST(commission_diff, base_diff)), 0) AS DECIMAL(14,2))
      FROM cmp) AS max_line_diff_brl,
