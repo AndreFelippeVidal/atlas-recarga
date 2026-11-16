@@ -30,7 +30,12 @@ DIM_MUNICIPALITY: list[Column] = [
     ),
     ("municipality_name", "STRING", "Nome do município."),
     ("uf", "STRING", "Sigla da unidade da federação (UF) do município."),
-    ("region", "STRING", "Região do Brasil: Norte, Nordeste, Centro-Oeste, Sudeste ou Sul."),
+    (
+        "region",
+        "STRING",
+        "Código da região do Brasil: N (Norte), NE (Nordeste), CO (Centro-Oeste), "
+        "SE (Sudeste) ou S (Sul).",
+    ),
     ("ddd", "STRING", "DDD aproximado do município, por região imediata."),
     ("population", "INT", "População do município (referência IBGE)."),
 ]

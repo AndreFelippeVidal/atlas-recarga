@@ -22,7 +22,7 @@
 | 4 | Dados sintéticos | [001-synthetic-data-cli](001-synthetic-data-cli/spec.md) | 9 |
 | 5 | Bundle e catálogo como código | [002-medallion-pipeline](002-medallion-pipeline/spec.md) | 2 |
 | 6 | Pipeline medalhão | [002-medallion-pipeline](002-medallion-pipeline/spec.md) | 7 |
-| 7 | Camada semântica (recargas) | [004-metric-views](004-metric-views/spec.md) | 5 |
+| 7 | Camada semântica (recargas) | [004-metric-views](004-metric-views/spec.md) | 6 |
 | 8 | Fechamento de comissão | [003-commission-closing](003-commission-closing/spec.md) | 11 |
 | 9 | Avaliação do agente: golden set antes do agente | [008-agent-evaluation](008-agent-evaluation/spec.md) | 3 |
 | 10 | Agente de negócio | [005-business-agent](005-business-agent/spec.md) | 8 |
@@ -115,6 +115,7 @@ _`mv_recharges` como a única porta de leitura, com AI/BI e Genie em cima._
 - [x] **P7.3** 🤝 Grants: `atlas_readers` só em `semantic` + teste de PERMISSION_DENIED — _pronto quando:_ Critério 4 da SPEC-004 §8 (#43) — conferido no `dev` via `scripts/check_readers_permissions.py` com um service principal de teste: `SELECT` em `mv_recharges` permitido; `PERMISSION_DENIED` em gold, silver, bronze e commission. Grants por principal (`--reader`), pois grupo de workspace não vale no UC (ADR-0016) · depende de P7.1
 - [x] **P7.4** 🤝 AI/BI Dashboard "Atlas — Visão Comercial" (páginas Brasil, UF, Rede) — _pronto quando:_ Publicado; filtros de mês, região e UF (#45) — conferido no `dev` pelo mantenedor: ranking de UFs e filtros funcionam; o mapa nativo não reconhece UFs do Brasil, então o coroplético fica na SPEC-007 · depende de P7.1
 - [x] **P7.5** 🤝 Genie Space "Atlas Recarga" com instruções e 10 exemplos — _pronto quando:_ Critério 5 da SPEC-004 §8 (#48) — Space no bundle (só `mv_recharges`; `mv_commission` entra na P8.11); conferido no `dev` pelo mantenedor via `scripts/check_genie_space.py`: para "qual a receita por DDD em outubro?" o Genie gerou SQL com `ddd` e `MEASURE(gross_revenue)` sobre `atlas_dev.semantic.mv_recharges`, sem tocar gold, silver, bronze ou commission · depende de P7.1
+- [x] **P7.6** 🤝 Descrever `region` como código (N, NE, CO, SE, S) no COMMENT do gold e nas metric views — _pronto quando:_ O COMMENT de `dim_municipality.region` e o comment da dimensão `region` nas duas metric views listam os códigos; `check_mv_recharges.py` e `check_mv_commission.py` continuam ok no `dev` (#62) — textos corrigidos; conferido no `dev` pelo mantenedor: `check_mv_recharges.py` (7 medidas e as 5 regiões `CO`, `N`, `NE`, `S`, `SE`) e `check_mv_commission.py` (agosto a outubro iguais ao `locked_lines`) ok · depende de P7.5
 
 ## Fase 8 — Fechamento de comissão → [003-commission-closing](003-commission-closing/spec.md)
 
