@@ -221,6 +221,8 @@ resources:
       parameters:
         - name: reference_month
           default: ""
+        - name: adjust_batch_id
+          default: ""
       environments:
         - environment_key: default
           spec:
@@ -234,6 +236,7 @@ resources:
               - ${var.catalog}
               - ${workspace.file_path}
               - "{{job.parameters.reference_month}}"
+              - "{{job.parameters.adjust_batch_id}}"
 
         - task_key: reconcile_draft
           depends_on:
@@ -245,6 +248,7 @@ resources:
               - ${var.catalog}
               - ${workspace.file_path}
               - "{{job.parameters.reference_month}}"
+              - "{{job.parameters.adjust_batch_id}}"
 
         - task_key: flag_draft
           depends_on:
@@ -256,6 +260,7 @@ resources:
               - ${var.catalog}
               - ${workspace.file_path}
               - "{{job.parameters.reference_month}}"
+              - "{{job.parameters.adjust_batch_id}}"
 
     atlas_commission_review:
       name: atlas_commission_review

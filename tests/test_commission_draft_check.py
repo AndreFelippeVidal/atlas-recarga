@@ -56,3 +56,16 @@ def test_tier_floors_match_the_rules_module() -> None:
     for tier in rules.TIERS:
         if tier.floor:
             assert f">= {tier.floor:.2f} THEN '{tier.name}'" in sql
+
+
+@pytest.mark.parametrize("value", ["COM-2026-08-v1", "COM-2026-08-ADJ-1", "COM-2026-08-ADJ-12"])
+def test_any_batch_id_accepts_regular_and_adjustment(value: str) -> None:
+    assert check.check_any_batch_id(value) == value
+
+
+@pytest.mark.parametrize(
+    "value", ["COM-2026-08-ADJ-0", "COM-2026-13-ADJ-1", "COM-2026-08-ADJ-1; X"]
+)
+def test_any_batch_id_rejects_malformed(value: str) -> None:
+    with pytest.raises(ValueError):
+        check.check_any_batch_id(value)
