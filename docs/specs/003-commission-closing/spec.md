@@ -66,9 +66,9 @@ stateDiagram-v2
 1. **Duas implementações independentes:** o cálculo principal em PySpark e um recálculo em SQL puro sobre `gold.fct_recharges`, sem passar por `agg_pos_month`. A diferença por linha e no total deve ser **R$ 0,00**.
 2. **Totais de controle:** a soma de `base_amount_brl` das linhas de PDV é igual ao volume aprovado do mês em `fct_recharges`, e a soma dos distribuidores bate com a soma por distribuidor.
 3. **Flags para revisão humana** (não bloqueiam; ficam destacados no relatório):
-   - `spike_3x`: comissão do PDV > 3× a média dos 3 meses anteriores.
-   - `fractioning_suspect`: mais de 20 recargas de R$ 10 ao mesmo `subscriber_id` em < 10 min.
-   - `tier_jump`: subiu 2 ou mais faixas em relação ao mês anterior.
+   - `spike_3x`: comissão do PDV > 3× a média dos 3 meses anteriores (a média usa os meses anteriores com linha do PDV, no máximo 3; sem nenhum, não sinaliza).
+   - `fractioning_suspect`: mais de 20 recargas de R$ 10 ao mesmo `subscriber_id` em < 10 min (janela sobre `gold.fct_recharges.recharge_ts_utc`, só recargas `approved`; o flag vai na linha do PDV).
+   - `tier_jump`: subiu 2 ou mais faixas em relação ao mês anterior (PDV sem linha no mês anterior não sinaliza).
    - `closed_pos`: PDV fechado no mês.
 4. O relatório é um notebook/dashboard `commission_review` por `batch_id`, com totais, top 20 maiores linhas, linhas com flag e comparação com o mês anterior.
 
