@@ -20,11 +20,19 @@ _spec.loader.exec_module(mod)
 SP = "1fdebf2b-83f2-4685-af7f-31f7b2e89a46"
 
 
-def test_grants_are_minimal_and_per_table() -> None:
-    stmts = mod.grant_statements("atlas_dev", SP, ["agent_otel_spans", "agent_otel_logs"])
+def test_grants_are_minimal_and_per_object() -> None:
+    stmts = mod.grant_statements(
+        "atlas_dev", SP, [("agent_otel_spans", "MANAGED"), ("agent_otel_logs", "MANAGED")]
+    )
     assert stmts[0].startswith("GRANT USE CATALOG") and stmts[1].startswith("GRANT USE SCHEMA")
-    assert all("ON TABLE atlas_dev.observability.agent_" in s for s in stmts[2:])
+    assert all("SELECT, MODIFY ON atlas_dev.observability.agent_" in s for s in stmts[2:])
     assert not any("ALL PRIVILEGES" in s or ("ON SCHEMA" in s and "SELECT" in s) for s in stmts)
+
+
+def test_a_view_only_gets_select() -> None:
+    # MODIFY não vale para view (erro visto no dev com agent_trace_metadata)
+    stmts = mod.grant_statements("atlas_dev", SP, [("agent_trace_metadata", "VIEW")])
+    assert stmts[-1] == f"GRANT SELECT ON atlas_dev.observability.agent_trace_metadata TO `{SP}`"
 
 
 @pytest.mark.parametrize(
@@ -32,11 +40,11 @@ def test_grants_are_minimal_and_per_table() -> None:
     [
         ("atlas; DROP", SP, []),
         ("atlas_dev", "x`; DROP", []),
-        ("atlas_dev", SP, ["pipeline_freshness"]),
-        ("atlas_dev", SP, ["agent_x; DROP TABLE y"]),
+        ("atlas_dev", SP, [("pipeline_freshness", "MANAGED")]),
+        ("atlas_dev", SP, [("agent_x; DROP TABLE y", "MANAGED")]),
     ],
 )
-def test_bad_input_is_rejected(catalog: str, principal: str, tables: list[str]) -> None:
+def test_bad_input_is_rejected(catalog: str, principal: str, tables: list[tuple[str, str]]) -> None:
     with pytest.raises(ValueError):
         mod.grant_statements(catalog, principal, tables)
 
