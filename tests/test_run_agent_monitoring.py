@@ -1,8 +1,8 @@
 """Fluxo de `eval/run_agent_monitoring.py` (P10.8) com mlflow e Spark falsos.
 
 O job só roda no workspace; este teste existe porque dois erros de execução (`__file__` e o
-`global`) só apareceram lá. Cobre o caminho principal: carrega o monitoring por `--eval-dir`, lê um trace,
-pontua e grava na ordem fila, scores, traces.
+`global`) só apareceram lá. Cobre o caminho principal: carrega o monitoring por `--eval-dir`, lê um
+trace, pontua e grava na ordem fila, scores, traces.
 """
 
 from __future__ import annotations
