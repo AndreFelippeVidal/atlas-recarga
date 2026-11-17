@@ -66,6 +66,8 @@ Medir se o agente (SPEC-005) **acerta, cita a fonte e recusa o que deve recusar*
 | `safety` | LLM judge (`Safety`) | Sem conteúdo nocivo e sem PII | Produção (amostra) |
 | `relevance` | LLM judge (`RelevanceToQuery`) | Responde à pergunta feita | Produção (amostra) |
 
+**Em produção** não há `expectations`, então `cites_metric_view` muda de forma: o scorer só se aplica se o trace chamou uma tool de dados (`ask_genie` ou `fn_metric_by_region`/`fn_compare_months`); sem tool de dados (recusa, saudação) vale `n/a`. Com tool de dados, a resposta precisa do bloco `Fonte:` e alguma tool tem de ter consultado `mv_recharges` ou `mv_commission`. `read_only_tools` não muda.
+
 **Acurácia (métrica do PRD)** = % de casos em que **todos** os scorers aplicáveis à categoria deram pass.
 
 ## 5. Gate de PR
@@ -76,11 +78,12 @@ Medir se o agente (SPEC-005) **acerta, cita a fonte e recusa o que deve recusar*
 
 ## 6. Produção
 - **Preferencial:** production monitoring do MLflow 3 (Beta) no experiment do agente. Scorers de código em **100%** dos traces e LLM judges em **20%** de amostra. O S0.3 validou o scorer de código agendado (`start()` anexou feedback aos traces); o LLM judge em amostra **não foi testado**. O `evaluate` sobre traces já avaliados gera assessments duplicadas com o mesmo nome; o painel deve deduplicar.
-- **Plano B (validado no S0.3, mas não é o caminho preferencial):** job diário `atlas_agent_monitoring` às 07:00 que lê os traces das últimas 24h via `mlflow.search_traces`, roda os mesmos scorers com a mesma amostragem e grava em `atlas.observability.agent_quality_daily`.
-- **Painel:** página "Qualidade do agente" no AI/BI Dashboard com o % de pass por scorer por dia, a média móvel de 7 dias, a latência p95 e o volume.
+- **Plano B (validado no S0.3, mas não é o caminho preferencial):** o mesmo trabalho num job diário, com `mlflow.search_traces` e os mesmos scorers.
+- **Tabelas (P10.8):** o job diário `atlas_agent_monitoring` (07:00) roda nos dois caminhos, porque o painel e a fila precisam de tabelas. Ele lê os traces recentes do experiment `/Shared/atlas/agent-traces`, calcula os scorers de código em 100% e grava, de forma idempotente (um trace já pontuado não é pontuado de novo): `atlas.observability.agent_quality_traces` (um trace por linha, com latência e status), `atlas.observability.agent_quality_scores` (um trace e um scorer por linha) e as views `agent_quality_daily` (% de pass por scorer por dia e média de 7 dias) e `agent_traffic_daily` (volume e latência p95). Com o production monitoring ligado, o job reaproveita a assessment do scorer (deduplicada por nome) em vez de recalcular; sem ela, calcula. Os LLM judges rodam em **20%** dos traces, escolhidos pelo hash do `trace_id` (a mesma amostra em toda execução), com o modelo `ATLAS_JUDGE_MODEL`, que **não** é o `agent_llm` (o judge não consome o rate limit nem o teto de tokens do agente).
+- **Painel:** AI/BI Dashboard "Atlas — Qualidade do agente" com o % de pass por scorer por dia, a média móvel de 7 dias, a latência p95 e o volume. É um dashboard próprio, e não uma página do "Visão Comercial": este lê só `atlas.semantic` e aquele lê `atlas.observability` (como o relatório de comissão, ADR-0018).
 - **MCP:** fica fora deste painel. Ele tem a página própria "Uso do MCP" (SPEC-006 §6), só com métricas operacionais. Os scorers de resposta não se aplicam, porque o MCP não gera texto; a qualidade dele é medida pela paridade com o golden set (SPEC-006 §7).
-- **Alerta:** média de 7 dias de `cites_metric_view` ou `read_only_tools` abaixo de 90% → SQL alert por e-mail para o dono.
-- **Ciclo de melhoria:** um trace que falhou um scorer entra na fila `atlas.eval.review_queue`. Uma pessoa revisa e, se for um caso novo, adiciona a `golden_set.yaml` por PR. O golden set cresce com falhas reais.
+- **Alerta:** média de 7 dias de `cites_metric_view` ou `read_only_tools` abaixo de 90% → SQL alert por e-mail para o dono (quem faz o deploy do bundle).
+- **Ciclo de melhoria:** um trace que falhou um scorer entra na fila `atlas.eval.review_queue` (`trace_id`, `scorer`, pergunta, trecho da resposta, justificativa, `status` = `open`; o job só insere, quem revisa muda o `status`). Uma pessoa revisa e, se for um caso novo, adiciona a `golden_set.yaml` por PR. O golden set cresce com falhas reais.
 
 ## 7. Critérios de aceite
 - **Dado** o agente da `main`, **quando** rodo a avaliação offline, **então** recebo a acurácia por categoria e o link do run do MLflow.
