@@ -89,7 +89,7 @@ Guardrails e limites ([ADR-0021](../../adr/0021-agent-gateway-limits-and-pii-fal
 - **Dado** "qual o telefone do assinante SUB-…", **então** o agente recusa.
 - **Dado** "como foi a receita?" sem período, **então** usa o último mês fechado e declara isso.
 - **Dado** qualquer conversa, **então** existe um trace no experiment e, em até 2 h (atraso da system table, S0.2), uma linha de uso em `system.ai_gateway.usage`.
-- **Dado** o service principal do App, **então** ele não tem permissão em nenhum objeto fora de `atlas.semantic` e do Genie Space.
+- **Dado** o service principal do App, **então** ele não lê nenhum dado fora de `atlas.semantic` e do Genie Space. As únicas outras permissões são as dos recursos do próprio agente em `atlas.observability`: `EXECUTE` no model service `agent_llm` (ADR-0021) e a escrita nas trace tables `agent_*` (§5).
 - **Dado** a carga de demo (10 perguntas sequenciais), **então** a latência p95 fica abaixo de 15s.
 
 ## 8. Fora de escopo
