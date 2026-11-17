@@ -185,3 +185,21 @@ def test_cites_ignores_catalog_tool_and_similar_view_names() -> None:
     assert scorers.check_cites_metric_view("1" + FONTE, similar, exp).passed is False
     data = FakeTrace([FakeSpan("fn_metric_by_region", None, {"source": "semantic.mv_recharges"})])
     assert scorers.check_cites_metric_view("1" + FONTE, data, exp).passed is True
+
+
+def test_data_functions_count_as_consulting_mv_recharges_only() -> None:
+    """O CSV de `fn_*` não cita a view, mas a função só lê `mv_recharges` (SPEC-005 §3)."""
+    csv = {"format": "CSV", "value": "level,key,label,value\nregion,SE,SE,2144780.000000\n"}
+    for tool in (
+        "fn_metric_by_region",
+        "fn_compare_months",
+        "atlas_dev.semantic.fn_compare_months",
+    ):
+        trace = FakeTrace([FakeSpan(tool, {"measure": "gross_revenue"}, csv)])
+        recharges = {"category": "metric", "expected_source_view": "mv_recharges"}
+        assert scorers.check_cites_metric_view("1" + FONTE, trace, recharges).passed is True
+        commission = {"category": "comparison", "expected_source_view": "mv_commission"}
+        assert scorers.check_cites_metric_view("1" + FONTE, trace, commission).passed is False
+    catalog = FakeTrace([FakeSpan("fn_list_metrics", {}, csv)])
+    exp = {"category": "metric", "expected_source_view": "mv_recharges"}
+    assert scorers.check_cites_metric_view("1" + FONTE, catalog, exp).passed is False

@@ -111,14 +111,23 @@ def tool_names(trace: Any) -> list[str]:
 
 # Tools que só descrevem o catálogo: citar a view no retorno delas não é consultar a view.
 _CATALOG_ONLY_TOOLS = frozenset({"fn_list_metrics"})
+# As UC functions de dados leem só `mv_recharges` (SPEC-005 §3), mas o retorno delas (CSV de
+# `level,key,label,value`) não traz o nome da view: a consulta vale pelo contrato da função.
+_TOOL_VIEWS = {
+    "fn_metric_by_region": frozenset({"mv_recharges"}),
+    "fn_compare_months": frozenset({"mv_recharges"}),
+}
 
 
 def _consulted_view(trace: Any, view: str) -> bool:
     """Alguma tool de dados citou `view` como identificador inteiro (não `mv_x_daily`)."""
     pattern = re.compile(rf"(?<![a-z0-9_]){re.escape(view.lower())}(?![a-z0-9_])")
     for span in trace.search_spans(span_type="TOOL"):
-        if normalize_tool_name(span.name) in _CATALOG_ONLY_TOOLS:
+        name = normalize_tool_name(span.name)
+        if name in _CATALOG_ONLY_TOOLS:
             continue
+        if view.lower() in _TOOL_VIEWS.get(name, frozenset()):
+            return True
         payload = json.dumps(
             {"i": span.inputs, "o": span.outputs}, ensure_ascii=False, default=str
         ).lower()

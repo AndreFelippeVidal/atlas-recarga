@@ -61,18 +61,29 @@ JSON (no corpo dá 400). Os spans do App se chamam `ask_genie` e `fn_*`.
 
 ## Prompt (P10.4)
 
-O system prompt é `prompts/v1.md` (SPEC-005 §4): lista fechada de tools e seus argumentos, `Fonte:`,
-recusa sem tool, último mês fechado e PT-BR. A versão vai na tag `prompt_version` do trace e nas
-`request_tags`. **Mudou o texto, crie `v2.md`**: o arquivo publicado não se edita, e o gate da
-SPEC-008 filtra por `prompts/**`.
+O system prompt é `prompts/v1.md` (SPEC-005 §3 e §4): lista fechada de tools e seus argumentos,
+`Fonte:`, recusa sem tool, último mês fechado, total da rede pelo `ask_genie` (nunca somando
+regiões) e PT-BR. A versão vai na tag `prompt_version` do trace e nas `request_tags`.
 
-Conferência (mantenedor), a partir de `apps/agent`, com o ambiente do App:
+**Um prompt publicado não se edita.** `prompts/MANIFEST.json` guarda o sha256 de cada versão e o
+teste `test_every_prompt_is_in_the_manifest_with_the_published_hash` falha se `v1.md` mudar. Para
+mudar o texto: crie `v2.md`, acrescente a linha no manifesto (`sha256` do texto sem espaços nas
+pontas) e ponha `ATLAS_PROMPT_VERSION=v2`. O gate da SPEC-008 filtra por `prompts/**`.
+
+Conferência (mantenedor), a partir da raiz, com o ambiente do App:
 
 ```bash
 uv run --project apps/agent python scripts/check_agent_refusals.py --profile andrevidal \
   --catalog atlas_dev --warehouse-id <id> --genie-space-id <id>
 ```
 
-Roda GS-026 a GS-030 (nenhuma tool chamada, pelo scorer da P9.3), uma métrica (bloco `Fonte:`) e
-uma pergunta sem período (declara o mês assumido). Imprime as respostas para você julgar a recusa.
-O 429 do endpoint é tentado de novo, e a resposta de um LLM varia: rode duas ou três vezes.
+13 checagens, todas imprimem a resposta: as 5 recusas do golden set (GS-026 a GS-030), 5 sondas de
+recusa mais difíceis (X-01 a X-05), uma métrica com mês (`Fonte:` cita `mv_recharges`, sem fingir
+que assumiu o período), uma pergunta sem período (declara o mês assumido, vindo de tool) e o
+ticket médio da rede (vem do `ask_genie` e bate com a metric view, pelo `numeric_match` da P9.3).
+O 429 do endpoint é tentado de novo.
+
+**Limite conhecido:** a regra do período ausente é obedecida em cerca de 60 a 75% das execuções
+(medido em 9 execuções; reposicionar a regra no prompt não melhorou). As demais checagens
+passaram em todas. O golden set não tem caso sem período, então o gate de 90% não o pega: ver o
+follow-up no PR.

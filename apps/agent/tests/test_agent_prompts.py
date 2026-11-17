@@ -2,7 +2,13 @@ from pathlib import Path
 
 import pytest
 from agent_server.config import load_config
-from agent_server.prompts import PROMPTS_DIR, PromptError, load_prompt
+from agent_server.prompts import (
+    PROMPTS_DIR,
+    PromptError,
+    load_prompt,
+    prompt_sha256,
+    published_hashes,
+)
 
 
 def test_default_prompt_version_has_a_file() -> None:
@@ -44,3 +50,14 @@ def test_v1_encodes_the_spec_rules() -> None:
 
 def test_v1_does_not_hardcode_a_month_as_today() -> None:
     assert "Nunca use o mês da data de hoje" in load_prompt("v1")
+
+
+def test_every_prompt_is_in_the_manifest_with_the_published_hash() -> None:
+    """Imutabilidade: editar `v1.md` sem criar `v2.md` falha aqui."""
+    files = {p.stem for p in PROMPTS_DIR.glob("*.md")}
+    manifest = published_hashes()
+    assert files == set(manifest), "cada prompts/<versão>.md precisa de uma linha no MANIFEST.json"
+    for version, expected in manifest.items():
+        assert prompt_sha256(load_prompt(version)) == expected, (
+            f"{version}.md mudou depois de publicado; crie uma versão nova"
+        )
