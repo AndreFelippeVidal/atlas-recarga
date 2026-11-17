@@ -30,3 +30,6 @@ A P5.1 exige `databricks bundle validate -t dev` no CI, e o comando precisa aute
 - **Positivas:** o CI valida o bundle de verdade; revogar o token é suficiente em caso de vazamento.
 - **Negativas aceitas:** o token pessoal tem poderes amplos. Nunca usar `pull_request_target` nem imprimir o token. Renovar o token a cada 90 dias (lembrete do mantenedor).
 - **Gatilho para revisitar:** disponibilidade de service principal na Free Edition, ou um segundo mantenedor.
+
+## Atualização (2026-11-17, P10.7)
+O Environment `ci-databricks` também autentica o gate do agente (`agent-eval.yml`, chamado pelo job `agent-eval` do `ci.yml`, SPEC-008 §5), que roda a avaliação offline no `dev` com o mesmo PAT. O job que roda código do PR mantém `contents: read`. O comentário no PR sai num job separado, **sem** secrets do Databricks, com `pull-requests: write` (o resumo vai por artifact). Mesmas regras: só `pull_request` e `push`, nunca `pull_request_target`; fork e Dependabot pulam o job. O Environment também guarda as variáveis `ATLAS_WAREHOUSE_ID` e `ATLAS_GENIE_SPACE_ID`.

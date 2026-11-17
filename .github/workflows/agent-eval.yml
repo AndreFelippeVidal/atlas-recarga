@@ -1,0 +1,84 @@
+# Gate de PR do agente — SPEC-008 §5. Roda só quando o agente, o golden set ou a camada
+# semântica mudam (nunca em PR só de docs). Auth: ADR-0015 (Environment `ci-databricks`).
+# O push na `main` registra a linha de base (tag `branch=main`) para a regra de queda de 5 pontos.
+name: agent-eval
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/agent/**'
+      - 'eval/**'
+      - 'semantic/**'
+      - '.github/workflows/agent-eval.yml'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/agent/**'
+      - 'eval/**'
+      - 'semantic/**'
+      - '.github/workflows/agent-eval.yml'
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    # Fork e Dependabot não recebem secrets de Environment: o job é pulado, não falha.
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ci-databricks
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Avaliação offline do agente
+        id: evaluate
+        # 1 rodada (~31 chamadas ao agente, rate limit de 30 req/min do gateway).
+        run: |
+          uv run --project apps/agent --locked python eval/run_offline_eval.py \
+            --catalog atlas_dev \
+            --warehouse-id "$DATABRICKS_WAREHOUSE_ID" \
+            --genie-space-id "$ATLAS_GENIE_SPACE_ID" \
+            --repeats 1 \
+            --branch "$BRANCH" \
+            --json-out "$RUNNER_TEMP/report.json"
+        continue-on-error: true
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_WAREHOUSE_ID: ${{ vars.ATLAS_WAREHOUSE_ID }}
+          ATLAS_GENIE_SPACE_ID: ${{ vars.ATLAS_GENIE_SPACE_ID }}
+          BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+      - name: Decidir o gate e montar o comentário
+        id: gate
+        # Sem relatório = a avaliação quebrou antes de terminar: o gate falha.
+        run: |
+          if [ ! -f "$RUNNER_TEMP/report.json" ]; then
+            printf '%s\n### Gate do agente: ❌ falhou\n\nA avaliação não gerou resultado (veja o log do job).\n' \
+              '<!-- atlas-agent-eval-gate -->' > "$RUNNER_TEMP/comment.md"
+            echo "::error::a avaliação offline não gerou relatório"
+            exit 1
+          fi
+          python3 eval/gate.py --report "$RUNNER_TEMP/report.json" --comment-out "$RUNNER_TEMP/comment.md"
+      - name: Comentar no PR
+        if: always() && github.event_name == 'pull_request' && hashFiles(format('{0}/comment.md', runner.temp)) != ''
+        run: gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body-file "$RUNNER_TEMP/comment.md"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}

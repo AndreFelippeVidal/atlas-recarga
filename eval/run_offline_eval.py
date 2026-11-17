@@ -28,6 +28,7 @@ import argparse
 import asyncio
 import importlib
 import importlib.util
+import json
 import os
 import re
 import sys
@@ -307,27 +308,76 @@ def run_once(
         return summary, run.info.run_id
 
 
+def build_report(
+    summaries: Sequence[Summary], run_urls: Sequence[str], tags: Mapping[str, str]
+) -> dict[str, Any]:
+    """Resumo em JSON para o gate de CI (`eval/gate.py`, P10.7).
+
+    A acurácia é a **pior** das rodadas (conservador); as falhas são a união das rodadas.
+    """
+    worst = min(summaries, key=lambda s: s.accuracy)
+    failures: dict[str, dict[str, Any]] = {}
+    for summary in summaries:
+        for case in summary.failures:
+            entry = failures.setdefault(
+                case.case_id,
+                {"id": case.case_id, "category": case.category, "scorers": set(), "runs": 0},
+            )
+            entry["scorers"].update(case.failed_scorers())
+            entry["runs"] += 1
+    return {
+        "accuracy": worst.accuracy,
+        "by_category": worst.by_category,
+        "total": worst.total,
+        "repeats": len(summaries),
+        "failures": [
+            {**f, "scorers": sorted(f["scorers"])}
+            for f in sorted(failures.values(), key=lambda f: f["id"])
+        ],
+        "run_urls": list(run_urls),
+        "tags": dict(tags),
+    }
+
+
+def latest_baseline_accuracy(experiment: str, branch: str) -> float | None:
+    """Acurácia do run mais recente do `branch` (tag `branch`) no experiment, se houver."""
+    import mlflow
+
+    runs = mlflow.search_runs(
+        experiment_names=[experiment],
+        filter_string=f"tags.branch = '{branch}' and metrics.accuracy >= 0",
+        order_by=["attributes.start_time DESC"],
+        max_results=1,
+    )
+    return float(runs.iloc[0]["metrics.accuracy"]) if len(runs) else None
+
+
 def run_url(host: str, experiment_id: str, run_id: str) -> str:
     return f"{host.rstrip('/')}/ml/experiments/{experiment_id}/runs/{run_id}"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("--profile", required=True, help="perfil da CLI do Databricks (explícito)")
+    parser.add_argument(
+        "--profile", help="perfil da CLI do Databricks; sem ele usa DATABRICKS_HOST/TOKEN (CI)"
+    )
     parser.add_argument("--catalog", required=True, help="catálogo do target (atlas_dev ou atlas)")
     parser.add_argument("--warehouse-id", required=True)
     parser.add_argument("--genie-space-id", required=True)
     parser.add_argument("--prompt-version", help="versão do prompt (padrão: a do código)")
     parser.add_argument("--repeats", type=int, default=3, help="rodadas (o LLM varia); padrão 3")
     parser.add_argument("--experiment", default=EXPERIMENT)
+    parser.add_argument("--branch", help="tag `branch` dos runs (o gate de CI compara com a main)")
+    parser.add_argument("--json-out", type=Path, help="grava o resumo JSON para o gate de CI")
     parser.add_argument("--only", help="ids separados por vírgula (ex.: GS-031), para depurar")
     args = parser.parse_args(argv)
     if args.repeats < 1:
         parser.error("--repeats deve ser ≥ 1")
 
     # O agente lê ATLAS_* e o perfil na importação; defina antes.
+    if args.profile:
+        os.environ["DATABRICKS_CONFIG_PROFILE"] = args.profile
     os.environ.update(
-        DATABRICKS_CONFIG_PROFILE=args.profile,
         ATLAS_CATALOG=args.catalog,
         DATABRICKS_WAREHOUSE_ID=args.warehouse_id,
         ATLAS_GENIE_SPACE_ID=args.genie_space_id,
@@ -360,16 +410,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     predict_fn = build_predict_fn()
     app = importlib.import_module("agent_server.agent")
     tags = {"prompt_version": app.CONFIG.prompt_version, "catalog": args.catalog}
+    if args.branch:
+        tags["branch"] = args.branch
     scorers = scorers_module.build_scorers()
+    baseline = latest_baseline_accuracy(args.experiment, "main") if args.json_out else None
 
     summaries: list[Summary] = []
+    urls: list[str] = []
     for i in range(1, args.repeats + 1):
         label = f"offline-{tags['prompt_version']}-{i}of{args.repeats}"
         print(f"\n--- rodada {i}/{args.repeats} ---")
         summary, run_id = run_once(records, predict_fn, scorers, label, {**tags, "repeat": str(i)})
         summaries.append(summary)
         print(format_summary(summary, label))
-        print(f"  run: {run_url(host, experiment_id, run_id)}")
+        urls.append(run_url(host, experiment_id, run_id))
+        print(f"  run: {urls[-1]}")
 
     accuracies = [s.accuracy for s in summaries]
     print(
@@ -377,6 +432,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"mín {min(accuracies):.1%} · média {sum(accuracies) / len(accuracies):.1%} "
         f"· máx {max(accuracies):.1%} (meta ≥ {TARGET_ACCURACY:.0%}, sem falha em refusal)"
     )
+    if args.json_out:
+        report = build_report(summaries, urls, tags)
+        report["baseline_accuracy"] = baseline
+        args.json_out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     # Os traces são enviados em segundo plano; espere antes de sair.
     mlflow.flush_trace_async_logging()
     return 0 if all(s.meets_target for s in summaries) else 1
