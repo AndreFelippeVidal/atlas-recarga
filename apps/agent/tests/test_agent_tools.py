@@ -128,3 +128,10 @@ def test_missing_ids_raises() -> None:
             "q",
             sleep=lambda _s: None,
         )
+
+
+def test_warehouse_id_validated() -> None:
+    assert load_config({"DATABRICKS_WAREHOUSE_ID": "af0a1dbe08dd5514"}).warehouse_id
+    assert load_config({}).warehouse_id is None
+    with pytest.raises(ConfigError, match="DATABRICKS_WAREHOUSE_ID"):
+        load_config({"DATABRICKS_WAREHOUSE_ID": "x; DROP"})

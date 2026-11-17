@@ -123,9 +123,13 @@ def build_uc_tools(config: AgentConfig, workspace_client: Any) -> list[Any]:
     """As 3 UC functions, só da lista fechada, com o nome curto que o scorer espera."""
     from databricks_langchain import DatabricksFunctionClient, UCFunctionToolkit
 
+    if config.warehouse_id is None:
+        raise RuntimeError("DATABRICKS_WAREHOUSE_ID não definido (recurso sql-warehouse do App)")
+    # As funções são SQL: rodam pelo warehouse (Statement Execution API). O modo serverless
+    # padrão exigiria o databricks-connect, que o App não instala.
     toolkit = UCFunctionToolkit(
         function_names=config.uc_function_names(),
-        client=DatabricksFunctionClient(client=workspace_client),
+        client=DatabricksFunctionClient(client=workspace_client, warehouse_id=config.warehouse_id),
     )
     tools = list(toolkit.tools)
     for t in tools:

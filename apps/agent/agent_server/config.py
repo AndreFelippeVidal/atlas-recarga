@@ -18,6 +18,7 @@ SUPPORTED_GATEWAY_MODES = ("unity",)  # "classic" (plano B do ADR-0007) não foi
 UC_FUNCTIONS = ("fn_list_metrics", "fn_metric_by_region", "fn_compare_months")
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")
 _SPACE_ID = re.compile(r"^[0-9a-f]{32}$")
+_WAREHOUSE_ID = re.compile(r"^[0-9a-f]{8,32}$")
 
 # catalog.schema.service: o nome curto cai no endpoint legado e dá 403 (S0.1).
 _THREE_PART_NAME = re.compile(r"^[A-Za-z0-9_]+\.[A-Za-z0-9_]+\.[A-Za-z0-9_.-]+$")
@@ -36,6 +37,7 @@ class AgentConfig:
     send_request_tags: bool
     catalog: str
     genie_space_id: str | None
+    warehouse_id: str | None
 
     def trace_tags(self, user: str | None) -> dict[str, str]:
         """Tags de cada trace (SPEC-005 §5)."""
@@ -75,6 +77,9 @@ def load_config(env: Mapping[str, str] | None = None) -> AgentConfig:
     space_id = e.get("ATLAS_GENIE_SPACE_ID", "").strip() or None
     if space_id is not None and not _SPACE_ID.match(space_id):
         raise ConfigError("ATLAS_GENIE_SPACE_ID deve ter 32 caracteres hexadecimais.")
+    warehouse_id = e.get("DATABRICKS_WAREHOUSE_ID", "").strip() or None
+    if warehouse_id is not None and not _WAREHOUSE_ID.match(warehouse_id):
+        raise ConfigError("DATABRICKS_WAREHOUSE_ID deve ser um id hexadecimal de warehouse.")
     return AgentConfig(
         gateway_mode=mode,
         llm_service=service,
@@ -83,4 +88,5 @@ def load_config(env: Mapping[str, str] | None = None) -> AgentConfig:
         send_request_tags=e.get("ATLAS_LLM_REQUEST_TAGS", "0").strip() in ("1", "true"),
         catalog=catalog,
         genie_space_id=space_id,
+        warehouse_id=warehouse_id,
     )
