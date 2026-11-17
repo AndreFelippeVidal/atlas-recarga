@@ -20,6 +20,7 @@ run = importlib.util.module_from_spec(_spec)
 sys.modules["run_offline_eval"] = run
 _spec.loader.exec_module(run)
 
+NAMES = ["numeric_match", "declares_assumed_month", "read_only_tools"]
 OK = {"numeric_match": True, "cites_metric_view": True, "read_only_tools": True}
 
 
@@ -84,18 +85,22 @@ def test_scores_from_result_df_rows() -> None:
             "declares_assumed_month/rationale": "o começo da resposta cita nenhum",
             "numeric_match/value": "n/a",
             "read_only_tools/value": True,
-            "outputs": "ignorado",
+            "id/value": "GS-999",  # coluna de expectation, não é scorer
+            "outputs": "Resposta sem declarar o mês",
         }
     ]
-    (scored,) = run.scores_from_result_df(rows)
+    (scored,) = run.scores_from_result_df(rows, NAMES)
     assert (scored.case_id, scored.category) == ("GS-031", "no_period")
     assert scored.scores["numeric_match"] == "n/a"
+    assert "id" not in scored.scores and "id/value" not in scored.scores
+    assert scored.answer == "Resposta sem declarar o mês"
     assert scored.passed is False
     assert scored.failed_scorers() == ["declares_assumed_month"]
     assert "cita nenhum" in scored.rationales["declares_assumed_month"]
     text = run.format_summary(run.summarize([scored]), "run-1")
     assert "acurácia 0.0%" in text
     assert "FALHA GS-031 (no_period) declares_assumed_month: o começo" in text
+    assert "resposta: 'Resposta sem declarar o mês'" in text
 
 
 def test_expected_values_are_recomputed_from_the_sql() -> None:
@@ -173,3 +178,28 @@ def test_ask_does_not_hide_other_errors() -> None:
 
     with pytest.raises(RuntimeError, match="boom"):
         asyncio.run(run.ask(Agent(), "oi", wait=0))
+
+
+def test_ask_gives_up_on_a_hung_case_instead_of_blocking_the_run() -> None:
+    import asyncio
+
+    class Agent:
+        async def ainvoke(self, _payload: dict[str, Any]) -> dict[str, Any]:
+            await asyncio.sleep(5)
+            return {}
+
+    answer = asyncio.run(run.ask(Agent(), "oi", timeout=0.05))
+    assert answer.startswith("[timeout")
+
+
+def test_a_case_missing_from_the_result_counts_as_a_failure() -> None:
+    records = [
+        {"expectations": {"id": "GS-001", "category": "metric"}},
+        {"expectations": {"id": "GS-002", "category": "metric"}},
+    ]
+    cases = run.with_missing_as_failures([case("GS-001", "metric")], records)
+    summary = run.summarize(cases)
+    assert summary.total == 2
+    assert summary.accuracy == 0.5
+    assert [f.case_id for f in summary.failures] == ["GS-002"]
+    assert "não voltou" in run.format_summary(summary, "x")

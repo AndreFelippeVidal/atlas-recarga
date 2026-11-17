@@ -154,8 +154,15 @@ def is_not_found(error: Exception) -> bool:
     )
 
 
+def rows_of(frame: Any) -> list[dict[str, Any]]:
+    """Linhas do dataset; um dataset recém-criado (vazio) não tem as colunas."""
+    if not {"inputs", "expectations"} <= set(frame.columns):
+        return []
+    return list(frame[["inputs", "expectations"]].to_dict("records"))
+
+
 def _rows(dataset: Any) -> list[dict[str, Any]]:
-    return list(dataset.to_df()[["inputs", "expectations"]].to_dict("records"))
+    return rows_of(dataset.to_df())
 
 
 def main(argv: list[str]) -> None:

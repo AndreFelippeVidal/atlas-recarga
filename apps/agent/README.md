@@ -30,7 +30,7 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
 | `ATLAS_LLM_REQUEST_TAGS` | `0` | `1` envia `request_tags` ao gateway, no cabeçalho `Databricks-Ai-Gateway-Request-Tags` |
 | `ATLAS_CATALOG` | `atlas` | Catálogo das UC functions (`atlas_dev` no `dev`; o bundle injeta) |
 | `ATLAS_GENIE_SPACE_ID` | (recurso `genie-space`) | Space do `ask_genie`; o App recebe `CAN_RUN` |
-| `ATLAS_APP_VERSION`, `ATLAS_PROMPT_VERSION` | `dev`, `v1` | Tags do trace; `ATLAS_PROMPT_VERSION` escolhe o arquivo `prompts/<versão>.md` |
+| `ATLAS_APP_VERSION`, `ATLAS_PROMPT_VERSION` | `dev`, `v2` | Tags do trace; `ATLAS_PROMPT_VERSION` escolhe o arquivo `prompts/<versão>.md` |
 
 ## Deploy e conferência (mantenedor)
 

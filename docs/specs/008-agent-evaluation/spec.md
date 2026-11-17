@@ -43,7 +43,7 @@ Medir se o agente (SPEC-005) **acerta, cita a fonte e recusa o que deve recusar*
       GROUP BY recharge_month ORDER BY recharge_month DESC LIMIT 1
     )
   reference_month_sql: |            # esse mês (1 data), para o scorer conferir a declaração
-    SELECT CAST(recharge_month AS STRING) AS value FROM (
+    SELECT CAST(CAST(recharge_month AS DATE) AS STRING) AS value FROM (
       SELECT recharge_month, MEASURE(gross_revenue) AS v
       FROM atlas.semantic.mv_recharges
       GROUP BY recharge_month ORDER BY recharge_month DESC LIMIT 1

@@ -32,7 +32,7 @@ import os
 import re
 import sys
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -79,6 +79,7 @@ class CaseScore:
     category: str
     scores: Mapping[str, Any]
     rationales: Mapping[str, str] = field(default_factory=dict)
+    answer: str = ""
 
     @property
     def passed(self) -> bool:
@@ -122,26 +123,51 @@ def summarize(cases: Sequence[CaseScore]) -> Summary:
     )
 
 
-def scores_from_result_df(rows: Iterable[Mapping[str, Any]]) -> list[CaseScore]:
-    """Linhas de `EvaluationResult.result_df`: colunas `<scorer>/value` e `<scorer>/rationale`."""
+def scores_from_result_df(
+    rows: Iterable[Mapping[str, Any]], scorer_names: Collection[str]
+) -> list[CaseScore]:
+    """Linhas de `EvaluationResult.result_df`: colunas `<scorer>/value` e `<scorer>/rationale`.
+
+    O `result_df` também traz as expectations como colunas `<campo>/value`: só os nomes de
+    `scorer_names` contam como scorer. O id e a categoria vêm de `expectations` (ou dessas colunas).
+    """
     cases: list[CaseScore] = []
     for row in rows:
         expectations = row.get("expectations") or {}
-        scores = {k[: -len("/value")]: v for k, v in row.items() if str(k).endswith("/value")}
+        scores = {n: row[f"{n}/value"] for n in scorer_names if f"{n}/value" in row}
         rationales = {
-            k[: -len("/rationale")]: str(v)
-            for k, v in row.items()
-            if str(k).endswith("/rationale") and v is not None
+            n: str(row[f"{n}/rationale"])
+            for n in scorer_names
+            if row.get(f"{n}/rationale") is not None
         }
         cases.append(
             CaseScore(
-                case_id=str(expectations.get("id", "?")),
-                category=str(expectations.get("category", "?")),
+                case_id=str(expectations.get("id") or row.get("id/value") or "?"),
+                category=str(expectations.get("category") or row.get("category/value") or "?"),
                 scores=scores,
                 rationales=rationales,
+                answer=str(row.get("outputs") or ""),
             )
         )
     return cases
+
+
+def with_missing_as_failures(
+    cases: list[CaseScore], records: Sequence[Mapping[str, Any]]
+) -> list[CaseScore]:
+    """Caso que foi para a avaliação e não voltou no resultado conta como falha, não some."""
+    seen = {c.case_id for c in cases}
+    missing = [
+        CaseScore(
+            str(r["expectations"]["id"]),
+            str(r["expectations"]["category"]),
+            {"avaliado": False},
+            {"avaliado": "o caso não voltou no resultado do MLflow"},
+        )
+        for r in records
+        if r["expectations"]["id"] not in seen
+    ]
+    return [*cases, *missing]
 
 
 def format_summary(summary: Summary, label: str) -> str:
@@ -153,6 +179,8 @@ def format_summary(summary: Summary, label: str) -> str:
     for case in summary.failures:
         why = "; ".join(f"{s}: {case.rationales.get(s, '-')}" for s in case.failed_scorers())
         lines.append(f"  FALHA {case.case_id} ({case.category}) {why}")
+        if case.answer:
+            lines.append(f"    resposta: {case.answer[:300]!r}")
     return "\n".join(lines)
 
 
@@ -215,11 +243,25 @@ def is_rate_limited(error: Exception) -> bool:
     return "429" in str(error) or "REQUEST_LIMIT_EXCEEDED" in str(error)
 
 
-async def ask(agent: Any, question: str, *, retries: int = 4, wait: float = 20.0) -> str:
+CASE_TIMEOUT_S = 240.0  # um caso pendurado (rede, Genie) não pode travar a rodada inteira
+
+
+async def ask(
+    agent: Any,
+    question: str,
+    *,
+    retries: int = 4,
+    wait: float = 20.0,
+    timeout: float = CASE_TIMEOUT_S,
+) -> str:
     for attempt in range(retries + 1):
         try:
-            out = await agent.ainvoke({"messages": [{"role": "user", "content": question}]})
+            out = await asyncio.wait_for(
+                agent.ainvoke({"messages": [{"role": "user", "content": question}]}), timeout
+            )
             return str(out["messages"][-1].content)
+        except TimeoutError:
+            return f"[timeout: o agente não respondeu em {timeout:.0f}s]"
         except Exception as error:
             if not is_rate_limited(error) or attempt == retries:
                 raise
@@ -255,7 +297,9 @@ def run_once(
     with mlflow.start_run(run_name=label) as run:
         mlflow.set_tags(tags)
         result = mlflow.genai.evaluate(data=list(records), predict_fn=predict_fn, scorers=scorers)
-        summary = summarize(scores_from_result_df(result.result_df.to_dict("records")))
+        names = [s.name for s in scorers]
+        scored = scores_from_result_df(result.result_df.to_dict("records"), names)
+        summary = summarize(with_missing_as_failures(scored, records))
         mlflow.log_metric("accuracy", summary.accuracy)
         for category, value in summary.by_category.items():
             mlflow.log_metric(f"accuracy_{category}", value)

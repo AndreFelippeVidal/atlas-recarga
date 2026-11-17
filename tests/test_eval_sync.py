@@ -211,3 +211,20 @@ def test_no_period_needs_the_month_sql() -> None:
     broken = {k: v for k, v in case.items() if k != "reference_month_sql"}
     with pytest.raises(ValueError, match="reference_month_sql"):
         sync.to_records([broken])
+
+
+def test_rows_of_an_empty_dataset_has_no_columns() -> None:
+    class Frame:
+        def __init__(self, columns: list[str], rows: list[dict[str, object]]) -> None:
+            self.columns = columns
+            self._rows = rows
+
+        def __getitem__(self, _keys: list[str]) -> Frame:
+            return self
+
+        def to_dict(self, _orient: str) -> list[dict[str, object]]:
+            return self._rows
+
+    assert sync.rows_of(Frame([], [])) == []
+    row: dict[str, object] = {"inputs": {"question": "q"}, "expectations": {"id": "A"}}
+    assert sync.rows_of(Frame(["inputs", "expectations", "x"], [row])) == [row]
