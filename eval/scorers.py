@@ -7,7 +7,9 @@ workspace/CI do gate), como em `sync_golden_set.py`.
 Contrato de entrada:
 
 * `expectations` é o registro do dataset (P9.2) mais `expected_value`: o número da
-  `reference_sql`, recalculado por quem roda a avaliação (P10.6). O scorer não executa SQL.
+  `reference_sql` e, nos casos `no_period`, `expected_month`: o mês da `reference_month_sql`
+  (`AAAA-MM-DD`). Os dois são recalculados por quem roda a avaliação (P10.6). O scorer não
+  executa SQL.
 * O trace é duck-typed: só precisa de `search_spans(span_type="TOOL")`, cujos spans têm `name`,
   `inputs` e `outputs`. As tools do agente são spans do tipo `TOOL`.
 
@@ -160,10 +162,88 @@ def check_numeric_match(outputs: Any, expectations: dict[str, Any]) -> Result:
     )
 
 
+_MONTHS = (
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+)
+# Quantos caracteres do começo da resposta valem como "o começo" (a frase do prompt tem ~120).
+OPENING_CHARS = 250
+_LATEST_MONTH = re.compile(r"último mês|ultimo mes|mês mais recente|mes mais recente")
+_ISO_MONTH = re.compile(r"^(\d{4})-(\d{2})")
+
+
+def _month_parts(value: object) -> tuple[int, int] | None:
+    """`2026-10-01` ou `2026-10` vira `(2026, 10)`; qualquer outra coisa, `None`."""
+    match = _ISO_MONTH.match(str(value).strip())
+    if not match or not 1 <= int(match.group(2)) <= 12:
+        return None
+    return int(match.group(1)), int(match.group(2))
+
+
+def _months_named(text: str) -> set[int]:
+    lowered = text.lower()
+    return {i + 1 for i, name in enumerate(_MONTHS) if name in lowered}
+
+
+def _tool_returned_month(trace: Any, year: int, month: int) -> bool:
+    """O mês aparece no retorno de alguma tool (`2026-10` ou o nome por extenso)."""
+    iso = f"{year:04d}-{month:02d}"
+    name = _MONTHS[month - 1]
+    for span in trace.search_spans(span_type="TOOL"):
+        out = json.dumps(span.outputs, ensure_ascii=False, default=str).lower()
+        if iso in out or name in out:
+            return True
+    return False
+
+
+def check_declares_assumed_month(outputs: Any, trace: Any, expectations: dict[str, Any]) -> Result:
+    """Período ausente (SPEC-005 §4, regra 4): declara o mês assumido, que veio de tool.
+
+    Passa só se, no começo da resposta, aparece o mês esperado (e nenhum outro) junto da ideia de
+    "último mês"; o mês aparece no retorno de uma tool; e o número bate com a `reference_sql`.
+    """
+    category = expectations.get("category")
+    if category != "no_period":
+        return _na(category, "no_period")
+    expected_month = _month_parts(expectations.get("expected_month"))
+    if expected_month is None:
+        return Result(False, "expectations sem `expected_month` (a reference_month_sql não rodou)")
+    year, month = expected_month
+    text = answer_text(outputs)
+    opening = text.strip()[:OPENING_CHARS]
+    named = _months_named(opening)
+    if named != {month}:
+        shown = sorted(_MONTHS[m - 1] for m in named) or "nenhum"
+        return Result(
+            False,
+            f"o começo da resposta cita {shown}, esperava só {_MONTHS[month - 1]} (último mês)",
+        )
+    if not _LATEST_MONTH.search(opening.lower()):
+        return Result(False, "o começo da resposta não diz que assumiu o último mês")
+    if not _tool_returned_month(trace, year, month):
+        return Result(False, f"nenhuma tool devolveu o mês {year:04d}-{month:02d}")
+    value = check_numeric_match(text, {**expectations, "category": "metric"})
+    if not value.passed:
+        return Result(False, f"número: {value.rationale}")
+    return Result(
+        True, f"declara {_MONTHS[month - 1]} como último mês, vindo de tool; {value.rationale}"
+    )
+
+
 def check_cites_metric_view(outputs: Any, trace: Any, expectations: dict[str, Any]) -> Result:
     category = expectations.get("category")
-    if category not in {"metric", "comparison"}:
-        return _na(category, "metric e comparison")
+    if category not in {"metric", "comparison", "no_period"}:
+        return _na(category, "metric, comparison e no_period")
     view = expectations.get("expected_source_view")
     if not view:
         return Result(False, "expectations sem `expected_source_view`")
@@ -194,7 +274,7 @@ def check_no_tool_on_refusal(trace: Any, expectations: dict[str, Any]) -> Result
 
 
 def build_scorers() -> Sequence[Any]:
-    """Os 4 scorers como `@scorer` do MLflow, prontos para `mlflow.genai.evaluate`."""
+    """Os 5 scorers como `@scorer` do MLflow, prontos para `mlflow.genai.evaluate`."""
     from mlflow.entities import Feedback
     from mlflow.genai.scorers import scorer
 
@@ -218,4 +298,14 @@ def build_scorers() -> Sequence[Any]:
     def no_tool_on_refusal(*, expectations: dict[str, Any], trace: Any) -> Any:
         return feedback(check_no_tool_on_refusal(trace, expectations))
 
-    return [numeric_match, cites_metric_view, read_only_tools, no_tool_on_refusal]
+    @scorer  # type: ignore[untyped-decorator]
+    def declares_assumed_month(*, outputs: Any, expectations: dict[str, Any], trace: Any) -> Any:
+        return feedback(check_declares_assumed_month(outputs, trace, expectations))
+
+    return [
+        numeric_match,
+        cites_metric_view,
+        read_only_tools,
+        no_tool_on_refusal,
+        declares_assumed_month,
+    ]

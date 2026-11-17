@@ -1,6 +1,7 @@
 """Confere `eval/golden_set.yaml` (SPEC-008 §3, task P9.1).
 
-Toda `reference_sql` deve executar e devolver 1 valor.
+Toda `reference_sql` deve executar e devolver 1 valor; a `reference_month_sql` (casos
+`no_period`) devolve 1 data `AAAA-MM-DD`.
 
 As views só existem no workspace, então o **mantenedor** roda este script no `dev`:
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess  # a CLI do Databricks é a única coisa que chamamos
 import sys
 from collections.abc import Sequence
@@ -50,6 +52,17 @@ def check_value(case_id: str, rows: Sequence[Sequence[str | None]]) -> str:
     if value is None:
         return f"FALHA {case_id}: valor nulo ou não numérico ({raw!r})"
     return f"ok    {case_id}: {value}"
+
+
+def check_month(case_id: str, rows: Sequence[Sequence[str | None]]) -> str:
+    """Como `check_value`, para a `reference_month_sql`: uma data `AAAA-MM-DD`."""
+    if len(rows) != 1 or len(rows[0]) != 1:
+        shape = f"{len(rows)} linha(s)" + (f" x {len(rows[0])} coluna(s)" if rows else "")
+        return f"FALHA {case_id}: mês: esperava 1 valor, veio {shape}"
+    raw = rows[0][0]
+    if raw is None or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        return f"FALHA {case_id}: mês: esperava uma data AAAA-MM-DD, veio {raw!r}"
+    return f"ok    {case_id}: mês {raw}"
 
 
 def _run(profile: str, warehouse_id: str, statement: str) -> list[list[str | None]]:
@@ -92,6 +105,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.profile, args.warehouse_id, for_catalog(case["reference_sql"], catalog)
             )
             lines.append(check_value(case["id"], rows))
+            if "reference_month_sql" in case:
+                month_rows = _run(
+                    args.profile,
+                    args.warehouse_id,
+                    for_catalog(case["reference_month_sql"], catalog),
+                )
+                lines.append(check_month(case["id"], month_rows))
         except RuntimeError as error:
             lines.append(f"FALHA {case['id']}: {error}")
     print("\n".join(lines))

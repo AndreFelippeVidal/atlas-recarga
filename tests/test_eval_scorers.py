@@ -161,13 +161,14 @@ def test_build_scorers_wraps_checks_with_mlflow(monkeypatch: pytest.MonkeyPatch)
     }.items():
         monkeypatch.setitem(sys.modules, name, mod)
 
-    numeric, cites, read_only, no_tool = scorers.build_scorers()
+    numeric, cites, read_only, no_tool, assumed = scorers.build_scorers()
     assert numeric(outputs="R$ 1.000,00", expectations=METRIC).value is True
     assert numeric(outputs="1", expectations={"category": "refusal"}).value == "n/a"
     exp = {"category": "metric", "expected_source_view": "mv_recharges"}
     assert cites(outputs="1" + FONTE, expectations=exp, trace=genie_trace()).value is True
     assert read_only(trace=FakeTrace([FakeSpan("run_sql")])).value is False
     assert no_tool(expectations={"category": "refusal"}, trace=FakeTrace()).value is True
+    assert assumed(outputs="1", expectations=METRIC, trace=FakeTrace()).value == "n/a"
 
 
 def test_tool_name_must_be_qualified_in_semantic() -> None:
@@ -203,3 +204,85 @@ def test_data_functions_count_as_consulting_mv_recharges_only() -> None:
     catalog = FakeTrace([FakeSpan("fn_list_metrics", {}, csv)])
     exp = {"category": "metric", "expected_source_view": "mv_recharges"}
     assert scorers.check_cites_metric_view("1" + FONTE, catalog, exp).passed is False
+
+
+NO_PERIOD = {
+    "category": "no_period",
+    "expected_value": 48880720.0,
+    "expected_month": "2026-10-01",
+    "expected_source_view": "mv_recharges",
+    "tolerance_pct": 0.5,
+}
+DECLARED = (
+    "Como você não informou o período, considerei **outubro de 2026**, o último mês fechado "
+    "(o mais recente com dados).\n\nA receita da rede foi R$ 48.880.720,00." + FONTE
+)
+MONTH_TRACE = FakeTrace([FakeSpan("ask_genie", {"q": "mês mais recente"}, {"mes": "2026-10-01"})])
+
+
+def test_declares_assumed_month_passes() -> None:
+    result = scorers.check_declares_assumed_month(DECLARED, MONTH_TRACE, NO_PERIOD)
+    assert result.passed is True
+
+
+def test_declares_assumed_month_is_na_outside_no_period() -> None:
+    assert scorers.check_declares_assumed_month(DECLARED, MONTH_TRACE, METRIC).passed is None
+
+
+@pytest.mark.parametrize(
+    ("answer", "trace", "expectations", "reason"),
+    [
+        # não declara nada: vai direto ao número
+        ("A receita da rede foi R$ 48.880.720,00." + FONTE, MONTH_TRACE, NO_PERIOD, "cita nenhum"),
+        # declara outro mês (o corrente, p.ex.)
+        (DECLARED.replace("outubro", "novembro"), MONTH_TRACE, NO_PERIOD, "novembro"),
+        # cita dois meses no começo
+        (DECLARED.replace("(o mais", "(não setembro; o mais"), MONTH_TRACE, NO_PERIOD, "setembro"),
+        # mês certo, mas sem dizer que é o último mês
+        (
+            DECLARED.replace("o último mês fechado (o mais recente com dados)", "o período"),
+            MONTH_TRACE,
+            NO_PERIOD,
+            "último mês",
+        ),
+        # o mês não veio de nenhuma tool
+        (
+            DECLARED,
+            FakeTrace([FakeSpan("ask_genie", None, {"mes": "2026-09-01"})]),
+            NO_PERIOD,
+            "nenhuma tool",
+        ),
+        (DECLARED, FakeTrace(), NO_PERIOD, "nenhuma tool"),
+        # número errado
+        (DECLARED.replace("48.880.720,00", "40.000.000,00"), MONTH_TRACE, NO_PERIOD, "número"),
+        # sem número
+        (DECLARED.split("\n\n")[0], MONTH_TRACE, NO_PERIOD, "número"),
+        # expectations sem o mês esperado
+        (DECLARED, MONTH_TRACE, {**NO_PERIOD, "expected_month": None}, "expected_month"),
+        (DECLARED, MONTH_TRACE, {**NO_PERIOD, "expected_month": "outubro"}, "expected_month"),
+    ],
+)
+def test_declares_assumed_month_fails(
+    answer: str, trace: FakeTrace, expectations: dict[str, Any], reason: str
+) -> None:
+    result = scorers.check_declares_assumed_month(answer, trace, expectations)
+    assert result.passed is False
+    assert reason in result.rationale
+
+
+def test_assumed_month_only_in_the_opening_counts() -> None:
+    late = "A receita foi R$ 48.880.720,00. " + "x" * 300 + DECLARED
+    result = scorers.check_declares_assumed_month(late, MONTH_TRACE, NO_PERIOD)
+    assert result.passed is False
+
+
+def test_month_may_come_back_from_a_tool_by_name_and_be_a_year_month() -> None:
+    trace = FakeTrace([FakeSpan("ask_genie", None, "o mês mais recente é Outubro de 2026")])
+    expectations = {**NO_PERIOD, "expected_month": "2026-10"}
+    assert scorers.check_declares_assumed_month(DECLARED, trace, expectations).passed is True
+
+
+def test_no_period_also_needs_the_source_block() -> None:
+    no_source = DECLARED.replace(FONTE, "")
+    assert scorers.check_cites_metric_view(no_source, genie_trace(), NO_PERIOD).passed is False
+    assert scorers.check_cites_metric_view(DECLARED, genie_trace(), NO_PERIOD).passed is True
