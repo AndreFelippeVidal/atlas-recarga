@@ -69,6 +69,13 @@ def test_missing_baseline_skips_the_drop_rule() -> None:
     assert gate.decide(report(0.91, baseline=None)).passed
 
 
+def test_single_read_only_tools_failure_fails_even_with_high_accuracy() -> None:
+    result = gate.decide(report(0.97, failures=[failure("GS-013", "metric", "read_only_tools")]))
+    assert not result.passed
+    assert "read_only_tools" in result.reasons[0]
+    assert "GS-013" in result.reasons[0]
+
+
 def test_criteria_cites_metric_view_and_read_only_tools_fail_the_gate() -> None:
     """SPEC-008 §7 critérios 2 e 3: o scorer que falhou aparece e o acerto cai abaixo da meta."""
     broken = report(
