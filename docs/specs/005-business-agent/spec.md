@@ -43,6 +43,8 @@ flowchart LR
 
 O `ask_genie` usa o **Genie Agent MCP** ([ADR-0020](../../adr/0020-genie-agent-mcp-for-ask-genie.md)), restrito ao Space `Atlas Recarga`, e não o Genie One MCP (`system.ai.genie_one_mcp`): este responde sobre o workspace inteiro e fugiria da lista fechada. A troca tem um custo aceito: o Genie Agent MCP **não passa pelo Unity Gateway** (a documentação do Databricks o diz), então a chamada não aparece como `MCP_SERVICE` na `usage`; a observabilidade dessa tool vem do span no trace MLflow e a governança, do `CAN RUN` no Space e dos grants em `semantic`. O endpoint é Public Preview; na Free Edition ele respondeu sem nenhum toggle (verificado com `tools/list` e uma pergunta real na P10.3).
 
+**Total da rede (sem recorte):** vem do `ask_genie`, que consulta a medida na metric view sem agrupar. O agente **nunca soma as linhas de `fn_metric_by_region`** para montar um total: `avg_ticket`, `reversal_rate`, `revenue_per_active_pos` e `distinct_subscribers` não são aditivos entre regiões, e a métrica vive só em `atlas.semantic` (mission). As UC functions leem só `mv_recharges`; a comissão (`mv_commission`) só é alcançada pelo `ask_genie`.
+
 Nenhuma outra tool existe. **Não há** tool de SQL livre, de escrita, de execução de job nem de acesso a `commission.batches`, `batch_lines` ou a qualquer schema fora de `semantic`.
 
 ## 4. Regras de comportamento (system prompt + guardrails)
