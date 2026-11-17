@@ -17,3 +17,9 @@ env:
     value: "unity"
   - name: ATLAS_LLM_SERVICE
     value: "system.ai.gpt-oss-120b"
+  - name: ATLAS_CATALOG
+    value: "atlas"
+  - name: ATLAS_GENIE_SPACE_ID
+    valueFrom: "genie-space"
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: "sql-warehouse"

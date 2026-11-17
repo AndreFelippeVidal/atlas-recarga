@@ -1,4 +1,4 @@
-"""Agente `agent-atlas` (SPEC-005). P10.2: esqueleto sem tools; o LLM vem do Unity Gateway."""
+"""Agente `agent-atlas` (SPEC-005). P10.3: tools da lista fechada; LLM pelo Unity Gateway."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 from functools import lru_cache
 
 import mlflow
+from databricks.sdk import WorkspaceClient
 from databricks_langchain import ChatDatabricks
 from langchain.agents import create_agent
 from mlflow.genai.agent_server import get_request_headers, invoke, stream
@@ -18,6 +19,7 @@ from mlflow.types.responses import (
 )
 
 from agent_server.config import AgentConfig, load_config
+from agent_server.tools import build_tools
 from agent_server.utils import (
     get_session_id,
     get_user_workspace_client,
@@ -41,9 +43,15 @@ def build_llm(config: AgentConfig) -> ChatDatabricks:
     return ChatDatabricks(model=config.llm_service, use_ai_gateway=True, extra_params=extra)
 
 
+@lru_cache(maxsize=1)
+def _tools() -> list:
+    # Lista fechada (SPEC-005 §3), com a identidade do service principal do App. Cache: o
+    # list_tools do MCP é uma ida ao workspace.
+    return build_tools(CONFIG, WorkspaceClient())
+
+
 def build_agent(config: AgentConfig = CONFIG):
-    # Sem tools: ask_genie e as UC functions entram na P10.3 (lista fechada, SPEC-005 §3).
-    return create_agent(model=build_llm(config), tools=[], system_prompt=SYSTEM_PROMPT)
+    return create_agent(model=build_llm(config), tools=_tools(), system_prompt=SYSTEM_PROMPT)
 
 
 @lru_cache(maxsize=256)

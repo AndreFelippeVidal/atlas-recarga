@@ -39,18 +39,19 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 "semantic/apply_functions.py" = ["S608"]
 "scripts/check_agent_functions.py" = ["S608"]
 "scripts/check_agent_skeleton.py" = ["S608"]
+"scripts/check_agent_tools.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_golden_set.py", "scripts/check_agent_golden_set.py", "eval/sync_golden_set.py", "eval/scorers.py", "scripts/check_commission_append_only.py", "scripts/check_commission_draft.py", "scripts/check_commission_reconciliation.py", "scripts/check_commission_review.py", "cli/src", "cli/tests", "scripts/check_agent_skeleton.py", "commission", "apps/agent/agent_server/config.py", "apps/agent/tests"]
+files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_golden_set.py", "scripts/check_agent_golden_set.py", "eval/sync_golden_set.py", "eval/scorers.py", "scripts/check_commission_append_only.py", "scripts/check_commission_draft.py", "scripts/check_commission_reconciliation.py", "scripts/check_commission_review.py", "cli/src", "cli/tests", "scripts/check_agent_skeleton.py", "commission", "apps/agent/agent_server/config.py", "apps/agent/agent_server/tools.py", "apps/agent/tests", "scripts/check_agent_tools.py"]
 
 [[tool.mypy.overrides]]
 module = ["pyarrow", "pyarrow.*"]
 ignore_missing_imports = true  # pyarrow não publica stubs
 
 [[tool.mypy.overrides]]
-module = ["pyspark", "pyspark.*", "mlflow", "mlflow.*", "databricks.connect"]
+module = ["pyspark", "pyspark.*", "mlflow", "mlflow.*", "databricks.connect", "databricks_mcp", "databricks_langchain", "langchain_core", "langchain_core.*"]
 ignore_missing_imports = true  # só existe no workspace; o import é feito dentro de main()
 
 [tool.pytest.ini_options]

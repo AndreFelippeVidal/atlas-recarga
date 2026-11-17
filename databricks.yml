@@ -168,11 +168,26 @@ resources:
             value: "unity"
           - name: ATLAS_LLM_SERVICE
             value: "system.ai.gpt-oss-120b"
+          - name: ATLAS_CATALOG
+            value: ${var.catalog}
+          - name: ATLAS_GENIE_SPACE_ID
+            value_from: "genie-space"
+          - name: DATABRICKS_WAREHOUSE_ID
+            value_from: "sql-warehouse"
       resources:
         - name: experiment
           experiment:
             experiment_id: ${resources.experiments.atlas_agent.id}
             permission: CAN_EDIT
+        - name: genie-space
+          genie_space:
+            name: "Atlas Recarga"
+            space_id: ${resources.genie_spaces.atlas_recarga.id}
+            permission: CAN_RUN
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
 
   pipelines:
     atlas_medallion:
