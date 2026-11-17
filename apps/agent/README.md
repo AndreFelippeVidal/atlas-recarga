@@ -8,7 +8,7 @@ App em AI Gateway > Agents (S0.2).
 **P10.3 (tools):** a lista fechada da SPEC-005 §3: `ask_genie` (Genie Agent MCP, restrito ao Space
 `Atlas Recarga`; **não** passa pelo Unity Gateway) e as UC functions `fn_list_metrics`,
 `fn_metric_by_region` e `fn_compare_months`. As tools usam os nomes curtos que o scorer
-`read_only_tools` espera. Os traces vão para o experiment do bundle (`/Shared/atlas/agent`;
+`read_only_tools` espera. Os traces vão para o experiment do bundle (`/Shared/atlas/agent-traces` desde a P10.5; antes, `/Shared/atlas/agent`;
 no `dev` o nome leva o prefixo do usuário) com as tags `user`, `app_version`, `prompt_version` e
 `llm_service`.
 
@@ -109,7 +109,7 @@ Conferência (mantenedor), nesta ordem:
    App já roda, `databricks bundle run agent_atlas -t dev --profile andrevidal` para pegar o novo
    `ATLAS_LLM_SERVICE`).
 2. Trace tables: `uv run --project apps/agent python scripts/setup_agent_trace_tables.py --profile
-   andrevidal --catalog atlas_dev --warehouse-id <id> --experiment-id <id> --app-sp <client_id>`
+   andrevidal --catalog atlas_dev --warehouse-id <id> --experiment-id <id do atlas_agent_traces> --app-sp <client_id>`
    (dry-run; acrescente `--apply`). **Não foi exercitado contra o workspace.**
 3. `uv run python scripts/check_agent_guardrails.py --profile andrevidal --warehouse-id <id>
    --catalog atlas_dev` (configuração, rajada com 429 e inference table).

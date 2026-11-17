@@ -9,7 +9,7 @@ permissões mínimas (USE CATALOG, USE SCHEMA em `observability`; SELECT e MODIF
 
     uv run --project apps/agent python scripts/setup_agent_trace_tables.py \\
         --profile andrevidal --catalog atlas_dev --warehouse-id <id> \\
-        --experiment-id <id do experiment atlas_agent> --app-sp <service_principal_client_id>
+        --experiment-id <id do experiment atlas_agent_traces> --app-sp <service_principal_client_id>
 
 O id do experiment e o do service principal saem de `databricks bundle summary -t dev` e de
 `databricks apps get agent-atlas`. Sem `--apply` só mostra o que faria.
