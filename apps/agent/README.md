@@ -44,7 +44,7 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
 
 ## Conferência da P10.3 (mantenedor)
 
-Pré-requisitos: preview *Managed MCP Servers* ligado no workspace e `EXECUTE` + `SELECT` em
+Pré-requisito: `EXECUTE` + `SELECT` em
 `semantic` para o service principal do App (`scripts/setup_workspace.py --reader <client_id>`,
 ADR-0016).
 
@@ -54,6 +54,7 @@ ADR-0016).
    (traz o valor esperado do GS-001 e confere `request_tags` na `usage`).
 4. Na aba Traces do experiment, confira os spans TOOL `ask_genie` e `fn_*`.
 
-Não verificado ainda: os nomes das tools do Genie Agent MCP (o `ask_genie` descobre a tool de
-pergunta e a de polling por nome, `query`/`ask` e `poll`) e o formato do `extra_params` de
-`request_tags`. Se algo divergir, corrija no PR.
+Verificado contra o workspace: o Genie Agent MCP expõe `query_space_<id>` (argumento `query`) e
+`poll_response_<id>` (`conversation_id`, `message_id`); a resposta traz `conversationId`,
+`messageId` e `status` (`COMPLETED` ao fim). Não verificado ainda: o formato do `extra_params` de
+`request_tags` e se o `DatabricksMCPClient` emite um span próprio.

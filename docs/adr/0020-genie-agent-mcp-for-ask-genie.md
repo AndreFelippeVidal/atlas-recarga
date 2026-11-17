@@ -22,7 +22,7 @@ O `ask_genie` precisa de NL→SQL sobre as metric views. A SPEC-005 §3 o restri
 **Opção 1.** O escopo restrito ao Space pesa mais que o `MCP_SERVICE` na `usage`.
 
 ## Prós e contras
-**Genie Agent MCP.** 👍 Só o Space `Atlas Recarga`; `CAN RUN` + `SELECT` em `semantic` limitam o acesso. 👎 Não passa pelo Gateway (sem `usage`, grants de MCP, policies); Public Preview; exige o preview *Managed MCP Servers*.
+**Genie Agent MCP.** 👍 Só o Space `Atlas Recarga`; `CAN RUN` + `SELECT` em `semantic` limitam o acesso. 👎 Não passa pelo Gateway (sem `usage`, grants de MCP, policies); Public Preview (na Free Edition respondeu sem toggle; as tools são `query_space_<id>` e `poll_response_<id>`).
 **Genie One MCP.** 👍 Governado pelo Gateway, aparece como `MCP_SERVICE`. 👎 Busca no workspace inteiro; a única barreira seriam os grants do service principal.
 **Conversation API (SDK).** 👍 Sem preview de MCP. 👎 Também fora do Gateway e mais código de polling para manter.
 

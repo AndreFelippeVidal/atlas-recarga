@@ -67,13 +67,19 @@ def ask_with_polling(
 ) -> str:
     """Faz a pergunta e espera a resposta final do Genie, com o timeout do §6."""
     started = clock()
-    text = call(pick_tool(tool_names, _QUERY_HINTS), {"question": question})
+    text = call(pick_tool(tool_names, _QUERY_HINTS), {"query": question})
     status = status_of(text)
     if status is None or status == "COMPLETED":
         return text
     poll = pick_tool(tool_names, _POLL_HINTS)
     payload = json.loads(text)
-    ids = {k: payload[k] for k in ("conversation_id", "response_id") if k in payload}
+    # A resposta traz camelCase (`conversationId`); a tool de polling pede snake_case.
+    ids = {
+        "conversation_id": payload.get("conversationId"),
+        "message_id": payload.get("messageId"),
+    }
+    if not all(ids.values()):
+        raise GenieUnavailableError("resposta do Genie sem conversationId/messageId")
     while status not in _TERMINAL_STATUS:
         if clock() - started > timeout:
             raise GenieUnavailableError(f"Genie sem resposta em {timeout:.0f}s")

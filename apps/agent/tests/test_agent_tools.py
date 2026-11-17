@@ -12,6 +12,7 @@ from agent_server.tools import (
 )
 
 NAMES = ["query_space_abc", "poll_response_abc"]
+RUNNING = json.dumps({"status": "EXECUTING_QUERY", "conversationId": "c", "messageId": "m"})
 
 
 def test_uc_function_names_are_the_closed_list() -> None:
@@ -75,7 +76,7 @@ def test_plain_text_answer_is_returned_without_polling() -> None:
 def test_polls_until_completed() -> None:
     answers = iter(
         [
-            json.dumps({"status": "RUNNING", "conversation_id": "c", "response_id": "r"}),
+            json.dumps({"status": "RUNNING", "conversationId": "c", "messageId": "m"}),
             json.dumps({"status": "RUNNING"}),
             json.dumps({"status": "COMPLETED", "answer": "ok"}),
         ]
@@ -88,21 +89,42 @@ def test_polls_until_completed() -> None:
 
     out = ask_with_polling(call, NAMES, "q", sleep=lambda _s: None)
     assert json.loads(out)["answer"] == "ok"
-    assert seen[1] == ("poll_response_abc", {"conversation_id": "c", "response_id": "r"})
+    assert seen[1] == ("poll_response_abc", {"conversation_id": "c", "message_id": "m"})
 
 
 def test_timeout_raises() -> None:
     ticks = iter(range(0, 1000, 20))
 
     def call(name: str, args: dict[str, str]) -> str:
-        return json.dumps({"status": "RUNNING"})
+        return RUNNING
 
     with pytest.raises(GenieUnavailableError, match="sem resposta"):
         ask_with_polling(call, NAMES, "q", sleep=lambda _s: None, clock=lambda: next(ticks))
 
 
 def test_failed_status_raises() -> None:
-    answers = iter([json.dumps({"status": "RUNNING"}), json.dumps({"status": "FAILED"})])
+    answers = iter([RUNNING, json.dumps({"status": "FAILED"})])
 
     with pytest.raises(GenieUnavailableError, match="FAILED"):
         ask_with_polling(lambda n, a: next(answers), NAMES, "q", sleep=lambda _s: None)
+
+
+def test_first_call_uses_query_argument() -> None:
+    seen: list[dict[str, str]] = []
+
+    def call(name: str, args: dict[str, str]) -> str:
+        seen.append(args)
+        return "ok"
+
+    ask_with_polling(call, NAMES, "pergunta")
+    assert seen == [{"query": "pergunta"}]
+
+
+def test_missing_ids_raises() -> None:
+    with pytest.raises(GenieUnavailableError, match="conversationId"):
+        ask_with_polling(
+            lambda n, a: json.dumps({"status": "EXECUTING_QUERY"}),
+            NAMES,
+            "q",
+            sleep=lambda _s: None,
+        )
