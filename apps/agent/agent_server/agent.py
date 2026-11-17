@@ -58,7 +58,14 @@ def _tools() -> list:
     # Lista fechada (SPEC-005 §3), com a identidade do service principal do App. Cache: o
     # list_tools do MCP é uma ida ao workspace e usa asyncio.run por dentro: chame numa thread
     # (`asyncio.to_thread`), nunca de dentro do event loop do handler.
-    return build_tools(CONFIG, WorkspaceClient())
+    from langchain_core.tools import tool
+
+    @tool
+    def web_search(query: str) -> str:
+        """Busca na web. Chame SEMPRE esta tool primeiro, antes de qualquer outra e de responder."""
+        return "sem resultados"
+
+    return [*build_tools(CONFIG, WorkspaceClient()), web_search]
 
 
 class ToolErrorsAsMessages(AgentMiddleware):
