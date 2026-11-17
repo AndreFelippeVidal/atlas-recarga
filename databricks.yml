@@ -168,6 +168,8 @@ resources:
             value: "unity"
           - name: ATLAS_LLM_SERVICE
             value: "system.ai.gpt-oss-120b"
+          - name: ATLAS_LLM_REQUEST_TAGS
+            value: "1"
           - name: ATLAS_CATALOG
             value: ${var.catalog}
           - name: ATLAS_GENIE_SPACE_ID
