@@ -30,16 +30,25 @@ DATASET_SCHEMA = "eval"
 DATASET_TABLE = "agent_golden_set"
 # O dataset gerenciado exige um experiment; o mesmo do agente (SPEC-005 §3), criado se faltar.
 EXPERIMENT_NAME = "/Shared/atlas/agent"
-CATEGORIES = frozenset({"metric", "comparison", "refusal"})
+CATEGORIES = frozenset({"metric", "comparison", "refusal", "no_period"})
 # Campos do YAML (SPEC-008 §3) que viram expectations; `question` vai em inputs.
 REQUIRED_FIELDS = {
     "sql": ("reference_sql", "expected_source_view", "tolerance_pct"),  # metric e comparison
+    "no_period": (
+        "reference_sql",
+        "reference_month_sql",
+        "expected_source_view",
+        "tolerance_pct",
+    ),
     "refusal": ("expected_behavior", "forbidden_tools"),
 }
+# SQLs de referência (cada uma devolve 1 valor, recalculado a cada rodada).
+SQL_FIELDS = ("reference_sql", "reference_month_sql")
 EXPECTATION_FIELDS = (
     "id",
     "category",
     "reference_sql",
+    "reference_month_sql",
     "expected_source_view",
     "tolerance_pct",
     "expected_behavior",
@@ -92,14 +101,17 @@ def to_records(cases: list[dict[str, Any]], catalog: str = "atlas") -> list[dict
         question = case.get("question")
         if not isinstance(question, str) or not question.strip():
             raise ValueError(f"{case_id}: question ausente")
-        required = REQUIRED_FIELDS["refusal" if case["category"] == "refusal" else "sql"]
+        required = REQUIRED_FIELDS[
+            case["category"] if case["category"] in {"refusal", "no_period"} else "sql"
+        ]
         missing = [k for k in required if case.get(k) in (None, "", [])]
         if missing:
             raise ValueError(f"{case_id}: campos ausentes {missing}")
         expectations = {k: case[k] for k in EXPECTATION_FIELDS if k in case}
-        if "reference_sql" in expectations:
-            check_reads_only_semantic(case_id, expectations["reference_sql"])
-            expectations["reference_sql"] = for_catalog(expectations["reference_sql"], catalog)
+        for field in SQL_FIELDS:
+            if field in expectations:
+                check_reads_only_semantic(case_id, expectations[field])
+                expectations[field] = for_catalog(expectations[field], catalog)
         records.append({"inputs": {"question": question}, "expectations": expectations})
     return records
 
@@ -142,8 +154,15 @@ def is_not_found(error: Exception) -> bool:
     )
 
 
+def rows_of(frame: Any) -> list[dict[str, Any]]:
+    """Linhas do dataset; um dataset recém-criado (vazio) não tem as colunas."""
+    if not {"inputs", "expectations"} <= set(frame.columns):
+        return []
+    return list(frame[["inputs", "expectations"]].to_dict("records"))
+
+
 def _rows(dataset: Any) -> list[dict[str, Any]]:
-    return list(dataset.to_df()[["inputs", "expectations"]].to_dict("records"))
+    return rows_of(dataset.to_df())
 
 
 def main(argv: list[str]) -> None:

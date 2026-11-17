@@ -61,3 +61,11 @@ def test_every_prompt_is_in_the_manifest_with_the_published_hash() -> None:
         assert prompt_sha256(load_prompt(version)) == expected, (
             f"{version}.md mudou depois de publicado; crie uma versão nova"
         )
+
+
+def test_v2_keeps_v1_rules_and_adds_the_p10_6_ones() -> None:
+    v1, v2 = load_prompt("v1"), load_prompt("v2")
+    assert v2.startswith(v1.split("6. **Formato.**")[0])  # só o fim do prompt muda
+    assert "Nunca use o mês da data de hoje" in v2
+    assert "nunca abreviado" in v2 and "165 mil" in v2
+    assert "semantic.mv_commission" in v2 and "ask_genie" in v2.split("7. **Comissão.**")[1]

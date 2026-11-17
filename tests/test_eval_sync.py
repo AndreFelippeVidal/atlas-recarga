@@ -37,7 +37,7 @@ def test_dataset_name_per_catalog() -> None:
 
 def test_one_record_per_case_without_computed_values() -> None:
     records = sync.to_records(CASES)
-    assert len(records) == len(CASES) == 30
+    assert len(records) == len(CASES) == 31
     for case, record in zip(CASES, records, strict=True):
         assert record["inputs"] == {"question": case["question"]}
         expectations = record["expectations"]
@@ -49,15 +49,18 @@ def test_one_record_per_case_without_computed_values() -> None:
         else:
             assert expectations["reference_sql"] == case["reference_sql"]
             assert expectations["expected_source_view"] == case["expected_source_view"]
+        if case["category"] == "no_period":
+            assert expectations["reference_month_sql"] == case["reference_month_sql"]
 
 
 def test_reference_sql_points_to_the_target_catalog() -> None:
     dev = sync.to_records(CASES, "atlas_dev")
     for record in dev:
-        sql = record["expectations"].get("reference_sql")
-        if sql:
-            assert "atlas_dev.semantic." in sql
-            assert "atlas.semantic." not in sql
+        for field in ("reference_sql", "reference_month_sql"):
+            sql = record["expectations"].get(field)
+            if sql:
+                assert "atlas_dev.semantic." in sql
+                assert "atlas.semantic." not in sql
     prod = sync.to_records(CASES, "atlas")
     assert prod[0]["expectations"]["reference_sql"] == CASES[0]["reference_sql"]
 
@@ -201,3 +204,27 @@ def test_is_not_found_only_for_missing_dataset() -> None:
     assert sync.is_not_found(RuntimeError("Table does not exist"))
     assert not sync.is_not_found(PermissionError("PERMISSION_DENIED: no access"))
     assert not sync.is_not_found(ConnectionError("timeout"))
+
+
+def test_no_period_needs_the_month_sql() -> None:
+    case = next(c for c in CASES if c["category"] == "no_period")
+    broken = {k: v for k, v in case.items() if k != "reference_month_sql"}
+    with pytest.raises(ValueError, match="reference_month_sql"):
+        sync.to_records([broken])
+
+
+def test_rows_of_an_empty_dataset_has_no_columns() -> None:
+    class Frame:
+        def __init__(self, columns: list[str], rows: list[dict[str, object]]) -> None:
+            self.columns = columns
+            self._rows = rows
+
+        def __getitem__(self, _keys: list[str]) -> Frame:
+            return self
+
+        def to_dict(self, _orient: str) -> list[dict[str, object]]:
+            return self._rows
+
+    assert sync.rows_of(Frame([], [])) == []
+    row: dict[str, object] = {"inputs": {"question": "q"}, "expectations": {"id": "A"}}
+    assert sync.rows_of(Frame(["inputs", "expectations", "x"], [row])) == [row]

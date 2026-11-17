@@ -40,9 +40,37 @@ def test_counts_and_unique_ids() -> None:
     ids = [c["id"] for c in CASES]
     assert len(ids) == len(set(ids))
     by_category = {
-        k: sum(c["category"] == k for c in CASES) for k in ("metric", "comparison", "refusal")
+        k: sum(c["category"] == k for c in CASES)
+        for k in ("metric", "comparison", "refusal", "no_period")
     }
-    assert by_category == {"metric": 20, "comparison": 5, "refusal": 5}
+    assert by_category == {"metric": 20, "comparison": 5, "refusal": 5, "no_period": 1}
+
+
+def test_no_period_case_has_no_month_in_the_question_and_a_month_sql() -> None:
+    (case,) = [c for c in CASES if c["category"] == "no_period"]
+    months = (
+        "janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro"
+    )
+    assert not re.search(rf"20\d\d|\bmês\b|{months}", case["question"].lower())
+    for field in ("reference_sql", "reference_month_sql"):
+        sql = case[field]
+        assert re.search(r"\batlas\.semantic\.mv_recharges\b", sql)
+        assert "DATE'" not in sql  # o mês vem dos dados, não de uma data fixa
+        assert re.search(r"ORDER BY recharge_month DESC LIMIT 1", sql)
+
+
+@pytest.mark.parametrize(
+    ("rows", "prefix"),
+    [
+        ([["2026-10-01"]], "ok"),
+        ([], "FALHA"),
+        ([["2026-10-01"], ["2026-09-01"]], "FALHA"),
+        ([[None]], "FALHA"),
+        ([["outubro"]], "FALHA"),
+    ],
+)
+def test_check_month(rows: list[list[str | None]], prefix: str) -> None:
+    assert check.check_month("GS-031", rows).startswith(prefix)
 
 
 @pytest.mark.parametrize("case", SQL_CASES, ids=lambda c: c["id"])
