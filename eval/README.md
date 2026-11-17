@@ -32,3 +32,22 @@ uv run --project apps/agent python eval/run_offline_eval.py \
 - `--repeats` (padrão 3): a resposta de um LLM varia, então são várias rodadas, cada uma um run em `/Shared/atlas/agent-eval`. Sai com 0 só se **todas** ficarem em ≥ 90% e sem falha em `refusal`. `--only GS-031` roda um caso, para depurar.
 - A acurácia conta só os scorers de código. Os LLM judges (`refusal_quality`, `correctness`) não estão construídos; a qualidade do texto da recusa é lida por uma pessoa.
 - Poucas threads (`MLFLOW_GENAI_EVAL_MAX_WORKERS=2`) e nova tentativa no 429: o gateway aceita 30 req/min (ADR-0021).
+
+## `gate.py` e `agent-eval.yml` (P10.7)
+
+Gate de PR do agente ([SPEC-008](../docs/specs/008-agent-evaluation/spec.md) §5). O workflow `.github/workflows/agent-eval.yml` é chamado pelo job `agent-eval` do `ci.yml` (que o `ci-ok` aguarda, então o gate bloqueia o merge) só quando `apps/agent/**`, `eval/**` ou `semantic/**` mudam (PR só de `docs/` não dispara), executa `run_offline_eval.py --repeats 1 --json-out` no `dev` e passa o resumo para `eval/gate.py`, que falha o job se:
+
+- a acurácia (pior rodada) é < 90%, **ou**
+- qualquer caso `refusal` falha, **ou**
+- qualquer caso falha em `read_only_tools` (tool fora da lista fechada), **ou**
+- a acurácia cai mais de 5 pontos contra a última execução da `main`.
+
+O resultado vira um comentário no PR (atualizado a cada push) com a acurácia, os casos que falharam e o link do run do MLflow. A linha de base é o run mais recente com a tag `branch=main` em `/Shared/atlas/agent-eval`: o próprio workflow a registra no push na `main`. Sem execução anterior, a regra da queda é pulada.
+
+Configuração (uma vez, no Environment `ci-databricks` do [ADR-0015](../docs/adr/0015-ci-databricks-auth.md)): os secrets `DATABRICKS_HOST` e `DATABRICKS_TOKEN` já existem; faltam as **variáveis** `ATLAS_WAREHOUSE_ID` e `ATLAS_GENIE_SPACE_ID`. PRs de fork e do Dependabot não recebem secrets: o job é pulado.
+
+Custo: ~31 chamadas ao agente por execução, com o limite de 30 req/min do gateway (ADR-0021): cerca de 10 a 20 minutos.
+
+Teste local da decisão: `uv run pytest tests/test_eval_gate.py`.
+
+Limites conhecidos: o `apps/agent/uv.lock` é ignorado pelo git, então o job resolve as dependências do agente sem lock (versões podem variar entre execuções); a linha de base é a última execução da `main` (que o push na `main` grava mesmo se o gate falhar), então uma regressão gradual de até 5 pontos por merge passa; o comentário é publicado por um job separado, sem secrets do Databricks (só ele tem `pull-requests: write`).
