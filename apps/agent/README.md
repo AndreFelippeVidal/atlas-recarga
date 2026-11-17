@@ -113,4 +113,4 @@ Conferência (mantenedor), nesta ordem:
    (dry-run; acrescente `--apply`). **Não foi exercitado contra o workspace.**
 3. `uv run python scripts/check_agent_guardrails.py --profile andrevidal --warehouse-id <id>
    --catalog atlas_dev` (configuração, rajada com 429 e inference table).
-4. No App: a pergunta com o CPF e a rajada de mais de 30 mensagens (o script imprime o texto).
+4. No App: confirme que a resposta **aparece** na chat UI (o texto agora chega inteiro, sem deltas); faça a pergunta com o CPF e a rajada de mais de 30 mensagens (o script imprime o texto). Se um novo `bundle deploy` recriar o experiment, rode o passo 2 de novo; se o deploy falhar por recurso ainda inexistente, rode-o outra vez.

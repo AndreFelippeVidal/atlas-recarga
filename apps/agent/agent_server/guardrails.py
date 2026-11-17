@@ -16,10 +16,16 @@ RATE_LIMITED_ERROR_TYPE = "rate_limited"
 # Só formatos com estrutura, para não mascarar valores em reais (R$ 4.122.460,00), códigos IBGE
 # (7 dígitos), datas (2026-10-01) nem ids de lote (COM-2026-10-v1).
 _CPF = re.compile(r"(?<!\d)\d{3}\.\d{3}\.\d{3}-\d{2}(?!\d)")
-_CPF_BY_LABEL = re.compile(r"(?i)\b(cpf)\b(\W{0,3})\d{11}(?!\d)")
+# Número cru de 11 dígitos só com rótulo de documento por perto (contagens de negócio não têm).
+_CPF_BY_LABEL = re.compile(r"(?i)\b(cpf|documento)\b(\W{0,3})\d{11}(?!\d)")
+# Telefone: com DDD (parênteses ou +55) ou com rótulo (tel, fone, celular, whatsapp). Um `dddd-dddd`
+# solto não conta: seria "2025-2026" ou "1000-2000".
+_PHONE_DIGITS = r"(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?9?\d{4}[\s-]?\d{4}"
 _PHONE = re.compile(
     r"(?<![\d.,-])(?:\+55[\s-]?\(?\d{2}\)?[\s-]?|\(\d{2}\)[\s-]?)9?\d{4}[\s-]?\d{4}(?!\d)"
-    r"|(?<![\d.,-])9?\d{4}-\d{4}(?!\d)"
+)
+_PHONE_BY_LABEL = re.compile(
+    rf"(?i)\b(tel(?:efone)?|fone|celular|whats(?:app)?)\b(\W{{0,4}})(?:{_PHONE_DIGITS}|9?\d{{4}}[\s-]?\d{{4}})(?!\d)"
 )
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
@@ -27,6 +33,7 @@ _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 def mask_pii(text: str) -> tuple[str, bool]:
     """Troca CPF, telefone e e-mail por `MASK`. Devolve o texto e se algo foi trocado."""
     masked = _CPF_BY_LABEL.sub(lambda m: f"{m.group(1)}{m.group(2)}{MASK}", text)
+    masked = _PHONE_BY_LABEL.sub(lambda m: f"{m.group(1)}{m.group(2)}{MASK}", masked)
     for pattern in (_CPF, _EMAIL, _PHONE):
         masked = pattern.sub(MASK, masked)
     return masked, masked != text
@@ -42,8 +49,7 @@ def is_rate_limited(error: BaseException) -> bool:
         response = getattr(exc, "response", None)
         if getattr(response, "status_code", None) == 429:
             return True
-        text = f"{type(exc).__name__} {exc}"
-        if "RateLimit" in text or "REQUEST_LIMIT_EXCEEDED" in text or "429" in text.split():
+        if type(exc).__name__ == "RateLimitError" or "REQUEST_LIMIT_EXCEEDED" in str(exc):
             return True
     return False
 

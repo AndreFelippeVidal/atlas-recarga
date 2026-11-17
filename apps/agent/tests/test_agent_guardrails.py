@@ -10,6 +10,9 @@ from agent_server.guardrails import MASK, is_rate_limited, mask_pii
         "Ligue para (11) 91234-5678.",
         "Ligue +55 11 91234-5678 agora",
         "Telefone 91234-5678",
+        "celular: 11912345678",
+        "whatsapp 11 91234 5678",
+        "o documento 12345678909",
         "Fale com joao.silva@exemplo.com.br",
     ],
 )
@@ -17,7 +20,7 @@ def test_pii_is_masked(text: str) -> None:
     masked, changed = mask_pii(text)
     assert changed
     assert MASK in masked
-    for secret in ("123.456.789-09", "12345678909", "91234-5678", "joao.silva@"):
+    for secret in ("123.456.789-09", "12345678909", "91234-5678", "joao.silva@", "912345678"):
         assert secret not in masked
 
 
@@ -30,6 +33,8 @@ def test_pii_is_masked(text: str) -> None:
         "Fonte: semantic.mv_recharges · gross_revenue · uf = 'PA', recharge_month = 2026-10",
         "Taxa de estorno de 1,25% e ticket médio de R$ 21,40.",
         "Total de 12345678901 recargas",
+        "entre 2025-2026 e faixa 1000-2000 recargas, ticket 9999-1234",
+        "Em 2025-2026 a receita foi de R$ 48.880.720,00.",
     ],
 )
 def test_business_numbers_are_kept(text: str) -> None:
@@ -58,7 +63,6 @@ def test_rate_limit_by_status_code() -> None:
 def test_rate_limit_by_name_and_text() -> None:
     assert is_rate_limited(RateLimitError("slow down"))
     assert is_rate_limited(Exception("REQUEST_LIMIT_EXCEEDED: rate limit"))
-    assert is_rate_limited(Exception("Error code: 429 - too many"))
     assert not is_rate_limited(Exception("ENDPOINT_NOT_FOUND"))
 
 
@@ -90,3 +94,18 @@ def test_guard_event_drops_deltas_and_masks_final_message() -> None:
 
     tool = SimpleNamespace(type="response.output_item.done", item={"type": "function_call"})
     assert guard_event(tool) == (True, False)
+
+
+def test_guard_event_with_a_real_responses_event() -> None:
+    from agent_server.guardrails import guard_event
+
+    responses = pytest.importorskip("mlflow.types.responses")  # só no ambiente do App
+    ResponsesAgentStreamEvent = responses.ResponsesAgentStreamEvent
+    create_text_output_item = responses.create_text_output_item
+
+    event = ResponsesAgentStreamEvent(
+        type="response.output_item.done",
+        item=create_text_output_item("fale com a@b.com", id="m1"),
+    )
+    assert guard_event(event) == (True, True)
+    assert MASK in event.item["content"][0]["text"]
