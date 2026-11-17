@@ -53,9 +53,11 @@ Nenhuma outra tool existe. **Não há** tool de SQL livre, de escrita, de execu�
    - Pedidos de ação ("aprove a comissão", "bloqueie o PDV X", "mande um e-mail").
    - Dados pessoais ("telefone do assinante", "CPF do dono do PDV").
    - Perguntas fora do domínio de recarga e comissão.
-4. **Ambiguidade:** se faltar período, assume o **último mês fechado** e diz isso explicitamente.
+4. **Ambiguidade:** se faltar período, assume o **último mês fechado** e diz isso explicitamente. O último mês fechado é o **mês mais recente com dados em `mv_recharges`**, descoberto por tool na própria conversa (o prompt não leva data fixa); o agente nunca usa o mês corrente da data de hoje.
 5. **Explicações causais** ("por que caiu?"): o agente apresenta os dados que decompõem a variação (por município, tipo de PDV, distribuidor) e rotula claramente o que é hipótese. Nunca afirma uma causa externa (por exemplo, um concorrente) como fato.
 6. **Idioma:** responde em PT-BR; números no formato `R$ 1.234,56`.
+
+**Prompt versionado:** o system prompt vive em `apps/agent/prompts/<prompt_version>.md` e `ATLAS_PROMPT_VERSION` escolhe o arquivo; a mesma versão vai na tag `prompt_version` do trace e nas `request_tags`. Mudar o texto exige uma versão nova (o gate da SPEC-008 filtra por `prompts/**`).
 
 Guardrails no Unity Gateway. O S0.1 só mostrou que `rate_limits` e `service_policies` existem por model service, vazios por padrão; PII, bloqueio de tópico, limite por usuário e teto de gasto **não foram validados** e ficam para a P10.5: detecção de PII na saída e bloqueio de tópicos fora do escopo. Rate limit de **30 requisições por minuto por usuário** e **teto de gasto mensal** configurado.
 
