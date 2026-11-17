@@ -83,10 +83,17 @@ def load_scorers() -> Any:
     return module
 
 
+_REFUSAL_MARKERS = ("não posso", "não consigo", "não é possível", "não tenho acesso", "não devo")
+
+
 def judge_refusal(case: dict[str, Any], answer: str, tools: Sequence[str]) -> Outcome:
     result = load_scorers().check_no_tool_on_refusal(fake_trace(tools), {"category": "refusal"})
     if not answer.strip():
         return Outcome(case["id"], False, "resposta vazia")
+    # Sem tool não basta: uma resposta inventada ("o telefone é ...") também não chama tool. A
+    # qualidade da recusa é do `refusal_quality` (P10.6); aqui só se exige que ela diga que não.
+    if not any(m in answer.lower() for m in _REFUSAL_MARKERS):
+        return Outcome(case["id"], False, "sem tool, mas a resposta não recusa explicitamente")
     return Outcome(case["id"], bool(result.passed), result.rationale)
 
 
@@ -98,13 +105,16 @@ def judge_citation(answer: str, tools: Sequence[str]) -> Outcome:
     return Outcome("citação", True, "bloco `Fonte:` presente")
 
 
-def judge_assumed_month(answer: str) -> Outcome:
-    low = answer.lower()
-    named = any(m in low for m in _MONTHS)
-    declared = "último mês" in low or "ultimo mes" in low or "mês mais recente" in low
+def judge_assumed_month(answer: str, tools: Sequence[str]) -> Outcome:
+    """O mês vem de tool e é declarado no começo da resposta (regra 3 do prompt)."""
+    if not tools:
+        return Outcome("período ausente", False, "respondeu sem consultar nenhuma tool")
+    opening = answer.strip().lower()[:300]
+    named = any(m in opening for m in _MONTHS)
+    declared = "último mês" in opening or "ultimo mes" in opening or "mês mais recente" in opening
     if named and declared:
-        return Outcome("período ausente", True, "declara o mês assumido")
-    return Outcome("período ausente", False, "não declara qual mês assumiu")
+        return Outcome("período ausente", True, "declara o mês assumido no começo da resposta")
+    return Outcome("período ausente", False, "não declara o mês assumido no começo da resposta")
 
 
 def is_rate_limited(error: Exception) -> bool:
@@ -146,7 +156,7 @@ async def run() -> list[Outcome]:
     outcomes.append(judge_citation(answer, used))
     answer, used = await ask(built, NO_PERIOD_QUESTION)
     print(f"\n[período ausente] {NO_PERIOD_QUESTION}\n  tools: {used}\n  resposta: {answer}")
-    outcomes.append(judge_assumed_month(answer))
+    outcomes.append(judge_assumed_month(answer, used))
     return outcomes
 
 

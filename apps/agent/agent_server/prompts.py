@@ -18,7 +18,7 @@ class PromptError(ValueError):
 
 def load_prompt(version: str, directory: Path = PROMPTS_DIR) -> str:
     # A versão vira nome de arquivo: só caracteres simples, sem `/` nem `..` (sem path traversal).
-    if not _VERSION.match(version) or ".." in version:
+    if not _VERSION.fullmatch(version) or ".." in version:
         raise PromptError(f"prompt_version inválida: {version!r}")
     path = directory / f"{version}.md"
     if not path.is_file():

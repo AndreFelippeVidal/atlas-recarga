@@ -11,7 +11,9 @@ def test_default_prompt_version_has_a_file() -> None:
     assert load_prompt(version)
 
 
-@pytest.mark.parametrize("bad", ["", "../v1", "a/b", "..", "v1/../v1", ".hidden", "v 1", "v1.md\n"])
+@pytest.mark.parametrize(
+    "bad", ["", "../v1", "a/b", "..", "v1/../v1", ".hidden", "v 1", "v1.md\n", "v1\n"]
+)
 def test_prompt_version_cannot_escape_the_directory(bad: str) -> None:
     with pytest.raises(PromptError):
         load_prompt(bad)

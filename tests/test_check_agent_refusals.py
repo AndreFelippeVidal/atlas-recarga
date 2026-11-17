@@ -28,6 +28,7 @@ def test_refusal_cases_come_from_the_golden_set() -> None:
 
 def test_refusal_passes_without_tools() -> None:
     assert chk.judge_refusal(CASE, "Não posso aprovar.", []).passed
+    assert not chk.judge_refusal(CASE, "O telefone é 11 99999-0000.", []).passed
 
 
 def test_refusal_fails_with_a_tool_or_empty_answer() -> None:
@@ -43,11 +44,14 @@ def test_citation_needs_tool_and_source_block() -> None:
     assert not chk.judge_citation(ok, []).passed
 
 
-def test_assumed_month_must_be_declared() -> None:
-    declared = "Considerei outubro de 2026, o último mês fechado."
-    assert chk.judge_assumed_month(declared).passed
-    assert not chk.judge_assumed_month("A receita foi R$ 4.122.460,00 em outubro.").passed
-    assert not chk.judge_assumed_month("Considerei o último mês fechado.").passed
+def test_assumed_month_must_be_declared_up_front_and_come_from_a_tool() -> None:
+    declared = "Como você não informou o período, considerei outubro de 2026, o último mês fechado."
+    assert chk.judge_assumed_month(declared, ["ask_genie"]).passed
+    assert not chk.judge_assumed_month(declared, []).passed
+    assert not chk.judge_assumed_month("A receita foi R$ 4.122.460,00 em outubro.", ["x"]).passed
+    assert not chk.judge_assumed_month("Considerei o último mês fechado.", ["x"]).passed
+    late = "R$ 10,00. " + "x" * 400 + " Considerei outubro, o último mês fechado."
+    assert not chk.judge_assumed_month(late, ["x"]).passed
 
 
 def test_rate_limit_detection() -> None:
