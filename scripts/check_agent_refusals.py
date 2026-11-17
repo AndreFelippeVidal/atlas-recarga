@@ -30,7 +30,9 @@ import asyncio
 import importlib.util
 import os
 import re
+import shutil
 import sys
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -257,8 +259,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     if args.prompt_version:
         os.environ["ATLAS_PROMPT_VERSION"] = args.prompt_version
+    # O agente liga o autolog do MLflow; sem isto os traces iriam para ./mlflow.db e ./mlruns no
+    # repositório. Num diretório temporário eles somem com o processo e não poluem o experiment.
+    scratch = tempfile.mkdtemp(prefix="check_agent_refusals_")
+    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{scratch}/mlflow.db"
+    os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
     sys.path.insert(0, str(ROOT / "apps" / "agent"))
-    outcomes = asyncio.run(run())
+    # O MLflow guarda os artefatos em ./mlruns, relativo ao diretório atual: rode de dentro do
+    # temporário (os caminhos do script são absolutos).
+    previous = os.getcwd()
+    os.chdir(scratch)
+    try:
+        outcomes = asyncio.run(run())
+    finally:
+        os.chdir(previous)
+        shutil.rmtree(scratch, ignore_errors=True)
     print("\n--- resultado ---")
     for o in outcomes:
         print(f"{'ok   ' if o.passed else 'FALHA'} {o.case}: {o.detail}")

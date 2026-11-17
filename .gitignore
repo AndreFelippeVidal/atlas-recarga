@@ -36,3 +36,7 @@ data/generated/
 # Claude Code local state
 .claude/settings.local.json
 .claude/hooks.log
+
+# apps/agent é um projeto uv à parte: o lock gerado por `uv run --project apps/agent` não vai
+# no bundle (o deploy sincroniza o que o git não ignora e mudaria as dependências do App).
+apps/agent/uv.lock
