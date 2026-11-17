@@ -24,6 +24,7 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       docs: ${{ steps.filter.outputs.docs }}
       bundle: ${{ steps.filter.outputs.bundle }}
+      agent: ${{ steps.filter.outputs.agent }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -45,6 +46,11 @@ jobs:
               - 'pipeline/**'
               - 'semantic/**'
               - '.github/workflows/ci.yml'
+            agent:
+              - 'apps/agent/**'
+              - 'eval/**'
+              - 'semantic/**'
+              - '.github/workflows/agent-eval.yml'
 
   lint:
     needs: changes
@@ -129,8 +135,23 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
+  # SPEC-008 §5: o gate do agente bloqueia o merge via `ci-ok`. Pulado (sem mudança no agente,
+  # fork, Dependabot) conta como ok. Auth: ADR-0015.
+  agent-eval:
+    needs: changes
+    if: >-
+      needs.changes.outputs.agent == 'true' &&
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    uses: ./.github/workflows/agent-eval.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: write  # teto; só o job `comment` do workflow chamado o usa
+
   ci-ok:
-    needs: [changes, lint, types, test, secrets, docs, bundle-validate]
+    needs: [changes, lint, types, test, secrets, docs, bundle-validate, agent-eval]
     if: always()
     runs-on: ubuntu-latest
     steps:

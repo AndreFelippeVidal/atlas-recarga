@@ -35,7 +35,7 @@ uv run --project apps/agent python eval/run_offline_eval.py \
 
 ## `gate.py` e `agent-eval.yml` (P10.7)
 
-Gate de PR do agente ([SPEC-008](../docs/specs/008-agent-evaluation/spec.md) §5). O workflow `.github/workflows/agent-eval.yml` roda só quando `apps/agent/**`, `eval/**` ou `semantic/**` mudam (nunca em PR só de `.md`), executa `run_offline_eval.py --repeats 1 --json-out` no `dev` e passa o resumo para `eval/gate.py`, que falha o job se:
+Gate de PR do agente ([SPEC-008](../docs/specs/008-agent-evaluation/spec.md) §5). O workflow `.github/workflows/agent-eval.yml` é chamado pelo job `agent-eval` do `ci.yml` (que o `ci-ok` aguarda, então o gate bloqueia o merge) só quando `apps/agent/**`, `eval/**` ou `semantic/**` mudam (PR só de `docs/` não dispara), executa `run_offline_eval.py --repeats 1 --json-out` no `dev` e passa o resumo para `eval/gate.py`, que falha o job se:
 
 - a acurácia (pior rodada) é < 90%, **ou**
 - qualquer caso `refusal` falha, **ou**
@@ -48,3 +48,5 @@ Configuração (uma vez, no Environment `ci-databricks` do [ADR-0015](../docs/ad
 Custo: ~31 chamadas ao agente por execução, com o limite de 30 req/min do gateway (ADR-0021): cerca de 10 a 20 minutos.
 
 Teste local da decisão: `uv run pytest tests/test_eval_gate.py`.
+
+Limites conhecidos: a linha de base é a última execução da `main` (que o push na `main` grava mesmo se o gate falhar), então uma regressão gradual de até 5 pontos por merge passa; o comentário é publicado por um job separado, sem secrets do Databricks (só ele tem `pull-requests: write`).

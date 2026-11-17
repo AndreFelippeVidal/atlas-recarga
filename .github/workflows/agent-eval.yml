@@ -1,25 +1,12 @@
-# Gate de PR do agente — SPEC-008 §5. Roda só quando o agente, o golden set ou a camada
-# semântica mudam (nunca em PR só de docs). Auth: ADR-0015 (Environment `ci-databricks`).
+# Gate de PR do agente — SPEC-008 §5. O path filter (agente, golden set, camada semântica; nunca
+# PR só de docs) fica no `changes` do `ci.yml`. Auth: ADR-0015 (Environment `ci-databricks`).
 # O push na `main` registra a linha de base (tag `branch=main`) para a regra de queda de 5 pontos.
 name: agent-eval
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'apps/agent/**'
-      - 'eval/**'
-      - 'semantic/**'
-      - '.github/workflows/agent-eval.yml'
-      - '!**/*.md'
-  push:
-    branches: [main]
-    paths:
-      - 'apps/agent/**'
-      - 'eval/**'
-      - 'semantic/**'
-      - '.github/workflows/agent-eval.yml'
-      - '!**/*.md'
+  # Chamado pelo `ci.yml` (job `agent-eval`, com o path filter do job `changes`), para o `ci-ok`
+  # depender dele e o gate bloquear o merge. `workflow_dispatch` serve para rodar à mão.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -27,7 +14,8 @@ permissions:
 
 concurrency:
   group: agent-eval-${{ github.ref }}
-  cancel-in-progress: true
+  # o push na main grava a linha de base: não cancelar
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   eval:
@@ -40,8 +28,7 @@ jobs:
     timeout-minutes: 45
     environment: ci-databricks
     permissions:
-      contents: read
-      pull-requests: write
+      contents: read  # sem pull-requests: write; o comentário sai no job `comment`, sem secrets
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,7 +43,7 @@ jobs:
             --warehouse-id "$DATABRICKS_WAREHOUSE_ID" \
             --genie-space-id "$ATLAS_GENIE_SPACE_ID" \
             --repeats 1 \
-            --branch "$BRANCH" \
+            --branch="$BRANCH" \
             --json-out "$RUNNER_TEMP/report.json"
         continue-on-error: true
         env:
@@ -76,9 +63,35 @@ jobs:
             exit 1
           fi
           python3 eval/gate.py --report "$RUNNER_TEMP/report.json" --comment-out "$RUNNER_TEMP/comment.md"
-      - name: Comentar no PR
-        if: always() && github.event_name == 'pull_request' && hashFiles(format('{0}/comment.md', runner.temp)) != ''
-        run: gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body-file "$RUNNER_TEMP/comment.md"
+      - name: Guardar o comentário
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: agent-eval-comment
+          path: ${{ runner.temp }}/comment.md
+          if-no-files-found: ignore
+
+  # Job sem secrets do Databricks: só ele tem `pull-requests: write` e não roda código do PR.
+  comment:
+    needs: eval
+    if: always() && github.event_name == 'pull_request' && needs.eval.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: agent-eval-comment
+      - name: Criar ou atualizar o comentário do gate
+        run: |
+          marker='<!-- atlas-agent-eval-gate -->'
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$marker\")))] | last | .id // empty")
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@comment.md
+          else
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file comment.md
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
