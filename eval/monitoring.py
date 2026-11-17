@@ -23,9 +23,10 @@ import re
 import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 EVAL_DIR = Path(__file__).resolve().parent
 NOT_APPLICABLE = "n/a"
@@ -41,7 +42,7 @@ DATA_TOOLS = frozenset({"ask_genie", "fn_metric_by_region", "fn_compare_months"}
 PRODUCTION_VIEWS = ("mv_recharges", "mv_commission")
 JUDGE_SAMPLE_RATE = 0.20
 _PASS_VALUES = {True, "yes", "pass", "true"}
-SAO_PAULO = timezone(timedelta(hours=-3))  # sem horário de verão desde 2019
+SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 ANSWER_PREVIEW_CHARS = 500
 _IDENT = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -323,7 +324,7 @@ COMMENT 'Alvo do SQL alert (SPEC-008 §6): um scorer vigiado por linha, só com 
 SELECT scorer, SUM(passed) / SUM(evaluated) AS pass_rate_7d
 FROM {obs}.agent_quality_daily
 WHERE scorer IN ('cites_metric_view', 'read_only_tools')
-  AND day >= date_sub(current_date(), 6)
+  AND day >= date_sub(CAST(from_utc_timestamp(current_timestamp(), 'America/Sao_Paulo') AS DATE), 6)
 GROUP BY scorer""",
         f"""CREATE TABLE IF NOT EXISTS {catalog}.eval.review_queue (
   trace_id STRING NOT NULL COMMENT 'id do trace MLflow que falhou',

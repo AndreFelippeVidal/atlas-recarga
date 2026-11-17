@@ -8,6 +8,8 @@ nome do experiment, janela em dias e o modelo dos LLM judges. Idempotente: um tr
 * LLM judges em 20% (hash do `trace_id`). Se o production monitoring do MLflow (Beta,
   `eval/start_monitoring.py`) já anexou a assessment ao trace, o job a reaproveita, deduplicada; só
   roda o judge para o que falta (o plano B da SPEC-008 §6).
+* Ordem de escrita: fila, scores, traces. Cada passo é idempotente e a fila vem primeiro, então
+  uma falha no meio nunca deixa um score reprovado fora da `review_queue` (critério 6).
 * O judge usa `--judge-model`, que **não** é o `agent_llm`: não gasta o rate limit nem o teto de
   tokens do agente. Um judge que falha (429, modelo indisponível) é pulado e tentado de novo na
   próxima execução, enquanto o trace estiver na janela.
@@ -30,6 +32,7 @@ EVAL_DIR = Path(__file__).resolve().parent
 DEFAULT_EXPERIMENT = "/Shared/atlas/agent-traces"
 DEFAULT_JUDGE_MODEL = "databricks:/databricks-gpt-oss-120b"
 DEFAULT_WINDOW_DAYS = 3
+TERMINAL_STATES = frozenset({"OK", "ERROR"})
 MAX_TRACES = 2000
 
 _JUDGE_GUIDELINES = {
@@ -68,11 +71,10 @@ def build_judges(model: str) -> dict[str, Any]:
 
 def run_judge(judge: Any, question: str, answer: str) -> Any:
     feedback = judge(inputs={"question": question}, outputs=answer)
-    return mon.Score(
-        "",
-        None if feedback.value is None else mon.is_pass(feedback.value),
-        str(feedback.rationale or ""),
-    )
+    if feedback.value is None or getattr(feedback, "error", None):
+        # Sem veredito não é "n/a": levanta para o trace ser tentado de novo na próxima execução.
+        raise RuntimeError(f"judge sem veredito: {getattr(feedback, 'error', None)}")
+    return mon.Score("", mon.is_pass(feedback.value), str(feedback.rationale or ""))
 
 
 def assessments_of(trace: Any) -> list[dict[str, Any]]:
@@ -154,6 +156,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     for trace in traces:
         info = trace.info
         trace_id = info.trace_id
+        status = str(getattr(info.state, "value", info.state))
+        if status not in TERMINAL_STATES:
+            continue  # em andamento: entra quando terminar, enquanto estiver na janela
         day = mon.day_brt(info.request_time)
         answer = mon.extract_answer(trace.data.response)
         question = mon.extract_question(trace.data.request)
@@ -161,18 +166,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         scores: list[Any] = []
         if trace_id not in seen_traces:
             scores += mon.code_scores(answer, trace)
+        # Assessments que o production monitoring (Beta) já anexou: de qualquer trace, pois a
+        # amostra dele não é a nossa. Deduplicadas por nome.
+        reused = mon.scores_from_assessments(assessments_of(trace))
+        scores += reused
         if mon.in_judge_sample(trace_id, args.judge_rate):
-            reused = mon.scores_from_assessments(assessments_of(trace))
-            scores += reused
-            missing = [
-                j for j in mon.judges_for(trace, answer) if j not in {s.scorer for s in reused}
-            ]
-            missing = [j for j in missing if (trace_id, j) not in seen_scores]
-            if missing and judges is None:
-                judges = build_judges(args.judge_model)
-            for name in missing:
+            have = {s.scorer for s in reused}
+            for name in mon.judges_for(trace, answer):
+                if name in have or (trace_id, name) in seen_scores:
+                    continue
                 try:
-                    result = run_judge(judges[name], question, answer)  # type: ignore[index]
+                    if judges is None:
+                        judges = build_judges(args.judge_model)
+                    result = run_judge(judges[name], question, answer)
                 except Exception as error:
                     judge_failures += 1
                     print(f"judge {name} falhou em {trace_id}: {type(error).__name__}: {error}")
@@ -181,7 +187,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         scores = [s for s in scores if (trace_id, s.scorer) not in seen_scores]
         if trace_id not in seen_traces:
-            status = str(getattr(info.state, "value", info.state))
             latency = info.execution_duration if info.execution_duration is not None else "NULL"
             ts = datetime.fromtimestamp(info.request_time / 1000, tz=UTC).strftime(
                 "%Y-%m-%d %H:%M:%S"
@@ -221,10 +226,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ]
             )
 
-    if score_rows:
-        spark.sql(f"INSERT INTO {scores_table} VALUES\n{_rows_sql(score_rows)}")
-    if trace_rows:
-        spark.sql(f"INSERT INTO {traces_table} VALUES\n{_rows_sql(trace_rows)}")
     if queue_rows:
         spark.sql(
             f"""MERGE INTO {queue_table} t USING (SELECT * FROM VALUES\n{_rows_sql(queue_rows)}
@@ -232,6 +233,10 @@ def main(argv: Sequence[str] | None = None) -> int:
   s ON t.trace_id = s.trace_id AND t.scorer = s.scorer
   WHEN NOT MATCHED THEN INSERT *"""  # noqa: S608
         )
+    if score_rows:
+        spark.sql(f"INSERT INTO {scores_table} VALUES\n{_rows_sql(score_rows)}")
+    if trace_rows:
+        spark.sql(f"INSERT INTO {traces_table} VALUES\n{_rows_sql(trace_rows)}")
     print(
         f"traces lidos={len(traces)} novos={len(trace_rows)} scores={len(score_rows)} "
         f"fila={len(queue_rows)} judges com falha={judge_failures}"
