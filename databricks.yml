@@ -378,6 +378,11 @@ resources:
             python_file: eval/run_agent_monitoring.py
             parameters:
               - ${var.catalog}
+              - --eval-dir
+              - ${workspace.file_path}/eval
+              # No dev o bundle prefixa o nome do experiment; o id é o que vale.
+              - --experiment-id
+              - ${resources.experiments.atlas_agent_traces.id}
 
     atlas_commission_deploy:
       name: atlas_commission_deploy

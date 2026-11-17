@@ -1,7 +1,8 @@
 """Job `atlas_agent_monitoring`: pontua os traces reais do agente (SPEC-008 §6, task P10.8).
 
 Roda como `spark_python_task` serverless (07:00 todo dia e sob demanda). Parâmetros: catálogo,
-nome do experiment, janela em dias e o modelo dos LLM judges. Idempotente: um trace já gravado em
+pasta `eval/` e id do experiment, janela em dias e o modelo dos LLM judges. Idempotente: um trace
+já gravado em
 `agent_quality_traces` não é pontuado de novo, e a fila só recebe `(trace_id, scorer)` novos.
 
 * Scorers de código (`read_only_tools`, `cites_metric_view`) em 100% dos traces.
@@ -28,8 +29,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-EVAL_DIR = Path(__file__).resolve().parent
-DEFAULT_EXPERIMENT = "/Shared/atlas/agent-traces"
 DEFAULT_JUDGE_MODEL = "databricks:/databricks-gpt-oss-120b"
 DEFAULT_WINDOW_DAYS = 3
 TERMINAL_STATES = frozenset({"OK", "ERROR"})
@@ -43,17 +42,20 @@ _JUDGE_GUIDELINES = {
 }
 
 
-def _load_monitoring() -> Any:
-    spec = importlib.util.spec_from_file_location("eval_monitoring", EVAL_DIR / "monitoring.py")
+mon: Any = None  # eval/monitoring.py, carregado em main() a partir de --eval-dir
+
+
+def _load_monitoring(eval_dir: str) -> Any:
+    """No serverless o script roda por `exec` e não tem `__file__`: o bundle passa o caminho."""
+    spec = importlib.util.spec_from_file_location(
+        "eval_monitoring", Path(eval_dir) / "monitoring.py"
+    )
     if spec is None or spec.loader is None:
-        raise RuntimeError("não consegui carregar eval/monitoring.py")
+        raise RuntimeError(f"não consegui carregar {eval_dir}/monitoring.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules["eval_monitoring"] = module
     spec.loader.exec_module(module)
     return module
-
-
-mon = _load_monitoring()
 
 
 def build_judges(model: str) -> dict[str, Any]:
@@ -115,11 +117,18 @@ def existing_scores(spark: Any, table: str) -> set[tuple[str, str]]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("catalog")
-    parser.add_argument("--experiment", default=DEFAULT_EXPERIMENT)
+    parser.add_argument("--eval-dir", required=True, help="pasta eval/ sincronizada pelo bundle")
+    parser.add_argument(
+        "--experiment-id",
+        required=True,
+        help="id do experiment dos traces do agente (no dev o nome ganha o prefixo do bundle)",
+    )
     parser.add_argument("--window-days", type=int, default=DEFAULT_WINDOW_DAYS)
     parser.add_argument("--judge-model", default=DEFAULT_JUDGE_MODEL)
     parser.add_argument("--judge-rate", type=float, default=mon.JUDGE_SAMPLE_RATE)
     args = parser.parse_args(argv)
+    global mon
+    mon = _load_monitoring(args.eval_dir)
 
     import mlflow
     from pyspark.sql import SparkSession
@@ -132,13 +141,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     traces_table, scores_table = f"{obs}.agent_quality_traces", f"{obs}.agent_quality_scores"
     queue_table = f"{args.catalog}.eval.review_queue"
 
-    experiment = mlflow.get_experiment_by_name(args.experiment)
-    if experiment is None:
-        print(f"experiment {args.experiment} não existe: nada a pontuar")
-        return 0
     since_ms = int((time.time() - args.window_days * 86400) * 1000)
     traces = mlflow.search_traces(
-        experiment_ids=[experiment.experiment_id],
+        experiment_ids=[args.experiment_id],
         filter_string=f"trace.timestamp_ms > {since_ms}",
         max_results=MAX_TRACES,
         return_type="list",

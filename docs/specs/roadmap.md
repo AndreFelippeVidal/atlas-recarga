@@ -195,6 +195,7 @@ _Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medida
 | v1.1 | Medidas com janela nas metric views; filtros de distribuidor e tipo de PDV no mapa |
 | v1.1 | Painel "Leitura do mapa" / "Onde crescer" no dashboard React, sem IA: texto determinístico calculado no backend (maior UF do mês, maior queda contra o mês anterior) |
 | v1.1 | Filtros de recorte e escopo no dashboard React (hoje só mês e medida) |
+| v1.1 | Alerta de frescor do monitoramento do agente: o alerta de qualidade não dispara se o job `atlas_agent_monitoring` parar (a view fica vazia) |
 | v2 | Forecast e metas regionais com backtesting |
 | v2 | Personas do agente (Helena, Analista, Regional) com golden set por persona |
 | v2 | DQ por camada + Lakehouse Monitoring; expectations de volume bloqueantes |

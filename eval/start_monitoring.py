@@ -21,7 +21,6 @@ import os
 import sys
 from collections.abc import Sequence
 
-EXPERIMENT = "/Shared/atlas/agent-traces"
 JUDGE_MODEL = "databricks:/databricks-gpt-oss-120b"
 SAMPLE_RATE = 0.20
 NAMES = ("atlas_refusal_quality", "atlas_safety", "atlas_relevance")
@@ -30,7 +29,11 @@ NAMES = ("atlas_refusal_quality", "atlas_safety", "atlas_relevance")
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--profile", required=True, help="perfil da CLI do Databricks (explícito)")
-    parser.add_argument("--experiment", default=EXPERIMENT)
+    parser.add_argument(
+        "--experiment-id",
+        required=True,
+        help="id do experiment atlas_agent_traces (bundle summary)",
+    )
     parser.add_argument("--judge-model", default=JUDGE_MODEL)
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--start", action="store_true")
@@ -48,7 +51,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     mlflow.set_tracking_uri("databricks")
-    mlflow.set_experiment(args.experiment)
+    mlflow.set_experiment(experiment_id=args.experiment_id)
     if args.stop:
         for name in NAMES:
             get_scorer(name=name).stop()

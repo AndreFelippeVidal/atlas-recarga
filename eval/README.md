@@ -74,7 +74,10 @@ Passos do mantenedor, no `dev`:
 ```bash
 databricks bundle deploy -t dev --profile <perfil>
 # Beta primeiro: liga os 3 judges (amostra de 20%). Sem --start só mostra o que faria.
-uv run --project apps/agent python eval/start_monitoring.py --profile <perfil> --start
+# --experiment-id: o id de atlas_agent_traces em `databricks bundle summary -t dev` (no dev o nome
+# ganha o prefixo do bundle, então o caminho /Shared/atlas/agent-traces não serve).
+uv run --project apps/agent python eval/start_monitoring.py --profile <perfil> \
+    --experiment-id <id> --start
 # Gere tráfego no agente e rode o job; depois confira.
 databricks bundle run atlas_agent_monitoring -t dev --profile <perfil>
 uv run python scripts/check_agent_monitoring.py --profile <perfil> --warehouse-id <id> --catalog atlas_dev

@@ -31,7 +31,14 @@ def test_job_runs_daily_at_7_after_atlas_daily() -> None:
     assert job["schedule"]["timezone_id"] == "America/Sao_Paulo"
     (task,) = job["tasks"]
     assert task["spark_python_task"]["python_file"] == "eval/run_agent_monitoring.py"
-    assert task["spark_python_task"]["parameters"] == ["${var.catalog}"]
+    params = task["spark_python_task"]["parameters"]
+    assert params[0] == "${var.catalog}"
+    # Sem __file__ no serverless: o caminho de eval/ e o id do experiment vêm do bundle.
+    assert params[params.index("--eval-dir") + 1] == "${workspace.file_path}/eval"
+    assert (
+        params[params.index("--experiment-id") + 1]
+        == "${resources.experiments.atlas_agent_traces.id}"
+    )
 
 
 def test_alert_watches_the_alert_view_below_90_percent() -> None:
