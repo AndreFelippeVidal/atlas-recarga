@@ -27,7 +27,7 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
 |---|---|---|
 | `ATLAS_GATEWAY_MODE` | `unity` | Só `unity`; o plano B `classic` (ADR-0007) não foi implementado e falha na subida |
 | `ATLAS_LLM_SERVICE` | `system.ai.gpt-oss-120b` | Model service de **três partes** (o nome curto cai no endpoint legado, 403) |
-| `ATLAS_LLM_REQUEST_TAGS` | `0` | `1` envia `request_tags` ao gateway (não validado; ver abaixo) |
+| `ATLAS_LLM_REQUEST_TAGS` | `0` | `1` envia `request_tags` ao gateway, no cabeçalho `Databricks-Ai-Gateway-Request-Tags` |
 | `ATLAS_CATALOG` | `atlas` | Catálogo das UC functions (`atlas_dev` no `dev`; o bundle injeta) |
 | `ATLAS_GENIE_SPACE_ID` | (recurso `genie-space`) | Space do `ask_genie`; o App recebe `CAN_RUN` |
 | `ATLAS_APP_VERSION`, `ATLAS_PROMPT_VERSION` | `dev`, `p10.3-tools` | Tags do trace |
@@ -39,8 +39,8 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
    (permissão de serving endpoint não vale; lição do S0.1/S0.2).
 3. Abra o App e escreva "olá".
 4. Depois de alguns minutos até ~1 h: `uv run python scripts/check_agent_skeleton.py --profile andrevidal --warehouse-id <id>`.
-5. Confira na UI o trace com as tags. Para validar `request_tags`, ponha `ATLAS_LLM_REQUEST_TAGS=1`
-   no `app.yaml`/bundle, redeploye e veja se a coluna `request_tags` da `usage` vem preenchida.
+5. Confira na UI o trace com as tags. A coluna `request_tags` da `usage` vem preenchida porque o
+   bundle liga `ATLAS_LLM_REQUEST_TAGS=1`.
 
 ## Conferência da P10.3 (mantenedor)
 
@@ -48,7 +48,7 @@ Pré-requisito: `EXECUTE` + `SELECT` em
 `semantic` para o service principal do App (`scripts/setup_workspace.py --reader <client_id>`,
 ADR-0016).
 
-1. Deploy e `bundle run` como acima, com `ATLAS_LLM_REQUEST_TAGS=1` no bundle.
+1. Deploy e `bundle run` como acima.
 2. No App, pergunte o GS-001: "Qual foi a receita de recarga da rede em outubro de 2026?"
 3. `uv run python scripts/check_agent_tools.py --profile andrevidal --warehouse-id <id> --catalog atlas_dev`
    (traz o valor esperado do GS-001 e confere `request_tags` na `usage`).
@@ -56,5 +56,5 @@ ADR-0016).
 
 Verificado contra o workspace: o Genie Agent MCP expõe `query_space_<id>` (argumento `query`) e
 `poll_response_<id>` (`conversation_id`, `message_id`); a resposta traz `conversationId`,
-`messageId` e `status` (`COMPLETED` ao fim). Não verificado ainda: o formato do `extra_params` de
-`request_tags` e se o `DatabricksMCPClient` emite um span próprio.
+`messageId` e `status` (`COMPLETED` ao fim). `request_tags` vai no cabeçalho do gateway como mapa
+JSON (no corpo dá 400). Os spans do App se chamam `ask_genie` e `fn_*`.
