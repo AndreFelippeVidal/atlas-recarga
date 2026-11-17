@@ -30,7 +30,7 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
 | `ATLAS_LLM_REQUEST_TAGS` | `0` | `1` envia `request_tags` ao gateway, no cabeçalho `Databricks-Ai-Gateway-Request-Tags` |
 | `ATLAS_CATALOG` | `atlas` | Catálogo das UC functions (`atlas_dev` no `dev`; o bundle injeta) |
 | `ATLAS_GENIE_SPACE_ID` | (recurso `genie-space`) | Space do `ask_genie`; o App recebe `CAN_RUN` |
-| `ATLAS_APP_VERSION`, `ATLAS_PROMPT_VERSION` | `dev`, `p10.3-tools` | Tags do trace |
+| `ATLAS_APP_VERSION`, `ATLAS_PROMPT_VERSION` | `dev`, `v1` | Tags do trace; `ATLAS_PROMPT_VERSION` escolhe o arquivo `prompts/<versão>.md` |
 
 ## Deploy e conferência (mantenedor)
 
@@ -58,3 +58,21 @@ Verificado contra o workspace: o Genie Agent MCP expõe `query_space_<id>` (argu
 `poll_response_<id>` (`conversation_id`, `message_id`); a resposta traz `conversationId`,
 `messageId` e `status` (`COMPLETED` ao fim). `request_tags` vai no cabeçalho do gateway como mapa
 JSON (no corpo dá 400). Os spans do App se chamam `ask_genie` e `fn_*`.
+
+## Prompt (P10.4)
+
+O system prompt é `prompts/v1.md` (SPEC-005 §4): lista fechada de tools e seus argumentos, `Fonte:`,
+recusa sem tool, último mês fechado e PT-BR. A versão vai na tag `prompt_version` do trace e nas
+`request_tags`. **Mudou o texto, crie `v2.md`**: o arquivo publicado não se edita, e o gate da
+SPEC-008 filtra por `prompts/**`.
+
+Conferência (mantenedor), a partir de `apps/agent`, com o ambiente do App:
+
+```bash
+uv run --project apps/agent python scripts/check_agent_refusals.py --profile andrevidal \
+  --catalog atlas_dev --warehouse-id <id> --genie-space-id <id>
+```
+
+Roda GS-026 a GS-030 (nenhuma tool chamada, pelo scorer da P9.3), uma métrica (bloco `Fonte:`) e
+uma pergunta sem período (declara o mês assumido). Imprime as respostas para você julgar a recusa.
+O 429 do endpoint é tentado de novo, e a resposta de um LLM varia: rode duas ou três vezes.

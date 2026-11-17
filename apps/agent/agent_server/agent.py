@@ -22,6 +22,7 @@ from mlflow.types.responses import (
 )
 
 from agent_server.config import AgentConfig, load_config
+from agent_server.prompts import load_prompt
 from agent_server.tools import build_tools
 from agent_server.utils import (
     get_session_id,
@@ -36,8 +37,7 @@ logging.getLogger("mlflow.utils.autologging_utils").setLevel(logging.ERROR)
 USER_HEADERS = ("x-forwarded-email", "x-forwarded-preferred-username", "x-forwarded-user")
 CONFIG = load_config()  # falha no start se ATLAS_* for inválida
 
-# Provisório: o system prompt completo (Fonte:, recusa, último mês fechado) é a P10.4.
-SYSTEM_PROMPT = "Você é o assistente de dados da rede de recarga Eaí? Telecom. Responda em PT-BR."
+SYSTEM_PROMPT = load_prompt(CONFIG.prompt_version)  # falha no start se a versão não existir
 
 
 def build_llm(config: AgentConfig) -> ChatDatabricks:
