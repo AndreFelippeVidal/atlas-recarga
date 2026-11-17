@@ -41,7 +41,7 @@ flowchart LR
 - `measure` fora da lista (ou `NULL`) falha com `INVALID_MEASURE`, e `level` fora de `region|uf|municipality|ddd` com `INVALID_LEVEL`, mesmo que o mês não tenha linhas. Não há SQL dinâmico.
 - Os leitores (agente, MCP, React) recebem `EXECUTE` no schema `semantic` por principal (ADR-0016), além do `SELECT`.
 
-O `ask_genie` usa o **Genie Agent MCP**, restrito ao Space `Atlas Recarga`, e não o Genie One MCP (`system.ai.genie_one_mcp`): este responde sobre o workspace inteiro e fugiria da lista fechada. A troca tem um custo aceito: o Genie Agent MCP **não passa pelo Unity Gateway** (a documentação do Databricks o diz), então a chamada não aparece como `MCP_SERVICE` na `usage`; a observabilidade dessa tool vem do span no trace MLflow e a governança, do `CAN RUN` no Space e dos grants em `semantic`. O endpoint é Public Preview e exige o preview *Managed MCP Servers*.
+O `ask_genie` usa o **Genie Agent MCP** ([ADR-0020](../../adr/0020-genie-agent-mcp-for-ask-genie.md)), restrito ao Space `Atlas Recarga`, e não o Genie One MCP (`system.ai.genie_one_mcp`): este responde sobre o workspace inteiro e fugiria da lista fechada. A troca tem um custo aceito: o Genie Agent MCP **não passa pelo Unity Gateway** (a documentação do Databricks o diz), então a chamada não aparece como `MCP_SERVICE` na `usage`; a observabilidade dessa tool vem do span no trace MLflow e a governança, do `CAN RUN` no Space e dos grants em `semantic`. O endpoint é Public Preview e exige o preview *Managed MCP Servers*.
 
 Nenhuma outra tool existe. **Não há** tool de SQL livre, de escrita, de execução de job nem de acesso a `commission.batches`, `batch_lines` ou a qualquer schema fora de `semantic`.
 
