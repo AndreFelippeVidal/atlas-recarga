@@ -11,6 +11,8 @@ import mlflow
 from databricks.sdk import WorkspaceClient
 from databricks_langchain import ChatDatabricks
 from langchain.agents import create_agent
+from langchain.agents.middleware import AgentMiddleware, ToolCallRequest
+from langchain.messages import ToolMessage
 from mlflow.genai.agent_server import get_request_headers, invoke, stream
 from mlflow.types.responses import (
     ResponsesAgentRequest,
@@ -40,7 +42,7 @@ SYSTEM_PROMPT = "Você é o assistente de dados da rede de recarga Eaí? Telecom
 
 def build_llm(config: AgentConfig) -> ChatDatabricks:
     """Chama o model service de três partes pelo Unity Gateway (nunca o endpoint legado)."""
-    extra = {"request_tags": config.request_tags()} if config.send_request_tags else None
+    extra = {"extra_headers": config.request_tags_headers()} if config.send_request_tags else None
     return ChatDatabricks(model=config.llm_service, use_ai_gateway=True, extra_params=extra)
 
 
@@ -52,8 +54,40 @@ def _tools() -> list:
     return build_tools(CONFIG, WorkspaceClient())
 
 
+class ToolErrorsAsMessages(AgentMiddleware):
+    """Erro de tool (argumento faltando, Genie indisponível ou com timeout) vira mensagem para o
+    modelo, que corrige a chamada ou tenta a UC function equivalente (SPEC-005 §6). Sem isso a
+    exceção derruba a requisição inteira."""
+
+    @staticmethod
+    def _message(request: ToolCallRequest, error: Exception) -> ToolMessage:
+        logger.warning("tool %s falhou: %s", request.tool_call["name"], error)
+        return ToolMessage(
+            content=f"Erro ao executar a tool: {error}",
+            tool_call_id=request.tool_call["id"],
+            status="error",
+        )
+
+    def wrap_tool_call(self, request: ToolCallRequest, handler):
+        try:
+            return handler(request)
+        except Exception as error:
+            return self._message(request, error)
+
+    async def awrap_tool_call(self, request: ToolCallRequest, handler):
+        try:
+            return await handler(request)
+        except Exception as error:
+            return self._message(request, error)
+
+
 def build_agent(tools: list, config: AgentConfig = CONFIG):
-    return create_agent(model=build_llm(config), tools=tools, system_prompt=SYSTEM_PROMPT)
+    return create_agent(
+        model=build_llm(config),
+        tools=tools,
+        system_prompt=SYSTEM_PROMPT,
+        middleware=[ToolErrorsAsMessages()],
+    )
 
 
 @lru_cache(maxsize=256)

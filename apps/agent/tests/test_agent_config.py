@@ -29,3 +29,14 @@ def test_trace_tags_have_spec_keys() -> None:
 
 def test_request_tags_opt_in() -> None:
     assert load_config({"ATLAS_LLM_REQUEST_TAGS": "1"}).send_request_tags is True
+
+
+def test_request_tags_go_in_gateway_header_as_json_map() -> None:
+    import json
+
+    headers = load_config({"ATLAS_PROMPT_VERSION": "v"}).request_tags_headers()
+    assert list(headers) == ["Databricks-Ai-Gateway-Request-Tags"]
+    assert json.loads(headers["Databricks-Ai-Gateway-Request-Tags"]) == {
+        "app": "agent-atlas",
+        "prompt_version": "v",
+    }

@@ -5,12 +5,14 @@ Sem imports pesados: o módulo é testado no CI sem mlflow nem langchain.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
 DEFAULT_LLM_SERVICE = "system.ai.gpt-oss-120b"
+GATEWAY_TAGS_HEADER = "Databricks-Ai-Gateway-Request-Tags"
 DEFAULT_EXPERIMENT = "/Shared/atlas/agent"
 SUPPORTED_GATEWAY_MODES = ("unity",)  # "classic" (plano B do ADR-0007) não foi acionado
 
@@ -51,6 +53,10 @@ class AgentConfig:
     def uc_function_names(self) -> list[str]:
         """As UC functions da lista fechada da SPEC-005 §3, qualificadas no catálogo do target."""
         return [f"{self.catalog}.semantic.{name}" for name in UC_FUNCTIONS]
+
+    def request_tags_headers(self) -> dict[str, str]:
+        """Cabeçalho do gateway com as tags (mapa JSON String -> String; no corpo dá 400)."""
+        return {GATEWAY_TAGS_HEADER: json.dumps(self.request_tags())}
 
     def request_tags(self) -> dict[str, str]:
         """Tags enviadas ao gateway para dimensionar o uso por agente (não validado no S0.2)."""
