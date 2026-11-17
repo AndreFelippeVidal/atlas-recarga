@@ -31,6 +31,7 @@ from typing import Any
 
 DEFAULT_JUDGE_MODEL = "databricks:/databricks-gpt-oss-120b"
 DEFAULT_WINDOW_DAYS = 3
+DEFAULT_JUDGE_RATE = 0.20  # SPEC-008 §6; igual a monitoring.JUDGE_SAMPLE_RATE
 TERMINAL_STATES = frozenset({"OK", "ERROR"})
 MAX_TRACES = 2000
 
@@ -115,6 +116,7 @@ def existing_scores(spark: Any, table: str) -> set[tuple[str, str]]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    global mon
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("catalog")
     parser.add_argument("--eval-dir", required=True, help="pasta eval/ sincronizada pelo bundle")
@@ -125,9 +127,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--window-days", type=int, default=DEFAULT_WINDOW_DAYS)
     parser.add_argument("--judge-model", default=DEFAULT_JUDGE_MODEL)
-    parser.add_argument("--judge-rate", type=float, default=mon.JUDGE_SAMPLE_RATE)
+    parser.add_argument("--judge-rate", type=float, default=DEFAULT_JUDGE_RATE)
     args = parser.parse_args(argv)
-    global mon
     mon = _load_monitoring(args.eval_dir)
 
     import mlflow
