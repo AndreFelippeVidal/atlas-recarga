@@ -8,7 +8,7 @@ App em AI Gateway > Agents (S0.2).
 **P10.3 (tools):** a lista fechada da SPEC-005 §3: `ask_genie` (Genie Agent MCP, restrito ao Space
 `Atlas Recarga`; **não** passa pelo Unity Gateway) e as UC functions `fn_list_metrics`,
 `fn_metric_by_region` e `fn_compare_months`. As tools usam os nomes curtos que o scorer
-`read_only_tools` espera. Os traces vão para o experiment do bundle (`/Shared/atlas/agent`;
+`read_only_tools` espera. Os traces vão para o experiment do bundle (`/Shared/atlas/agent-traces` desde a P10.5; antes, `/Shared/atlas/agent`;
 no `dev` o nome leva o prefixo do usuário) com as tags `user`, `app_version`, `prompt_version` e
 `llm_service`.
 
@@ -26,7 +26,7 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
 | Variável | Padrão | O que faz |
 |---|---|---|
 | `ATLAS_GATEWAY_MODE` | `unity` | Só `unity`; o plano B `classic` (ADR-0007) não foi implementado e falha na subida |
-| `ATLAS_LLM_SERVICE` | `system.ai.gpt-oss-120b` | Model service de **três partes** (o nome curto cai no endpoint legado, 403) |
+| `ATLAS_LLM_SERVICE` | `system.ai.gpt-oss-120b` | Model service de **três partes** (o nome curto cai no endpoint legado, 403). No bundle: `<catalog>.observability.agent_llm` (P10.5) |
 | `ATLAS_LLM_REQUEST_TAGS` | `0` | `1` envia `request_tags` ao gateway, no cabeçalho `Databricks-Ai-Gateway-Request-Tags` |
 | `ATLAS_CATALOG` | `atlas` | Catálogo das UC functions (`atlas_dev` no `dev`; o bundle injeta) |
 | `ATLAS_GENIE_SPACE_ID` | (recurso `genie-space`) | Space do `ask_genie`; o App recebe `CAN_RUN` |
@@ -87,3 +87,30 @@ O 429 do endpoint é tentado de novo.
 (medido em 9 execuções; reposicionar a regra no prompt não melhorou). As demais checagens
 passaram em todas. O golden set não tem caso sem período, então o gate de 90% não o pega: ver o
 follow-up no PR.
+
+## Limites e guardrails (P10.5, ADR-0021)
+
+- **Gateway:** o bundle cria o model service `<catalog>.observability.agent_llm` (destino
+  `system.ai.gpt-oss-120b`) com 30 req/min (`USER_DEFAULT`, que para o gateway é o service principal
+  do App, não o usuário final), 500.000 tokens/hora no serviço (o freio de gasto; o pior turno da
+  P10.2 foi de 143.841) e inference table `agent_llm_payload`. O App recebe `EXECUTE` pelo bundle.
+- **App:** `agent_server/guardrails.py` mascara CPF, telefone e e-mail na resposta final (o
+  texto sai inteiro no fim, sem deltas de token) e marca o trace com `pii_masked = true`. Um 429 do
+  gateway vira "Limite de uso atingido, tente em 1 minuto." e a tag `error_type = rate_limited`.
+- **Gasto mensal:** o gateway não bloqueia por mês. O aviso é um orçamento de conta, criado pelo
+  mantenedor com um perfil de **conta** (`databricks account budgets create --json @budget.json`):
+  `resource_type` `BUDGET_RESOURCE_TYPE_UNITY_AI_GATEWAY`, filtro `workspace_id`, alerta
+  `CUMULATIVE_SPENDING_EXCEEDED` mensal por e-mail com o valor que você escolher. Ele avisa e não
+  bloqueia.
+
+Conferência (mantenedor), nesta ordem:
+
+1. `databricks bundle deploy -t dev --profile andrevidal` (cria o model service e o grant; se o
+   App já roda, `databricks bundle run agent_atlas -t dev --profile andrevidal` para pegar o novo
+   `ATLAS_LLM_SERVICE`).
+2. Trace tables: `uv run --project apps/agent python scripts/setup_agent_trace_tables.py --profile
+   andrevidal --catalog atlas_dev --warehouse-id <id> --experiment-id <id do atlas_agent_traces> --app-sp <client_id>`
+   (dry-run; acrescente `--apply`). **Não foi exercitado contra o workspace.**
+3. `uv run python scripts/check_agent_guardrails.py --profile andrevidal --warehouse-id <id>
+   --catalog atlas_dev` (configuração, rajada com 429 e inference table).
+4. No App: confirme que a resposta **aparece** na chat UI (o texto agora chega inteiro, sem deltas); faça a pergunta com o CPF e a rajada de mais de 30 mensagens (o script imprime o texto). Se um novo `bundle deploy` recriar o experiment, rode o passo 2 de novo; se o deploy falhar por recurso ainda inexistente, rode-o outra vez.

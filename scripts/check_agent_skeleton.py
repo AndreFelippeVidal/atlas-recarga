@@ -28,7 +28,12 @@ from collections.abc import Sequence
 from typing import Any
 
 APP_NAME = "agent-atlas"
+# P10.5 (ADR-0021): o agente passou a usar o model service próprio
+# `<catalog>.observability.agent_llm`
+# (destino system.ai.gpt-oss-120b). O nome que a `usage` grava em `destination_name` não foi
+# verificado, então aceitamos os dois.
 EXPECTED_SERVICE = "system.ai.gpt-oss-120b"
+EXPECTED_SERVICES = (EXPECTED_SERVICE, "agent_llm")
 _UUID = re.compile(r"^[0-9a-fA-F-]{8,64}$")
 
 
@@ -65,9 +70,17 @@ def evaluate_usage(rows: Sequence[Sequence[str | None]]) -> list[str]:
     """Problemas da `usage`: precisa ter chamada 200 ao model service esperado."""
     if not rows:
         return ["nenhuma linha na usage (o atraso chega a ~1 h; converse com o agente e repita)"]
-    ok = [r for r in rows if r[1] == "MODEL_SERVICE" and r[2] == EXPECTED_SERVICE and r[3] == "200"]
+    ok = [
+        r
+        for r in rows
+        if r[1] == "MODEL_SERVICE"
+        and any(name in (r[2] or "") for name in EXPECTED_SERVICES)
+        and r[3] == "200"
+    ]
     return (
-        [] if ok else [f"{len(rows)} linhas, mas nenhuma 200 em {EXPECTED_SERVICE} (MODEL_SERVICE)"]
+        []
+        if ok
+        else [f"{len(rows)} linhas, mas nenhuma 200 em {EXPECTED_SERVICES} (MODEL_SERVICE)"]
     )
 
 

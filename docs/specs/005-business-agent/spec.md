@@ -61,10 +61,14 @@ Nenhuma outra tool existe. **Não há** tool de SQL livre, de escrita, de execu�
 
 **Prompt versionado:** o system prompt vive em `apps/agent/prompts/<prompt_version>.md` e `ATLAS_PROMPT_VERSION` escolhe o arquivo; a mesma versão vai na tag `prompt_version` do trace e nas `request_tags`. Mudar o texto exige uma versão nova (o gate da SPEC-008 filtra por `prompts/**`).
 
-Guardrails no Unity Gateway. O S0.1 só mostrou que `rate_limits` e `service_policies` existem por model service, vazios por padrão; PII, bloqueio de tópico, limite por usuário e teto de gasto **não foram validados** e ficam para a P10.5: detecção de PII na saída e bloqueio de tópicos fora do escopo. Rate limit de **30 requisições por minuto por usuário** e **teto de gasto mensal** configurado.
+Guardrails e limites ([ADR-0021](../../adr/0021-agent-gateway-limits-and-pii-fallback.md)). O spike da P10.5 mostrou que a API do model service só tem `routing`, `rate_limits` e `inference_table`: **não há guardrail de PII nem de tópico no gateway**, e o orçamento de gasto só avisa. O agente usa um model service próprio no bundle (destino `system.ai.gpt-oss-120b`), com:
+- **Rate limit** de **30 requisições por minuto** (`RATE_LIMIT_KEY_USER_DEFAULT`). O requester que o gateway vê é o service principal do App, então o limite vale para o App inteiro, não por usuário final.
+- **Freio de gasto:** 500.000 tokens por hora no serviço (`RATE_LIMIT_KEY_SERVICE`), dimensionado pelo pior turno da P10.2 (143.841 tokens). O aviso mensal é um orçamento de conta com alerta por e-mail, que notifica e não bloqueia.
+- **PII na saída:** filtro determinístico no App (CPF, telefone, e-mail) que mascara o trecho e marca o trace com `pii_masked = true`. Tópicos fora do escopo: a recusa do prompt (regra 3), medida pelo golden set.
+- **Inference table** do LLM em `atlas.observability.agent_llm_payload`.
 
 ## 5. Observabilidade
-- `mlflow.langchain.autolog()` com tracing ligado; experiment `/Shared/atlas/agent`. Trace tables no UC em `atlas.observability.agent_*` (declaradas como recursos do App).
+- `mlflow.langchain.autolog()` com tracing ligado; experiment `/Shared/atlas/agent-traces`. Trace tables no UC em `atlas.observability.agent_*`, ligadas a esse experiment por `scripts/setup_agent_trace_tables.py`. O MLflow só liga um trace location UC a um experiment **sem traces**, por isso é um experiment novo; o `/Shared/atlas/agent` (traces da P10.2 a P10.4 e o dataset do golden set) continua como está.
 - Cada trace guarda as tags `user`, `app_version`, `prompt_version`, `llm_service`.
 - O uso do LLM aparece em `system.ai_gateway.usage` (`service_type = 'MODEL_SERVICE'`), com atraso de minutos a cerca de 1 hora (S0.2). Alertas quase em tempo real vêm do trace, não da `usage`.
 - A atribuição por agente é pelo `requester` (service principal do App) e por `invocation_metadata.source = 'DATABRICKS_APPS'`; não há coluna com o nome do App. O agente envia `request_tags` na chamada ao LLM (`ATLAS_LLM_REQUEST_TAGS=1`), e elas dimensionam o uso por agente na coluna `request_tags` da `usage`. Validado na P10.3: o gateway rejeita `request_tags` no corpo (400) e exige o cabeçalho `Databricks-Ai-Gateway-Request-Tags` com um mapa JSON String -> String. O span de cada tool (`ask_genie`, `fn_*`) chega ao experiment a partir do App. O `ask_genie` (Genie Agent MCP) **não** aparece na `usage`: o endpoint não passa pelo Unity Gateway (§3). Na P10.2 o App não repassa o e-mail do usuário em cabeçalho; a tag `user` do trace vem de `current_user.me()` com o `x-forwarded-access-token`.
@@ -85,7 +89,7 @@ Guardrails no Unity Gateway. O S0.1 só mostrou que `rate_limits` e `service_pol
 - **Dado** "qual o telefone do assinante SUB-…", **então** o agente recusa.
 - **Dado** "como foi a receita?" sem período, **então** usa o último mês fechado e declara isso.
 - **Dado** qualquer conversa, **então** existe um trace no experiment e, em até 2 h (atraso da system table, S0.2), uma linha de uso em `system.ai_gateway.usage`.
-- **Dado** o service principal do App, **então** ele não tem permissão em nenhum objeto fora de `atlas.semantic` e do Genie Space.
+- **Dado** o service principal do App, **então** ele não lê nenhum dado fora de `atlas.semantic` e do Genie Space. As únicas outras permissões são as dos recursos do próprio agente em `atlas.observability`: `EXECUTE` no model service `agent_llm` (ADR-0021) e a escrita nas trace tables `agent_*` (§5).
 - **Dado** a carga de demo (10 perguntas sequenciais), **então** a latência p95 fica abaixo de 15s.
 
 ## 8. Fora de escopo
