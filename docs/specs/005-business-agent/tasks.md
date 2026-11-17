@@ -43,7 +43,7 @@
 - **Depende de:** P9.3, P10.4
 - **Pronto quando:** Run do MLflow linkado no PR
 - **Passos:**
-  - Antes de rodar a avaliação, cobrir a regra do período ausente (SPEC-005 §4, regra 3), que o gate de 90% não mede hoje: na P10.4 o `v1` a cumpriu em só 60 a 75% das execuções.
+  - Antes de rodar a avaliação, cobrir a regra do período ausente (SPEC-005 §4, regra 4), que o gate de 90% não mede hoje: na P10.4 o `v1` a cumpriu em só 60 a 75% das execuções.
     - Atualizar a SPEC-008 §3 (nova categoria `no_period` e a contagem do golden set) num commit `docs(specs)` anterior ao código.
     - Acrescentar a `eval/golden_set.yaml` ao menos um caso `no_period` (pergunta sem mês, como "Como foi a receita da rede?") com a `reference_sql` do último mês com dados, e sincronizar o dataset (`atlas_eval_sync`).
     - Escrever o scorer de código `declares_assumed_month` em `eval/scorers.py`: a resposta declara o mês assumido nos primeiros caracteres, o mês vem de uma tool e o valor bate com o do último mês com dados; `n/a` nas outras categorias; testes unitários com traces fake (cobertura ≥ 90%, como os demais).
