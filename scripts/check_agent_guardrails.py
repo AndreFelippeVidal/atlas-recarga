@@ -12,7 +12,9 @@ O que faz:
    30 req/min, freio de 500.000 tokens/hora e inference table.
 2. Dispara uma rajada de chamadas de 1 token ao serviço (`--burst`, padrão 45, em paralelo) e
    exige pelo menos uma resposta 429. Gasta poucos tokens; roda como o usuário do perfil, e o
-   limite `USER_DEFAULT` vale por requester.
+   limite `USER_DEFAULT` vale por requester. A CLI do Databricks refaz sozinha as chamadas com 429,
+   então o 429 não aparece no retorno dela: ele é contado na inference table (`status_code = 429`
+   desde o começo da rajada; o script espera até 3 min pelas linhas).
 3. Lê a inference table `agent_llm_payload` (a linha pode atrasar alguns minutos).
 
 A política de PII e a mensagem do 429 no agente são do App (`agent_server/guardrails.py`, testadas
@@ -27,8 +29,10 @@ import json
 import re
 import subprocess  # a CLI do Databricks é a única coisa que chamamos
 import sys
+import time
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 SERVICE_NAME = "agent_llm"
@@ -71,12 +75,13 @@ def evaluate_service(service: dict[str, Any]) -> list[str]:
     return problems
 
 
-def evaluate_burst(outcomes: Sequence[str]) -> list[str]:
-    """`outcomes` traz `ok`, `429` ou `erro: ...` por chamada; precisa de ao menos um 429."""
+def evaluate_burst(outcomes: Sequence[str], logged_429: int = 0) -> list[str]:
+    """`outcomes` traz `ok`, `429` ou `erro: ...` por chamada; `logged_429` são os 429 que a
+    inference table registrou na rajada. Precisa de ao menos um 429 em algum dos dois."""
     other = [o for o in outcomes if o not in ("ok", "429")]
     if other:
         return [f"{len(other)} chamadas falharam por outro motivo, ex.: {other[0]}"]
-    if "429" not in outcomes:
+    if "429" not in outcomes and logged_429 < 1:
         return [
             f"nenhum 429 em {len(outcomes)} chamadas; o limite de {REQUESTS_PER_MINUTE}/min "
             "não vale"
@@ -135,6 +140,17 @@ def _sql(profile: str, warehouse_id: str, statement: str) -> list[list[str | Non
     return list(response.get("result", {}).get("data_array", []))
 
 
+def burst_429_query(catalog: str, since_utc: str) -> str:
+    if not _IDENT.fullmatch(catalog) or not re.fullmatch(
+        r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d", since_utc
+    ):
+        raise ValueError("catalog ou instante inválido")
+    return (
+        f"SELECT COUNT(*) FROM {catalog}.{SCHEMA}.{SERVICE_NAME}_payload "  # noqa: S608
+        f"WHERE status_code = 429 AND event_time >= TIMESTAMP '{since_utc}'"
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--profile", required=True, help="perfil da CLI do Databricks (explícito)")
@@ -157,10 +173,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"{'FALHA' if problems else 'ok   '} model service {service}: {problems or 'config ok'}")
     failed |= bool(problems)
 
+    # 30 s de folga para o relógio local diferir do servidor
+    started = (datetime.now(UTC) - timedelta(seconds=30)).strftime("%Y-%m-%d %H:%M:%S")
     with ThreadPoolExecutor(max_workers=10) as pool:
         outcomes = list(pool.map(lambda _: _call_once(args.profile, service), range(args.burst)))
-    problems = evaluate_burst(outcomes)
-    summary = f"{outcomes.count('ok')} ok, {outcomes.count('429')} com 429"
+    logged = 0
+    for _ in range(18):  # a inference table atrasa; espera até ~3 min
+        rows = _sql(args.profile, args.warehouse_id, burst_429_query(args.catalog, started))
+        logged = int(rows[0][0] or 0) if rows else 0
+        if logged:
+            break
+        time.sleep(10)
+    problems = evaluate_burst(outcomes, logged)
+    summary = (
+        f"{outcomes.count('ok')} ok no retorno da CLI; {logged} respostas 429 na inference table"
+    )
     print(f"{'FALHA' if problems else 'ok   '} rajada de {args.burst}: {problems or summary}")
     failed |= bool(problems)
 

@@ -57,6 +57,8 @@ def test_service_wrong_numbers_fail() -> None:
 def test_burst_needs_a_429_and_no_other_error() -> None:
     assert chk.evaluate_burst(["ok"] * 30 + ["429"] * 5) == []
     assert chk.evaluate_burst(["ok"] * 40)
+    # a CLI refaz as chamadas com 429: o retorno é todo ok e o 429 está na inference table
+    assert chk.evaluate_burst(["ok"] * 45, logged_429=136) == []
     assert chk.evaluate_burst(["ok", "429", "erro: boom"])
 
 
@@ -76,3 +78,13 @@ def test_payload_rows() -> None:
 def test_burst_body_uses_three_part_name_and_one_token() -> None:
     body = chk.burst_body("atlas_dev.observability.agent_llm")
     assert body["model"].count(".") == 2 and body["max_tokens"] == 1
+
+
+def test_burst_429_query_validates_its_inputs() -> None:
+    import pytest
+
+    q = chk.burst_429_query("atlas_dev", "2026-11-17 16:20:00")
+    assert "status_code = 429" in q and "atlas_dev.observability.agent_llm_payload" in q
+    for bad in (("atlas; DROP", "2026-11-17 16:20:00"), ("atlas_dev", "x' OR 1=1 --")):
+        with pytest.raises(ValueError):
+            chk.burst_429_query(*bad)
