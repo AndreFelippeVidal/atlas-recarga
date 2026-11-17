@@ -9,6 +9,7 @@
 # P8.6: job `atlas_commission_review` (uma transição por execução; só uma pessoa dispara, nunca um agente).
 # P8.7: a aprovação final também trava o lote e grava a remessa; o job de deploy cria o Volume `commission.remittance`.
 # P8.8: dashboard `commission_review` (lê só commission.*; filtro por lote) e notebook commission/commission_review.py.
+# P10.8: job `atlas_agent_monitoring` (07:00; pontua os traces do agente), dashboard `agent_quality` e SQL alert.
 # P9.2: job `atlas_eval_sync` (golden set do YAML para <catalog>.eval.agent_golden_set).
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml); P10.1: + UC functions fn_* do agente.
 # P6.1: pipeline `atlas_medallion` (um só, serverless; a Free Edition permite 1 ativo por tipo).
@@ -43,6 +44,38 @@ resources:
       # Relatório do próprio domínio (SPEC-003 §5.4): lê commission.*, não consome semantic.
       dataset_catalog: ${var.catalog}
       dataset_schema: commission
+
+    agent_quality:
+      display_name: "Atlas — Qualidade do agente"
+      file_path: semantic/dashboards/agent_quality.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      # P10.8 (SPEC-008 §6): lê só as views de observability do próprio agente, não o semantic.
+      dataset_catalog: ${var.catalog}
+      dataset_schema: observability
+
+  alerts:
+    agent_quality_below_90:
+      display_name: "Atlas — Qualidade do agente abaixo de 90%"
+      custom_summary: "Média de 7 dias de cites_metric_view ou read_only_tools abaixo de 90%"
+      custom_description: "SPEC-008 §6. Veja o dashboard Atlas — Qualidade do agente e a fila atlas.eval.review_queue."
+      warehouse_id: ${var.warehouse_id}
+      query_text: "SELECT scorer, pass_rate_7d FROM ${var.catalog}.observability.agent_quality_alert"
+      evaluation:
+        comparison_operator: LESS_THAN
+        source:
+          name: pass_rate_7d
+          aggregation: MIN
+        threshold:
+          value:
+            double_value: 0.9
+        notification:
+          notify_on_ok: false
+          # Quem faz o deploy do bundle (o dono); sem e-mail fixo no repositório.
+          subscriptions:
+            - user_email: ${workspace.current_user.userName}
+      schedule:
+        quartz_cron_schedule: "0 30 7 * * ?"
+        timezone_id: America/Sao_Paulo
 
   genie_spaces:
     atlas_recarga:
@@ -323,6 +356,28 @@ resources:
             parameters:
               - ${var.catalog}
               - ${workspace.file_path}/eval/golden_set.yaml
+
+    atlas_agent_monitoring:
+      name: atlas_agent_monitoring
+      description: "Pontua os traces reais do agente (SPEC-008 §6, P10.8): scorers de código em 100% e LLM judges em 20%. Grava observability.agent_quality_* e a fila eval.review_queue. Idempotente; só lê traces e escreve nas próprias tabelas."
+      # 07:00 em Brasília, depois do atlas_daily (06:00).
+      schedule:
+        quartz_cron_expression: "0 0 7 * * ?"
+        timezone_id: America/Sao_Paulo
+      max_concurrent_runs: 1
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - "mlflow[databricks]>=3.9.0"
+      tasks:
+        - task_key: score_traces
+          environment_key: default
+          spark_python_task:
+            python_file: eval/run_agent_monitoring.py
+            parameters:
+              - ${var.catalog}
 
     atlas_commission_deploy:
       name: atlas_commission_deploy

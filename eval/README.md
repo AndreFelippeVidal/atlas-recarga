@@ -51,3 +51,33 @@ Custo: ~31 chamadas ao agente por execução, com o limite de 30 req/min do gate
 Teste local da decisão: `uv run pytest tests/test_eval_gate.py`.
 
 Limites conhecidos: o `apps/agent/uv.lock` é ignorado pelo git, então o job resolve as dependências do agente sem lock (versões podem variar entre execuções); a linha de base é a última execução da `main` (que o push na `main` grava mesmo se o gate falhar), então uma regressão gradual de até 5 pontos por merge passa; o comentário é publicado por um job separado, sem secrets do Databricks (só ele tem `pull-requests: write`).
+
+## `monitoring.py`, `run_agent_monitoring.py` e `start_monitoring.py` (P10.8)
+
+Monitoramento do agente em produção ([SPEC-008](../docs/specs/008-agent-evaluation/spec.md) §6). O job `atlas_agent_monitoring` (07:00, depois do `atlas_daily`) lê os traces de `/Shared/atlas/agent-traces` e grava, de forma idempotente:
+
+| Objeto | O que é |
+|---|---|
+| `observability.agent_quality_traces` | um trace por linha (latência, status) |
+| `observability.agent_quality_scores` | um trace e um scorer por linha |
+| `observability.agent_quality_daily` (view) | % de pass por scorer por dia e média de 7 dias |
+| `observability.agent_traffic_daily` (view) | volume e latência p95 por dia |
+| `observability.agent_quality_alert` (view) | alvo do SQL alert (`cites_metric_view` e `read_only_tools` abaixo de 90% na média de 7 dias) |
+| `eval.review_queue` | fila de revisão: todo scorer que reprovou; o job só insere, quem revisa muda o `status` |
+
+- **Scorers de código** (100% dos traces): `read_only_tools` e `cites_metric_view`. Sem `expectations` em produção, `cites_metric_view` é `n/a` se o trace não chamou tool de dados, e senão exige o bloco `Fonte:` e uma consulta a `mv_recharges` ou `mv_commission` (SPEC-008 §4).
+- **LLM judges** (~20%, por hash do `trace_id`): `refusal_quality` (só sem tool de dados), `safety`, `relevance`, com o modelo de `--judge-model` (padrão `databricks:/databricks-gpt-oss-120b`, **fora** do `agent_llm`, para não gastar o rate limit do agente). Se o production monitoring (Beta) já anexou a assessment, o job a reaproveita; senão roda o judge (plano B).
+- **Painel** "Atlas — Qualidade do agente" (`semantic/dashboards/agent_quality.lvdash.json`) e o **alerta** por e-mail para quem faz o deploy estão no `databricks.yml`.
+
+Passos do mantenedor, no `dev`:
+
+```bash
+databricks bundle deploy -t dev --profile <perfil>
+# Beta primeiro: liga os 3 judges (amostra de 20%). Sem --start só mostra o que faria.
+uv run --project apps/agent python eval/start_monitoring.py --profile <perfil> --start
+# Gere tráfego no agente e rode o job; depois confira.
+databricks bundle run atlas_agent_monitoring -t dev --profile <perfil>
+uv run python scripts/check_agent_monitoring.py --profile <perfil> --warehouse-id <id> --catalog atlas_dev
+```
+
+Se o Beta não funcionar (o S0.3 não validou o judge em amostra), não ligue nada: o job faz o mesmo sozinho. Teste local da lógica: `uv run pytest tests/test_eval_monitoring.py tests/test_check_agent_monitoring.py tests/test_agent_quality_bundle.py`.

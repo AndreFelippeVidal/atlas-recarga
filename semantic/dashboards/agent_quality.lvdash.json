@@ -1,0 +1,545 @@
+{
+  "datasets": [
+    {
+      "name": "ds_daily",
+      "displayName": "Qualidade por scorer e dia",
+      "asset_name": "agent_quality_daily"
+    },
+    {
+      "name": "ds_traffic",
+      "displayName": "Volume e latência",
+      "asset_name": "agent_traffic_daily"
+    }
+  ],
+  "pages": [
+    {
+      "name": "quality",
+      "displayName": "Qualidade do agente",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "q-title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Qualidade do agente em produção\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "q-sub",
+            "multilineTextboxSpec": {
+              "lines": [
+                "% de pass por scorer por dia, média de 7 dias, latência p95 e volume (SPEC-008 §6). Scorers de código em 100% dos traces; LLM judges em ~20%. `cites_metric_view` não se aplica a recusas. O alerta dispara se a média de 7 dias de `cites_metric_view` ou `read_only_tools` ficar abaixo de 90%. Dados sintéticos."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "q-traces",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_traffic",
+                  "fields": [
+                    {
+                      "name": "sum(traces)",
+                      "expression": "SUM(`traces`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(traces)",
+                  "displayName": "Traces",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Traces"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "q-errors",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_traffic",
+                  "fields": [
+                    {
+                      "name": "sum(errors)",
+                      "expression": "SUM(`errors`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(errors)",
+                  "displayName": "Traces com erro",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Traces com erro"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "q-p95",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_traffic",
+                  "fields": [
+                    {
+                      "name": "max(latency_p95_ms)",
+                      "expression": "MAX(`latency_p95_ms`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(latency_p95_ms)",
+                  "displayName": "Pior p95 diário (ms)",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Pior p95 diário (ms)"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "q-pass-day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_daily",
+                  "fields": [
+                    {
+                      "name": "day",
+                      "expression": "`day`"
+                    },
+                    {
+                      "name": "pass_rate",
+                      "expression": "`pass_rate`"
+                    },
+                    {
+                      "name": "scorer",
+                      "expression": "`scorer`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "Dia",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "pass_rate",
+                  "displayName": "% de pass",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "scorer",
+                  "displayName": "Scorer",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "% de pass por dia"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "q-pass-7d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_daily",
+                  "fields": [
+                    {
+                      "name": "day",
+                      "expression": "`day`"
+                    },
+                    {
+                      "name": "pass_rate_7d",
+                      "expression": "`pass_rate_7d`"
+                    },
+                    {
+                      "name": "scorer",
+                      "expression": "`scorer`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "Dia",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "pass_rate_7d",
+                  "displayName": "Média de 7 dias",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "scorer",
+                  "displayName": "Scorer",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Média de 7 dias (alerta abaixo de 90%)"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 6,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "q-p95-line",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_traffic",
+                  "fields": [
+                    {
+                      "name": "day",
+                      "expression": "`day`"
+                    },
+                    {
+                      "name": "latency_p95_ms",
+                      "expression": "`latency_p95_ms`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "Dia",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "latency_p95_ms",
+                  "displayName": "p95 (ms)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Latência p95 por dia (ms)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "q-volume",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_traffic",
+                  "fields": [
+                    {
+                      "name": "day",
+                      "expression": "`day`"
+                    },
+                    {
+                      "name": "traces",
+                      "expression": "`traces`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "Dia",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "traces",
+                  "displayName": "Traces",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Traces por dia"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 13,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "q-table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_daily",
+                  "fields": [
+                    {
+                      "name": "day",
+                      "expression": "`day`"
+                    },
+                    {
+                      "name": "scorer",
+                      "expression": "`scorer`"
+                    },
+                    {
+                      "name": "evaluated",
+                      "expression": "`evaluated`"
+                    },
+                    {
+                      "name": "passed",
+                      "expression": "`passed`"
+                    },
+                    {
+                      "name": "pass_rate",
+                      "expression": "`pass_rate`"
+                    },
+                    {
+                      "name": "pass_rate_7d",
+                      "expression": "`pass_rate_7d`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "day",
+                    "displayName": "Dia"
+                  },
+                  {
+                    "fieldName": "scorer",
+                    "displayName": "Scorer"
+                  },
+                  {
+                    "fieldName": "evaluated",
+                    "displayName": "Avaliados",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "passed",
+                    "displayName": "Passaram",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "pass_rate",
+                    "displayName": "% de pass",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "pass_rate_7d",
+                    "displayName": "Média de 7 dias",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Pass por scorer e dia"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ]
+    }
+  ]
+}
