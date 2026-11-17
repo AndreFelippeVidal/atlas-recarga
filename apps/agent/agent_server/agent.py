@@ -18,10 +18,17 @@ from mlflow.types.responses import (
     ResponsesAgentRequest,
     ResponsesAgentResponse,
     ResponsesAgentStreamEvent,
+    create_text_output_item,
     to_chat_completions_input,
 )
 
 from agent_server.config import AgentConfig, load_config
+from agent_server.guardrails import (
+    RATE_LIMIT_MESSAGE,
+    RATE_LIMITED_ERROR_TYPE,
+    guard_event,
+    is_rate_limited,
+)
 from agent_server.prompts import load_prompt
 from agent_server.tools import build_tools
 from agent_server.utils import (
@@ -130,7 +137,22 @@ async def stream_handler(
     _tag_trace(request)
     messages = {"messages": to_chat_completions_input([i.model_dump() for i in request.input])}
     tools = await asyncio.to_thread(_tools)
-    async for event in process_agent_astream_events(
-        build_agent(tools).astream(input=messages, stream_mode=["updates", "messages"])
-    ):
-        yield event
+    try:
+        async for event in process_agent_astream_events(
+            build_agent(tools).astream(input=messages, stream_mode=["updates", "messages"])
+        ):
+            keep, masked = guard_event(event)  # PII na saída (ADR-0021)
+            if masked:
+                mlflow.update_current_trace(tags={"pii_masked": "true"})
+            if keep:
+                yield event
+    except Exception as error:
+        if not is_rate_limited(error):
+            raise
+        # 429 do gateway (SPEC-005 §6): mensagem ao usuário e marca no trace.
+        logger.warning("429 do gateway: %s", error)
+        mlflow.update_current_trace(tags={"error_type": RATE_LIMITED_ERROR_TYPE})
+        yield ResponsesAgentStreamEvent(
+            type="response.output_item.done",
+            item=create_text_output_item(RATE_LIMIT_MESSAGE, id="rate_limited"),
+        )
