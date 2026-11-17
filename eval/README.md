@@ -49,4 +49,4 @@ Custo: ~31 chamadas ao agente por execução, com o limite de 30 req/min do gate
 
 Teste local da decisão: `uv run pytest tests/test_eval_gate.py`.
 
-Limites conhecidos: a linha de base é a última execução da `main` (que o push na `main` grava mesmo se o gate falhar), então uma regressão gradual de até 5 pontos por merge passa; o comentário é publicado por um job separado, sem secrets do Databricks (só ele tem `pull-requests: write`).
+Limites conhecidos: o `apps/agent/uv.lock` é ignorado pelo git, então o job resolve as dependências do agente sem lock (versões podem variar entre execuções); a linha de base é a última execução da `main` (que o push na `main` grava mesmo se o gate falhar), então uma regressão gradual de até 5 pontos por merge passa; o comentário é publicado por um job separado, sem secrets do Databricks (só ele tem `pull-requests: write`).

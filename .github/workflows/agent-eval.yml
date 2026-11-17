@@ -38,7 +38,7 @@ jobs:
         id: evaluate
         # 1 rodada (~31 chamadas ao agente, rate limit de 30 req/min do gateway).
         run: |
-          uv run --project apps/agent --locked python eval/run_offline_eval.py \
+          uv run --project apps/agent python eval/run_offline_eval.py \
             --catalog atlas_dev \
             --warehouse-id "$DATABRICKS_WAREHOUSE_ID" \
             --genie-space-id "$ATLAS_GENIE_SPACE_ID" \
