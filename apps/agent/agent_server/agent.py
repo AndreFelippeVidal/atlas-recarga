@@ -1,14 +1,18 @@
-"""Agente `agent-atlas` (SPEC-005). P10.2: esqueleto sem tools; o LLM vem do Unity Gateway."""
+"""Agente `agent-atlas` (SPEC-005). P10.3: tools da lista fechada; LLM pelo Unity Gateway."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from functools import lru_cache
 
 import mlflow
+from databricks.sdk import WorkspaceClient
 from databricks_langchain import ChatDatabricks
 from langchain.agents import create_agent
+from langchain.agents.middleware import AgentMiddleware, ToolCallRequest
+from langchain.messages import ToolMessage
 from mlflow.genai.agent_server import get_request_headers, invoke, stream
 from mlflow.types.responses import (
     ResponsesAgentRequest,
@@ -18,6 +22,7 @@ from mlflow.types.responses import (
 )
 
 from agent_server.config import AgentConfig, load_config
+from agent_server.tools import build_tools
 from agent_server.utils import (
     get_session_id,
     get_user_workspace_client,
@@ -37,13 +42,52 @@ SYSTEM_PROMPT = "Você é o assistente de dados da rede de recarga Eaí? Telecom
 
 def build_llm(config: AgentConfig) -> ChatDatabricks:
     """Chama o model service de três partes pelo Unity Gateway (nunca o endpoint legado)."""
-    extra = {"request_tags": config.request_tags()} if config.send_request_tags else None
+    extra = {"extra_headers": config.request_tags_headers()} if config.send_request_tags else None
     return ChatDatabricks(model=config.llm_service, use_ai_gateway=True, extra_params=extra)
 
 
-def build_agent(config: AgentConfig = CONFIG):
-    # Sem tools: ask_genie e as UC functions entram na P10.3 (lista fechada, SPEC-005 §3).
-    return create_agent(model=build_llm(config), tools=[], system_prompt=SYSTEM_PROMPT)
+@lru_cache(maxsize=1)
+def _tools() -> list:
+    # Lista fechada (SPEC-005 §3), com a identidade do service principal do App. Cache: o
+    # list_tools do MCP é uma ida ao workspace e usa asyncio.run por dentro: chame numa thread
+    # (`asyncio.to_thread`), nunca de dentro do event loop do handler.
+    return build_tools(CONFIG, WorkspaceClient())
+
+
+class ToolErrorsAsMessages(AgentMiddleware):
+    """Erro de tool (argumento faltando, Genie indisponível ou com timeout) vira mensagem para o
+    modelo, que corrige a chamada ou tenta a UC function equivalente (SPEC-005 §6). Sem isso a
+    exceção derruba a requisição inteira."""
+
+    @staticmethod
+    def _message(request: ToolCallRequest, error: Exception) -> ToolMessage:
+        logger.warning("tool %s falhou: %s", request.tool_call["name"], error)
+        return ToolMessage(
+            content=f"Erro ao executar a tool: {error}",
+            tool_call_id=request.tool_call["id"],
+            status="error",
+        )
+
+    def wrap_tool_call(self, request: ToolCallRequest, handler):
+        try:
+            return handler(request)
+        except Exception as error:
+            return self._message(request, error)
+
+    async def awrap_tool_call(self, request: ToolCallRequest, handler):
+        try:
+            return await handler(request)
+        except Exception as error:
+            return self._message(request, error)
+
+
+def build_agent(tools: list, config: AgentConfig = CONFIG):
+    return create_agent(
+        model=build_llm(config),
+        tools=tools,
+        system_prompt=SYSTEM_PROMPT,
+        middleware=[ToolErrorsAsMessages()],
+    )
 
 
 @lru_cache(maxsize=256)
@@ -85,7 +129,8 @@ async def stream_handler(
 ) -> AsyncGenerator[ResponsesAgentStreamEvent, None]:
     _tag_trace(request)
     messages = {"messages": to_chat_completions_input([i.model_dump() for i in request.input])}
+    tools = await asyncio.to_thread(_tools)
     async for event in process_agent_astream_events(
-        build_agent().astream(input=messages, stream_mode=["updates", "messages"])
+        build_agent(tools).astream(input=messages, stream_mode=["updates", "messages"])
     ):
         yield event

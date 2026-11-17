@@ -28,7 +28,7 @@ flowchart LR
 
 | Tool | Tipo | O que faz | Permissão necessária |
 |---|---|---|---|
-| `ask_genie` | Genie Space `Atlas Recarga` | Perguntas analíticas abertas sobre as metric views | `CAN RUN` no Genie Space; `SELECT` em `semantic.*` |
+| `ask_genie` | Genie Space `Atlas Recarga`, pelo Genie Agent MCP (`/api/2.0/mcp/genie/{space_id}`) | Perguntas analíticas abertas sobre as metric views | `CAN RUN` no Genie Space; `SELECT` em `semantic.*` |
 | `atlas.semantic.fn_list_metrics()` | UC function SQL | Lista as medidas e dimensões com a descrição oficial | `EXECUTE` |
 | `atlas.semantic.fn_metric_by_region(measure, level, month, uf)` | UC function SQL | Medida por `region`\|`uf`\|`municipality`\|`ddd` num mês, com `measure` validado contra uma lista fechada | `EXECUTE` |
 | `atlas.semantic.fn_compare_months(measure, month_a, month_b, level, uf)` | UC function SQL | Variação absoluta e percentual entre dois meses | `EXECUTE` |
@@ -40,6 +40,8 @@ flowchart LR
 - `value` é sempre `DECIMAL(24,6)`, nunca `DOUBLE`; a escala maior que a de `DECIMAL(14,2)` existe porque o mesmo tipo carrega `avg_ticket` e `reversal_rate` (fração). Aplicar o arredondamento monetário é do consumidor.
 - `measure` fora da lista (ou `NULL`) falha com `INVALID_MEASURE`, e `level` fora de `region|uf|municipality|ddd` com `INVALID_LEVEL`, mesmo que o mês não tenha linhas. Não há SQL dinâmico.
 - Os leitores (agente, MCP, React) recebem `EXECUTE` no schema `semantic` por principal (ADR-0016), além do `SELECT`.
+
+O `ask_genie` usa o **Genie Agent MCP** ([ADR-0020](../../adr/0020-genie-agent-mcp-for-ask-genie.md)), restrito ao Space `Atlas Recarga`, e não o Genie One MCP (`system.ai.genie_one_mcp`): este responde sobre o workspace inteiro e fugiria da lista fechada. A troca tem um custo aceito: o Genie Agent MCP **não passa pelo Unity Gateway** (a documentação do Databricks o diz), então a chamada não aparece como `MCP_SERVICE` na `usage`; a observabilidade dessa tool vem do span no trace MLflow e a governança, do `CAN RUN` no Space e dos grants em `semantic`. O endpoint é Public Preview; na Free Edition ele respondeu sem nenhum toggle (verificado com `tools/list` e uma pergunta real na P10.3).
 
 Nenhuma outra tool existe. **Não há** tool de SQL livre, de escrita, de execução de job nem de acesso a `commission.batches`, `batch_lines` ou a qualquer schema fora de `semantic`.
 
@@ -61,7 +63,7 @@ Guardrails no Unity Gateway. O S0.1 só mostrou que `rate_limits` e `service_pol
 - `mlflow.langchain.autolog()` com tracing ligado; experiment `/Shared/atlas/agent`. Trace tables no UC em `atlas.observability.agent_*` (declaradas como recursos do App).
 - Cada trace guarda as tags `user`, `app_version`, `prompt_version`, `llm_service`.
 - O uso do LLM aparece em `system.ai_gateway.usage` (`service_type = 'MODEL_SERVICE'`), com atraso de minutos a cerca de 1 hora (S0.2). Alertas quase em tempo real vêm do trace, não da `usage`.
-- A atribuição por agente é pelo `requester` (service principal do App) e por `invocation_metadata.source = 'DATABRICKS_APPS'`; não há coluna com o nome do App. Se o agente puder enviar `request_tags` na chamada ao LLM, elas dimensionam o uso por agente; isso **não foi validado** (a P10.2 deixou o envio como opt-in, `ATLAS_LLM_REQUEST_TAGS`, desligado) e fica para a P10.3, junto com: o `ask_genie` via `genie_one_mcp` aparecer como `MCP_SERVICE`, e o span de cada tool chegar ao experiment a partir de um App. Na P10.2 o App não repassa o e-mail do usuário em cabeçalho; a tag `user` do trace vem de `current_user.me()` com o `x-forwarded-access-token`.
+- A atribuição por agente é pelo `requester` (service principal do App) e por `invocation_metadata.source = 'DATABRICKS_APPS'`; não há coluna com o nome do App. O agente envia `request_tags` na chamada ao LLM (`ATLAS_LLM_REQUEST_TAGS=1`), e elas dimensionam o uso por agente na coluna `request_tags` da `usage`. Validado na P10.3: o gateway rejeita `request_tags` no corpo (400) e exige o cabeçalho `Databricks-Ai-Gateway-Request-Tags` com um mapa JSON String -> String. O span de cada tool (`ask_genie`, `fn_*`) chega ao experiment a partir do App. O `ask_genie` (Genie Agent MCP) **não** aparece na `usage`: o endpoint não passa pelo Unity Gateway (§3). Na P10.2 o App não repassa o e-mail do usuário em cabeçalho; a tag `user` do trace vem de `current_user.me()` com o `x-forwarded-access-token`.
 - **Qualidade:** avaliada e monitorada conforme a SPEC-008.
 
 ## 6. Falhas

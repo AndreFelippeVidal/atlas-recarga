@@ -4,8 +4,11 @@ Databricks App `agent-atlas` (componente `atlas-agent`). Governado pela
 [SPEC-005](../../docs/specs/005-business-agent/spec.md). O prefixo `agent-` do nome é o que lista o
 App em AI Gateway > Agents (S0.2).
 
-**P10.2 (esqueleto):** o agente responde em PT-BR pelo Unity Gateway, sem tools (`ask_genie` e as
-UC functions entram na P10.3). Os traces vão para o experiment do bundle (`/Shared/atlas/agent`;
+**P10.2 (esqueleto):** o agente responde em PT-BR pelo Unity Gateway.
+**P10.3 (tools):** a lista fechada da SPEC-005 §3: `ask_genie` (Genie Agent MCP, restrito ao Space
+`Atlas Recarga`; **não** passa pelo Unity Gateway) e as UC functions `fn_list_metrics`,
+`fn_metric_by_region` e `fn_compare_months`. As tools usam os nomes curtos que o scorer
+`read_only_tools` espera. Os traces vão para o experiment do bundle (`/Shared/atlas/agent`;
 no `dev` o nome leva o prefixo do usuário) com as tags `user`, `app_version`, `prompt_version` e
 `llm_service`.
 
@@ -24,8 +27,10 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
 |---|---|---|
 | `ATLAS_GATEWAY_MODE` | `unity` | Só `unity`; o plano B `classic` (ADR-0007) não foi implementado e falha na subida |
 | `ATLAS_LLM_SERVICE` | `system.ai.gpt-oss-120b` | Model service de **três partes** (o nome curto cai no endpoint legado, 403) |
-| `ATLAS_LLM_REQUEST_TAGS` | `0` | `1` envia `request_tags` ao gateway (não validado; ver abaixo) |
-| `ATLAS_APP_VERSION`, `ATLAS_PROMPT_VERSION` | `dev`, `p10.2-skeleton` | Tags do trace |
+| `ATLAS_LLM_REQUEST_TAGS` | `0` | `1` envia `request_tags` ao gateway, no cabeçalho `Databricks-Ai-Gateway-Request-Tags` |
+| `ATLAS_CATALOG` | `atlas` | Catálogo das UC functions (`atlas_dev` no `dev`; o bundle injeta) |
+| `ATLAS_GENIE_SPACE_ID` | (recurso `genie-space`) | Space do `ask_genie`; o App recebe `CAN_RUN` |
+| `ATLAS_APP_VERSION`, `ATLAS_PROMPT_VERSION` | `dev`, `p10.3-tools` | Tags do trace |
 
 ## Deploy e conferência (mantenedor)
 
@@ -34,11 +39,22 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
    (permissão de serving endpoint não vale; lição do S0.1/S0.2).
 3. Abra o App e escreva "olá".
 4. Depois de alguns minutos até ~1 h: `uv run python scripts/check_agent_skeleton.py --profile andrevidal --warehouse-id <id>`.
-5. Confira na UI o trace com as tags. Para validar `request_tags`, ponha `ATLAS_LLM_REQUEST_TAGS=1`
-   no `app.yaml`/bundle, redeploye e veja se a coluna `request_tags` da `usage` vem preenchida.
+5. Confira na UI o trace com as tags. A coluna `request_tags` da `usage` vem preenchida porque o
+   bundle liga `ATLAS_LLM_REQUEST_TAGS=1`.
 
-## Pendências de validação (SPEC-005 §5)
+## Conferência da P10.3 (mantenedor)
 
-- `request_tags` na chamada ao LLM (opt-in acima; formato do `extra_params` ainda não validado).
-- `ask_genie` via `genie_one_mcp` como `MCP_SERVICE` e span de tool no experiment: P10.3, quando
-  houver tools.
+Pré-requisito: `EXECUTE` + `SELECT` em
+`semantic` para o service principal do App (`scripts/setup_workspace.py --reader <client_id>`,
+ADR-0016).
+
+1. Deploy e `bundle run` como acima.
+2. No App, pergunte o GS-001: "Qual foi a receita de recarga da rede em outubro de 2026?"
+3. `uv run python scripts/check_agent_tools.py --profile andrevidal --warehouse-id <id> --catalog atlas_dev`
+   (traz o valor esperado do GS-001 e confere `request_tags` na `usage`).
+4. Na aba Traces do experiment, confira os spans TOOL `ask_genie` e `fn_*`.
+
+Verificado contra o workspace: o Genie Agent MCP expõe `query_space_<id>` (argumento `query`) e
+`poll_response_<id>` (`conversation_id`, `message_id`); a resposta traz `conversationId`,
+`messageId` e `status` (`COMPLETED` ao fim). `request_tags` vai no cabeçalho do gateway como mapa
+JSON (no corpo dá 400). Os spans do App se chamam `ask_genie` e `fn_*`.
