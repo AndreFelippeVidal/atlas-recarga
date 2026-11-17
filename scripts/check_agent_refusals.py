@@ -272,6 +272,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         outcomes = asyncio.run(run())
     finally:
+        # Os traces são enviados em segundo plano: espere antes de apagar o banco, senão o envio
+        # cai num SQLite que sumiu ("attempt to write a readonly database").
+        importlib.import_module("mlflow").flush_trace_async_logging()
         os.chdir(previous)
         shutil.rmtree(scratch, ignore_errors=True)
     print("\n--- resultado ---")
