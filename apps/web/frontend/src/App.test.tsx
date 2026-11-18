@@ -427,3 +427,17 @@ describe("Escala divergente e acessibilidade (P12.7)", () => {
     expect(await screen.findByRole("list", { name: "Ranking: UFs da região" })).toBeVisible();
   });
 });
+
+describe("Aquecimento sem meses (P12.7)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("lista de meses vazia não fica 'aquecendo' para sempre", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    mockFetch(route({ "/api/months": () => json({ months: [] }) }));
+    render(<App />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(screen.queryByText("Aquecendo o banco de dados…")).not.toBeInTheDocument();
+  });
+});

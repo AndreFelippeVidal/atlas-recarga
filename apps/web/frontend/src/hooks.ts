@@ -55,7 +55,13 @@ export function useApi<T>(cacheKey: string | null, fetcher: (signal: AbortSignal
 
 export function useMonths() {
   const api = useApi<string[]>("months", fetchMonths);
-  return { months: api.data ?? [], error: api.error, retry: api.retry };
+  return {
+    months: api.data ?? [],
+    // Ainda sem resposta nem erro: a lista de meses está a caminho.
+    loading: api.data === null && api.error === null,
+    error: api.error,
+    retry: api.retry,
+  };
 }
 
 export function useKpis(month: string | null) {

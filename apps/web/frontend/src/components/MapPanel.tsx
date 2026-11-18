@@ -119,7 +119,7 @@ export default function MapPanel({ month, measure, monthLoading }: Props) {
       <section className="map-area" aria-label="Mapa">
         {error && <ErrorBanner code={error} onRetry={retry} />}
         <div className="sr-only" role="status">
-          {`${MAP_LABELS[view.level]}${mapPending ? ": carregando" : ""}`}
+          {`${MAP_LABELS[view.level]}${mapPending || !geometry ? ": carregando" : ""}`}
         </div>
         {warming && (
           <div className="warming" role="status">

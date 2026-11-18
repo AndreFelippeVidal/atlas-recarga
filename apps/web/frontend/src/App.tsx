@@ -69,7 +69,7 @@ export default function App() {
       </section>
 
       <main className="content">
-        <MapPanel month={month} measure={measure} monthLoading={months.error === null} />
+        <MapPanel month={month} measure={measure} monthLoading={months.loading} />
       </main>
     </div>
   );

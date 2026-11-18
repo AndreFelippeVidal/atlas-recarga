@@ -15,9 +15,9 @@
   --seq-5: #0d366b;
   /* Divergente (mom_change): vermelho = queda, azul = alta, cinza = estável. */
   --div-1: #b42318;
-  --div-2: #ee9a90;
-  --div-3: #d5d9df;
-  --div-4: #86b6ef;
+  --div-2: #e0675a;
+  --div-3: #9aa4b1;
+  --div-4: #4a8fe0;
   --div-5: #1c5cab;
   --map-loading: #e3e7ec;
   --map-empty: #eef0f3;
@@ -44,7 +44,7 @@
     --seq-5: #184f95;
     --div-1: #ff6b5e;
     --div-2: #b5524a;
-    --div-3: #4a5563;
+    --div-3: #6b7686;
     --div-4: #3f78c4;
     --div-5: #7fb0f5;
     --map-loading: #2a323c;
