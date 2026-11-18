@@ -1,7 +1,8 @@
 """Checks of the committed map geometry (SPEC-007 §2 and §6, task P12.1).
 
 Reads only the TopoJSON in ``apps/web/public/geo/`` and the IBGE snapshot that feeds
-``gold.dim_municipality``: no network, no script run.
+``gold.dim_municipality``: no network, no script run. It proves the match against that
+snapshot, not against the table in the workspace.
 """
 
 from __future__ import annotations

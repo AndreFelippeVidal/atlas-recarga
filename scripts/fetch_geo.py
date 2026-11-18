@@ -204,17 +204,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=OUTPUT, help="destination directory")
     args = parser.parse_args(argv)
 
-    sizes = build(args.output, load_reference())
-    too_big = {
-        name: size
-        for name, size in sizes.items()
-        if size > (MAX_UF_BYTES if name == "br-uf.json" else MAX_MUN_BYTES)
-    }
-    for name, size in sorted(sizes.items()):
-        print(f"{size / 1024:8.1f} KB  {name}")
-    if too_big:
-        print(f"over the SPEC-007 §2 limit: {too_big}; lower UF_KEEP/MUN_KEEP", file=sys.stderr)
-        return 1
+    with tempfile.TemporaryDirectory() as tmp:
+        staging = Path(tmp)
+        sizes = build(staging, load_reference())
+        too_big = {
+            name: size
+            for name, size in sizes.items()
+            if size > (MAX_UF_BYTES if name == "br-uf.json" else MAX_MUN_BYTES)
+        }
+        for name, size in sorted(sizes.items()):
+            print(f"{size / 1024:8.1f} KB  {name}")
+        if too_big:
+            print(f"over the SPEC-007 §2 limit: {too_big}; lower UF_KEEP/MUN_KEEP", file=sys.stderr)
+            return 1
+        # Only a complete, within-limit build replaces the committed files.
+        shutil.copytree(staging, args.output, dirs_exist_ok=True)
     return 0
 
 
