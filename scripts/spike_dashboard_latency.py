@@ -14,6 +14,8 @@ Modos:
   `warehouse-frio` e repita logo depois, com o `--label warehouse-quente`.
 - `aggregate`: cria `<catalog>.semantic.spike_map_agg` por `MEASURE()` (agregado derivado da
   metric view, princípio 1) e mede a leitura dele contra a consulta direta à metric view.
+- `reuse`: UFs direto na metric view com conexão nova a cada consulta (como o `sql_client`
+  de hoje) contra uma conexão aberta uma vez.
 - `drop`: remove a tabela do spike.
 """
 
@@ -210,9 +212,50 @@ def run_aggregate(args: argparse.Namespace, drop: bool) -> int:
     return 0 if same else 1
 
 
+def run_reuse(args: argparse.Namespace) -> int:
+    """Conexão aberta uma vez contra conexão nova a cada consulta (como o `sql_client` de hoje)."""
+    from atlas_web.sql_client import make_executor
+    from databricks import sql as dbsql
+    from databricks.sdk.core import Config
+
+    catalog = os.environ["ATLAS_CATALOG"]
+    if not CATALOG_RE.fullmatch(catalog):
+        print("ATLAS_CATALOG inválido")
+        return 1
+    first = f"{args.month or '2026-10'}-01"
+    query = (
+        f"SELECT `uf`, MEASURE(`gross_revenue`) AS `value` FROM {catalog}.semantic.mv_recharges "
+        "WHERE `recharge_month` = :month GROUP BY ALL"
+    )
+    new_each = make_executor()
+    fresh = [timed(lambda: new_each(query, {"month": first}))[0] for _ in range(args.repeat)]
+
+    host = os.environ["DATABRICKS_HOST"].removeprefix("https://").rstrip("/")
+    cfg = Config()
+    open_s, conn = timed(
+        lambda: dbsql.connect(
+            server_hostname=host,
+            http_path=f"/sql/1.0/warehouses/{os.environ['DATABRICKS_WAREHOUSE_ID']}",
+            credentials_provider=lambda: cfg.authenticate,
+        )
+    )
+    reused: list[float] = []
+    with conn, conn.cursor() as cursor:
+        for _ in range(args.repeat):
+            reused.append(
+                timed(lambda: (cursor.execute(query, {"month": first}), cursor.fetchall()))[0]
+            )
+    print(f"abrir a conexão uma vez: {open_s * 1000:.0f} ms\n")
+    print("| consulta de UFs | n | mín ms | p50 ms | p95 ms | máx ms |")
+    print("|---|---|---|---|---|---|")
+    print(format_row("conexão nova a cada consulta (hoje)", fresh))
+    print(format_row("conexão reaproveitada", reused))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("endpoints", "aggregate", "drop"))
+    parser.add_argument("mode", choices=("endpoints", "aggregate", "reuse", "drop"))
     parser.add_argument("--label", default="warehouse-quente", help="rótulo da execução")
     parser.add_argument("--month", default=None, help="YYYY-MM (padrão: o mais recente)")
     parser.add_argument("--uf", default="SP", help="UF do nível município")
@@ -220,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.mode == "endpoints":
         return run_endpoints(args)
+    if args.mode == "reuse":
+        return run_reuse(args)
     return run_aggregate(args, drop=args.mode == "drop")
 
 
