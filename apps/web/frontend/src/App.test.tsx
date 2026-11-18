@@ -49,6 +49,26 @@ const REGIONS = {
   ],
 };
 
+// Município: um quadrado com 3 municípios lado a lado (código IBGE como propriedade).
+const MUN_TOPOLOGY = {
+  type: "Topology",
+  arcs: [SQUARE(0), SQUARE(10), SQUARE(20)],
+  objects: {
+    municipalities: {
+      type: "GeometryCollection",
+      geometries: [
+        { type: "Polygon", arcs: [[0]], properties: { municipality_ibge_code: "1500001" } },
+        { type: "Polygon", arcs: [[1]], properties: { municipality_ibge_code: "1500002" } },
+        { type: "Polygon", arcs: [[2]], properties: { municipality_ibge_code: "1500003" } },
+      ],
+    },
+  },
+};
+const MUNICIPALITIES = [
+  { municipality_ibge_code: "1500002", municipality_name: "Alenquer", value: "50.00" },
+  { municipality_ibge_code: "1500001", municipality_name: "Santarém", value: "10.00" },
+];
+
 type Handler = (url: string) => Response | Promise<Response>;
 
 const json = (body: unknown, status = 200) =>
@@ -63,7 +83,10 @@ function route(overrides: Record<string, Handler> = {}): Handler {
       const measure = new URL(url, "http://x").searchParams.get("measure") as keyof typeof REGIONS;
       return json(REGIONS[measure]);
     },
+    "/api/map/uf": () => json([{ uf: "PA", value: "300000.00" }]),
+    "/api/map/municipality": () => json(MUNICIPALITIES),
     "/geo/br-uf.json": () => json(TOPOLOGY),
+    "/geo/mun/PA.json": () => json(MUN_TOPOLOGY),
   };
   const all = { ...base, ...overrides };
   return (url) => {
@@ -129,7 +152,7 @@ describe("Mapa por região", () => {
   it("pinta as UFs pela região, com legenda e ranking que repetem o valor", async () => {
     mockFetch(route());
     render(<App />);
-    const ranking = await screen.findByRole("list", { name: "Ranking das regiões" });
+    const ranking = await screen.findByRole("list", { name: "Ranking: regiões" });
     expect(
       within(ranking).getByRole("button", { name: /1º Sudeste: R\$\s2\.500\.000,00/ }),
     ).toBeVisible();
@@ -154,13 +177,13 @@ describe("Mapa por região", () => {
     await userEvent.hover(sp);
     const tip = await screen.findByRole("tooltip");
     expect(tip).toHaveTextContent("Sudeste");
-    expect(tip).toHaveTextContent("1º de 5");
+    expect(tip).toHaveTextContent("1º de 2");
   });
 
   it("recolore e busca de novo ao trocar a medida", async () => {
     const fetchMock = mockFetch(route());
     render(<App />);
-    await screen.findByRole("list", { name: "Ranking das regiões" });
+    await screen.findByRole("list", { name: "Ranking: regiões" });
     await userEvent.selectOptions(screen.getByLabelText(/Medida/), "recharge_count");
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -184,5 +207,91 @@ describe("Mapa por região", () => {
     await userEvent.selectOptions(screen.getByLabelText(/Medida/), "recharge_count");
     expect(await screen.findByRole("alert")).toHaveTextContent("WAREHOUSE_UNAVAILABLE");
     expect(screen.getByRole("button", { name: /1º Sudeste: R\$\s2\.500\.000,00/ })).toBeVisible();
+  });
+});
+
+describe("Drill-down", () => {
+  const shapes = () => document.querySelectorAll("path.uf");
+
+  it("clicar numa região mostra só as UFs dela e busca /api/map/uf", async () => {
+    const fetchMock = mockFetch(route());
+    render(<App />);
+    expect(shapes()).toHaveLength(0);
+    await userEvent.click(await screen.findByRole("button", { name: /PA, região Norte/ }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/map/uf?month=2026-10&measure=gross_revenue&region=N",
+        expect.anything(),
+      ),
+    );
+    expect(await screen.findByRole("list", { name: "Ranking: UFs da região" })).toBeVisible();
+    expect(shapes()).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /SP/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "← Ver o Brasil inteiro" })).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "Navegação do mapa" })).toHaveTextContent(
+      "Brasil › Norte",
+    );
+  });
+
+  it("clicar numa UF carrega os municípios e o botão volta ao Brasil inteiro", async () => {
+    const fetchMock = mockFetch(route());
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /PA, região Norte/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^PA: R\$\s300\.000,00/ }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/map/municipality?month=2026-10&measure=gross_revenue&uf=PA",
+        expect.anything(),
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledWith("/geo/mun/PA.json", expect.anything());
+    expect(await screen.findByRole("list", { name: "Ranking: municípios da UF" })).toBeVisible();
+    expect(shapes()).toHaveLength(3);
+    // município sem recarga fica hachurado e é descrito como "sem recargas"
+    expect(screen.getByRole("img", { name: "1500003: sem recargas" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "← Ver o Brasil inteiro" }));
+    expect(await screen.findByRole("list", { name: "Ranking: regiões" })).toBeVisible();
+    expect(shapes()).toHaveLength(2);
+  });
+
+  it("Esc sobe um nível por vez: município → UF → Brasil", async () => {
+    mockFetch(route());
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /PA, região Norte/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^PA: R\$\s300\.000,00/ }));
+    await screen.findByRole("list", { name: "Ranking: municípios da UF" });
+    await userEvent.keyboard("{Escape}");
+    expect(await screen.findByRole("list", { name: "Ranking: UFs da região" })).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    expect(await screen.findByRole("list", { name: "Ranking: regiões" })).toBeVisible();
+  });
+
+  it("com mom_change, a maior queda do PA cai na classe mais baixa (critério 1)", async () => {
+    mockFetch(
+      route({
+        "/api/map/region": () => json([{ region: "N", value: "-12.00" }]),
+        "/api/map/uf": () => json([{ uf: "PA", value: "-12.00" }]),
+        "/api/map/municipality": () =>
+          json([
+            { municipality_ibge_code: "1500001", municipality_name: "Santarém", value: "-40.00" },
+            { municipality_ibge_code: "1500002", municipality_name: "Alenquer", value: "4.00" },
+            { municipality_ibge_code: "1500003", municipality_name: "Óbidos", value: null },
+          ]),
+      }),
+    );
+    render(<App />);
+    await screen.findByRole("list", { name: "Ranking: regiões" });
+    await userEvent.selectOptions(screen.getByLabelText(/Medida/), "mom_change");
+    await userEvent.click(await screen.findByRole("button", { name: /PA, região Norte: -12,00%/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^PA: -12,00%/ }));
+    const fall = await screen.findByRole("img", { name: "1500001: -40,00%" });
+    expect((fall as unknown as SVGElement).style.fill).toBe("var(--seq-1)");
+    expect(
+      (screen.getByRole("img", { name: "1500002: +4,00%" }) as unknown as SVGElement).style.fill,
+    ).toBe("var(--seq-5)");
+    // sem base = sem valor: hachurado, nunca classe de queda
+    expect(
+      screen.getByRole("img", { name: "1500003: sem recargas" }).getAttribute("style"),
+    ).toContain("#no-data");
   });
 });

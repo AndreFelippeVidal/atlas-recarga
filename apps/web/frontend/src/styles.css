@@ -278,3 +278,39 @@ button {
   color: var(--muted);
   padding: 6px 10px;
 }
+
+.back-button,
+.crumb {
+  font: inherit;
+  cursor: pointer;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+.crumb {
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+}
+.back-button {
+  margin-bottom: 12px;
+}
+.uf.clickable {
+  cursor: pointer;
+}
+.map-zoom {
+  animation: map-zoom-in 0.6s ease-out;
+}
+@keyframes map-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-zoom {
+    animation: none;
+  }
+}

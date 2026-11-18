@@ -3,11 +3,13 @@ import {
   ApiError,
   fetchKpis,
   fetchMonths,
-  fetchRegionMap,
+  fetchMap,
+  fetchMunTopology,
   fetchUfTopology,
   type KpisResponse,
+  type MapFocus,
+  type MapItem,
   type MapMeasure,
-  type RegionValue,
 } from "./api";
 
 function errorCode(err: unknown): string {
@@ -61,20 +63,27 @@ export function useKpis(month: string | null) {
   return { kpis: api.data, error: api.error, retry: api.retry };
 }
 
-export interface RegionMapData {
+export interface MapData {
   month: string;
   measure: MapMeasure;
-  items: RegionValue[];
+  focus: MapFocus;
+  items: MapItem[];
 }
 
-// O resultado carrega o mês e a medida a que pertence, para que o mapa anterior mantido em erro
-// continue com a legenda e a unidade certas.
-export function useRegionMap(month: string | null, measure: MapMeasure) {
-  const cacheKey = month === null ? null : `${month}|${measure}`;
-  const api = useApi<RegionMapData>(cacheKey, async (s) => ({
+function focusKey(focus: MapFocus): string {
+  if (focus.level === "brazil") return "brazil";
+  return focus.level === "region" ? `region:${focus.region}` : `uf:${focus.uf}`;
+}
+
+// O resultado carrega mês, medida e foco a que pertence, para que o mapa anterior mantido em erro
+// continue com a legenda, a unidade e a geometria certas.
+export function useMapData(month: string | null, measure: MapMeasure, focus: MapFocus) {
+  const cacheKey = month === null ? null : `${month}|${measure}|${focusKey(focus)}`;
+  const api = useApi<MapData>(cacheKey, async (s) => ({
     month: month as string,
     measure,
-    items: await fetchRegionMap(month as string, measure, s),
+    focus,
+    items: await fetchMap(month as string, measure, focus, s),
   }));
   return { data: api.data, stale: api.stale, error: api.error, retry: api.retry };
 }
@@ -82,4 +91,20 @@ export function useRegionMap(month: string | null, measure: MapMeasure) {
 export function useUfTopology() {
   const api = useApi<unknown>("br-uf", fetchUfTopology);
   return { topology: api.data, error: api.error, retry: api.retry };
+}
+
+// Malha dos municípios da UF, carregada sob demanda. Guarda a UF a que pertence.
+export function useMunTopology(uf: string | null) {
+  const api = useApi<{ uf: string; topology: unknown }>(
+    uf === null ? null : `mun:${uf}`,
+    async (s) => ({
+      uf: uf as string,
+      topology: await fetchMunTopology(uf as string, s),
+    }),
+  );
+  return {
+    topology: uf !== null ? (api.data?.topology ?? null) : null,
+    error: api.error,
+    retry: api.retry,
+  };
 }

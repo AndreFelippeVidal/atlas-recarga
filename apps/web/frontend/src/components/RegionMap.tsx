@@ -1,91 +1,67 @@
-import { geoMercator, geoPath } from "d3-geo";
 import { useMemo, useState } from "react";
-import { feature, mesh } from "topojson-client";
-import type { GeometryCollection, Topology } from "topojson-specification";
-import type { MapMeasure, Region } from "../api";
-import type { RegionStat } from "../mapStats";
+import type { MapMeasure } from "../api";
 import { formatMeasure } from "../format";
-import { REGION_NAMES } from "../regions";
+import type { Geometry } from "../geoShapes";
+import { HEIGHT, WIDTH } from "../geoShapes";
+import type { Stat } from "../mapStats";
 import { classOf, quantileThresholds } from "../scale";
 
-const WIDTH = 600;
-
-function regionOf(g: { properties?: object | null }): string | undefined {
-  return (g.properties as Partial<UfProps> | null | undefined)?.region;
-}
-const HEIGHT = 640;
-
-interface UfProps {
-  uf: string;
-  region: Region;
-}
-
 interface Props {
-  topology: unknown;
+  geometry: Geometry;
   measure: MapMeasure;
-  // null = carregando (skeleton). Região fora do mapa = "sem recargas".
-  stats: Map<Region, RegionStat> | null;
-  total: number;
-  highlighted: Region | null;
-  onHighlight: (region: Region | null) => void;
+  // null = carregando (skeleton). Chave fora do mapa = "sem recargas".
+  stats: Map<string, Stat> | null;
+  label: string;
+  // Só os níveis Brasil e região têm um nível abaixo para onde descer.
+  interactive: boolean;
+  highlighted: string | null;
+  onHighlight: (statKey: string | null) => void;
+  onSelect: (statKey: string) => void;
 }
 
 interface TooltipState {
-  region: Region;
+  statKey: string;
+  title: string;
   x: number;
   y: number;
 }
 
 export default function RegionMap({
-  topology,
+  geometry,
   measure,
   stats,
-  total,
+  label,
+  interactive,
   highlighted,
   onHighlight,
+  onSelect,
 }: Props) {
   const [tip, setTip] = useState<TooltipState | null>(null);
-
-  const geo = useMemo(() => {
-    const topo = topology as Topology;
-    const obj = topo.objects.uf as GeometryCollection<UfProps>;
-    const collection = feature(topo, obj);
-    const projection = geoMercator().fitSize([WIDTH, HEIGHT], collection);
-    const path = geoPath(projection);
-    return {
-      ufs: collection.features.map((f) => ({
-        uf: f.properties.uf,
-        region: f.properties.region,
-        d: path(f) ?? "",
-      })),
-      regionBorders: path(mesh(topo, obj, (a, b) => regionOf(a) !== regionOf(b))) ?? "",
-      outline: path(mesh(topo, obj, (a, b) => a === b)) ?? "",
-    };
-  }, [topology]);
 
   const thresholds = useMemo(
     () => (stats ? quantileThresholds([...stats.values()].map((s) => Number(s.value))) : []),
     [stats],
   );
+  const total = useMemo(() => new Set(geometry.shapes.map((s) => s.statKey)).size, [geometry]);
 
-  const fillFor = (region: Region): string => {
+  const fillFor = (statKey: string): string => {
     if (!stats) return "var(--map-loading)";
-    const stat = stats.get(region);
+    const stat = stats.get(statKey);
     if (!stat) return "url(#no-data)";
     return `var(--seq-${classOf(Number(stat.value), thresholds) + 1})`;
   };
 
-  const labelFor = (uf: string, region: Region): string => {
-    const stat = stats?.get(region);
-    const value = stat ? formatMeasure(measure, stat.value) : "sem recargas";
-    return `${uf}, região ${REGION_NAMES[region]}: ${value}`;
+  const labelFor = (ariaName: string, statKey: string): string => {
+    const stat = stats?.get(statKey);
+    return `${ariaName}: ${stat ? formatMeasure(measure, stat.value) : "sem recargas"}`;
   };
 
-  const tipStat = tip ? stats?.get(tip.region) : undefined;
+  const tipStat = tip ? stats?.get(tip.statKey) : undefined;
+  const tipTitle = tip ? (tipStat?.name ?? tip.title) : "";
 
   return (
     <div className="map-wrap" aria-busy={stats === null}>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="group" aria-label="Mapa do Brasil por região">
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="group" aria-label={label}>
         <defs>
           <pattern
             id="no-data"
@@ -98,35 +74,50 @@ export default function RegionMap({
             <line x1="0" y1="0" x2="0" y2="6" stroke="var(--map-hatch)" strokeWidth="2" />
           </pattern>
         </defs>
-        {geo.ufs.map((u) => (
-          <path
-            key={u.uf}
-            d={u.d}
-            role="button"
-            aria-label={labelFor(u.uf, u.region)}
-            className={`uf${highlighted === u.region ? " active" : ""}`}
-            style={{ fill: fillFor(u.region) }}
-            onMouseMove={(e) => {
-              const box = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
-              setTip({
-                region: u.region,
-                x: e.clientX - (box?.left ?? 0),
-                y: e.clientY - (box?.top ?? 0),
-              });
-            }}
-            onMouseEnter={() => onHighlight(u.region)}
-            onMouseLeave={() => {
-              setTip(null);
-              onHighlight(null);
-            }}
-          />
-        ))}
-        <path d={geo.regionBorders} className="region-border" />
-        <path d={geo.outline} className="outline" />
+        <g className="shapes">
+          {geometry.shapes.map((s) => (
+            <path
+              key={s.id}
+              d={s.d}
+              role={interactive ? "button" : "img"}
+              tabIndex={interactive ? 0 : undefined}
+              aria-label={labelFor(s.ariaName, s.statKey)}
+              className={`uf${highlighted === s.statKey ? " active" : ""}${interactive ? " clickable" : ""}`}
+              style={{ fill: fillFor(s.statKey) }}
+              onClick={interactive ? () => onSelect(s.statKey) : undefined}
+              onKeyDown={
+                interactive
+                  ? (ev) => {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        onSelect(s.statKey);
+                      }
+                    }
+                  : undefined
+              }
+              onMouseMove={(ev) => {
+                const box = ev.currentTarget.ownerSVGElement?.getBoundingClientRect();
+                setTip({
+                  statKey: s.statKey,
+                  title: s.title,
+                  x: ev.clientX - (box?.left ?? 0),
+                  y: ev.clientY - (box?.top ?? 0),
+                });
+              }}
+              onMouseEnter={() => onHighlight(s.statKey)}
+              onMouseLeave={() => {
+                setTip(null);
+                onHighlight(null);
+              }}
+            />
+          ))}
+        </g>
+        {geometry.regionBorders && <path d={geometry.regionBorders} className="region-border" />}
+        <path d={geometry.outline} className="outline" />
       </svg>
       {tip && (
         <div className="tooltip" role="tooltip" style={{ left: tip.x + 12, top: tip.y + 12 }}>
-          <strong>{REGION_NAMES[tip.region]}</strong>
+          <strong>{tipTitle}</strong>
           {tipStat ? (
             <>
               <div>{formatMeasure(measure, tipStat.value)}</div>

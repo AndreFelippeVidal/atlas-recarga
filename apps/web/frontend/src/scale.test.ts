@@ -33,14 +33,22 @@ describe("quantis", () => {
 describe("ranking", () => {
   it("ordena por valor decrescente e numera a posição", () => {
     const stats = buildStats([
-      { region: "N", value: "300000.00" },
-      { region: "SE", value: "2500000.00" },
-      { region: "S", value: "900000.50" },
+      { id: "N", name: "Norte", value: "300000.00" },
+      { id: "SE", name: "Sudeste", value: "2500000.00" },
+      { id: "S", name: "Sul", value: "900000.50" },
     ]);
-    expect([...stats.values()].map((s) => [s.region, s.rank])).toEqual([
+    expect([...stats.values()].map((s) => [s.id, s.rank])).toEqual([
       ["SE", 1],
       ["S", 2],
       ["N", 3],
     ]);
+  });
+
+  it("deixa de fora as linhas sem valor (mom_change sem base)", () => {
+    const stats = buildStats([
+      { id: "N", name: "Norte", value: null },
+      { id: "S", name: "Sul", value: "-3.50" },
+    ]);
+    expect([...stats.keys()]).toEqual(["S"]);
   });
 });

@@ -1,12 +1,14 @@
 // Formatação de exibição em pt-BR. Não calcula métrica: só apresenta o que a API devolveu.
-import type { KpiMeasure } from "./api";
+import type { MapMeasure } from "./api";
 
 const int = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-export function formatMeasure(measure: KpiMeasure, value: string): string {
+export function formatMeasure(measure: MapMeasure, value: string): string {
   const n = Number(value);
   switch (measure) {
+    case "mom_change":
+      return formatDelta(value);
     case "gross_revenue":
     case "avg_ticket":
       // Intl aceita a string decimal: o valor DECIMAL(14,2) sai exato, sem passar por float.
@@ -45,7 +47,8 @@ const ticket = new Intl.NumberFormat("pt-BR", {
 });
 
 // Forma curta para legenda e tooltip (`R$ 1,2 mi`, `12.345`). Só exibição.
-export function formatCompact(measure: KpiMeasure, n: number): string {
+export function formatCompact(measure: MapMeasure, n: number): string {
+  if (measure === "mom_change") return formatDelta(String(n));
   const money = measure === "gross_revenue" || measure === "avg_ticket";
   const abs = Math.abs(n);
   let scaled: string;
@@ -56,16 +59,18 @@ export function formatCompact(measure: KpiMeasure, n: number): string {
   return money ? `R$ ${scaled}` : scaled;
 }
 
-export const MEASURE_UNITS: Record<KpiMeasure, string> = {
+export const MEASURE_UNITS: Record<MapMeasure, string> = {
   gross_revenue: "R$",
   recharge_count: "recargas",
   avg_ticket: "R$ por recarga",
   active_pos: "PDVs",
+  mom_change: "Δ% da receita contra o mês anterior",
 };
 
-export const MEASURE_LABELS: Record<KpiMeasure, string> = {
+export const MEASURE_LABELS: Record<MapMeasure, string> = {
   gross_revenue: "Receita bruta",
   recharge_count: "Recargas",
   avg_ticket: "Ticket médio",
   active_pos: "PDVs ativos",
+  mom_change: "Variação da receita (Δ%)",
 };
