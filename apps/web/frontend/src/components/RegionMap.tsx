@@ -4,7 +4,7 @@ import { formatMeasure } from "../format";
 import type { Geometry } from "../geoShapes";
 import { HEIGHT, WIDTH } from "../geoShapes";
 import type { Stat } from "../mapStats";
-import { classOf, quantileThresholds } from "../scale";
+import { buildScale, classColor, scaleClass } from "../scale";
 
 interface Props {
   geometry: Geometry;
@@ -38,9 +38,9 @@ export default function RegionMap({
 }: Props) {
   const [tip, setTip] = useState<TooltipState | null>(null);
 
-  const thresholds = useMemo(
-    () => (stats ? quantileThresholds([...stats.values()].map((s) => Number(s.value))) : []),
-    [stats],
+  const scale = useMemo(
+    () => buildScale(measure, stats ? [...stats.values()].map((s) => Number(s.value)) : []),
+    [measure, stats],
   );
   const total = useMemo(() => new Set(geometry.shapes.map((s) => s.statKey)).size, [geometry]);
 
@@ -48,7 +48,7 @@ export default function RegionMap({
     if (!stats) return "var(--map-loading)";
     const stat = stats.get(statKey);
     if (!stat) return "url(#no-data)";
-    return `var(--seq-${classOf(Number(stat.value), thresholds) + 1})`;
+    return classColor(scale, scaleClass(scale, Number(stat.value)));
   };
 
   const labelFor = (ariaName: string, statKey: string): string => {
@@ -60,7 +60,7 @@ export default function RegionMap({
   const tipTitle = tip ? (tipStat?.name ?? tip.title) : "";
 
   return (
-    <div className="map-wrap" aria-busy={stats === null}>
+    <div className={`map-wrap${stats === null ? " loading" : ""}`} aria-busy={stats === null}>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="group" aria-label={label}>
         <defs>
           <pattern
@@ -105,6 +105,8 @@ export default function RegionMap({
                 });
               }}
               onMouseEnter={() => onHighlight(s.statKey)}
+              onFocus={interactive ? () => onHighlight(s.statKey) : undefined}
+              onBlur={interactive ? () => onHighlight(null) : undefined}
               onMouseLeave={() => {
                 setTip(null);
                 onHighlight(null);

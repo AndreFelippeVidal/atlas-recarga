@@ -13,6 +13,12 @@
   --seq-3: #3987e5;
   --seq-4: #1c5cab;
   --seq-5: #0d366b;
+  /* Divergente (mom_change): vermelho = queda, azul = alta, cinza = estável. */
+  --div-1: #b42318;
+  --div-2: #ee9a90;
+  --div-3: #d5d9df;
+  --div-4: #86b6ef;
+  --div-5: #1c5cab;
   --map-loading: #e3e7ec;
   --map-empty: #eef0f3;
   --map-hatch: #b5bcc6;
@@ -36,6 +42,11 @@
     --seq-3: #3987e5;
     --seq-4: #256abf;
     --seq-5: #184f95;
+    --div-1: #ff6b5e;
+    --div-2: #b5524a;
+    --div-3: #4a5563;
+    --div-4: #3f78c4;
+    --div-5: #7fb0f5;
     --map-loading: #2a323c;
     --map-empty: #232a33;
     --map-hatch: #4a5563;
@@ -311,6 +322,58 @@ button {
 }
 @media (prefers-reduced-motion: reduce) {
   .map-zoom {
+    animation: none;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.warming {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--muted);
+}
+.skeleton-map {
+  height: 320px;
+  border-radius: 8px;
+  background: var(--map-loading);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.skeleton-list {
+  display: grid;
+  gap: 6px;
+}
+.skeleton-row {
+  height: 34px;
+  border-radius: 6px;
+  background: var(--border);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.map-wrap.loading .uf {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.rank-gap {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton .card-value,
+  .skeleton-map,
+  .skeleton-row,
+  .map-wrap.loading .uf {
     animation: none;
   }
 }

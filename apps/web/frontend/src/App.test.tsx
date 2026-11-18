@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 
@@ -285,13 +285,145 @@ describe("Drill-down", () => {
     await userEvent.click(await screen.findByRole("button", { name: /PA, região Norte: -12,00%/ }));
     await userEvent.click(await screen.findByRole("button", { name: /^PA: -12,00%/ }));
     const fall = await screen.findByRole("img", { name: "1500001: -40,00%" });
-    expect((fall as unknown as SVGElement).style.fill).toBe("var(--seq-1)");
+    expect((fall as unknown as SVGElement).style.fill).toBe("var(--div-1)");
     expect(
       (screen.getByRole("img", { name: "1500002: +4,00%" }) as unknown as SVGElement).style.fill,
-    ).toBe("var(--seq-5)");
+    ).toBe("var(--div-3)");
     // sem base = sem valor: hachurado, nunca classe de queda
     expect(
       screen.getByRole("img", { name: "1500003: sem recargas" }).getAttribute("style"),
     ).toContain("#no-data");
+  });
+});
+
+describe("Estados de carregamento e erro (P12.7)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("mostra o skeleton do mapa e do ranking enquanto carrega", async () => {
+    mockFetch(route({ "/api/map/region": () => new Promise<Response>(() => {}) }));
+    render(<App />);
+    expect(await screen.findByLabelText("Carregando o ranking")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    expect(screen.queryByText("Aquecendo o banco de dados…")).not.toBeInTheDocument();
+  });
+
+  it("depois de 3s de espera mostra 'Aquecendo o banco de dados…' e some ao chegar", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let release: (r: Response) => void = () => {};
+    mockFetch(
+      route({
+        "/api/map/region": () =>
+          new Promise<Response>((resolve) => {
+            release = resolve;
+          }),
+      }),
+    );
+    render(<App />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2900);
+    });
+    expect(screen.queryByText("Aquecendo o banco de dados…")).not.toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(screen.getByText("Aquecendo o banco de dados…")).toBeInTheDocument();
+    await act(async () => {
+      release(json(REGIONS.gross_revenue));
+    });
+    expect(screen.queryByText("Aquecendo o banco de dados…")).not.toBeInTheDocument();
+  });
+
+  it("com erro, os KPIs não ficam em skeleton e o banner mantém o botão de tentar de novo", async () => {
+    mockFetch(route({ "/api/kpis": () => down() }));
+    render(<App />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("WAREHOUSE_UNAVAILABLE");
+    expect(screen.queryAllByLabelText(/carregando/)).toHaveLength(0);
+    expect(screen.getAllByLabelText(/indisponível/)).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
+    // a página não quebra: o seletor de mês e o ranking continuam
+    expect(screen.getByLabelText(/Mês/)).toBeVisible();
+    expect(await screen.findByRole("list", { name: "Ranking: regiões" })).toBeVisible();
+  });
+});
+
+describe("Escala divergente e acessibilidade (P12.7)", () => {
+  const momRegions = () =>
+    json([
+      { region: "N", value: "-12.00" },
+      { region: "SE", value: "12.00" },
+    ]);
+
+  it("mom_change usa a escala divergente: queda vermelha, alta azul, legenda com ±max", async () => {
+    mockFetch(route({ "/api/map/region": momRegions }));
+    render(<App />);
+    await screen.findByRole("list", { name: "Ranking: regiões" });
+    await userEvent.selectOptions(screen.getByLabelText(/Medida/), "mom_change");
+    const pa = await screen.findByRole("button", { name: /PA, região Norte: -12,00%/ });
+    const sp = screen.getByRole("button", { name: /SP, região Sudeste: \+12,00%/ });
+    expect((pa as unknown as SVGElement).style.fill).toBe("var(--div-1)");
+    expect((sp as unknown as SVGElement).style.fill).toBe("var(--div-5)");
+    const legend = screen.getByRole("group", { name: /^Legenda/ });
+    expect(legend).toHaveTextContent("Escala divergente centrada em 0%");
+    expect(legend).toHaveTextContent("±12,00%");
+    expect(legend).toHaveTextContent("maior queda");
+    expect(legend).toHaveTextContent("maior alta");
+  });
+
+  it("o ranking de mom_change traz as 5 maiores altas e as 5 maiores quedas", async () => {
+    const ufs = Array.from({ length: 14 }, (_, i) => ({
+      uf: `U${i}`,
+      value: String(7 - i), // 7, 6, ..., -6
+    }));
+    mockFetch(
+      route({
+        "/api/map/region": () => json([{ region: "N", value: "1.00" }]),
+        "/api/map/uf": () => json(ufs),
+      }),
+    );
+    render(<App />);
+    await screen.findByRole("list", { name: "Ranking: regiões" });
+    await userEvent.selectOptions(screen.getByLabelText(/Medida/), "mom_change");
+    await userEvent.click(await screen.findByRole("button", { name: /PA, região Norte/ }));
+    const list = await screen.findByRole("list", { name: "Ranking: UFs da região" });
+    const names = within(list)
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label"));
+    expect(names).toHaveLength(10);
+    expect(names[0]).toContain("1º U0: +7,00%");
+    expect(names[4]).toContain("5º U4: +3,00%");
+    expect(names[5]).toContain("10º U9: -2,00%");
+    expect(names[9]).toContain("14º U13: -6,00%");
+  });
+
+  it("navega por teclado: Tab chega ao polígono e Enter desce para a região", async () => {
+    mockFetch(route());
+    render(<App />);
+    const pa = await screen.findByRole("button", { name: /PA, região Norte/ });
+    expect(pa).toHaveAttribute("tabindex", "0");
+    pa.focus();
+    expect(pa).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("list", { name: "Ranking: UFs da região" })).toBeVisible();
+  });
+
+  it("anuncia o nível do mapa numa região de status", async () => {
+    mockFetch(route());
+    render(<App />);
+    await screen.findByRole("list", { name: "Ranking: regiões" });
+    expect(screen.getByText("Mapa do Brasil por região")).toHaveClass("sr-only");
+    await userEvent.click(await screen.findByRole("button", { name: /PA, região Norte/ }));
+    expect(await screen.findByText("Mapa da região por UF")).toHaveClass("sr-only");
+  });
+
+  it("o ranking é alcançável por Tab e Enter desce no nível", async () => {
+    mockFetch(route());
+    render(<App />);
+    const ranking = await screen.findByRole("list", { name: "Ranking: regiões" });
+    const first = within(ranking).getAllByRole("button")[0];
+    first.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("list", { name: "Ranking: UFs da região" })).toBeVisible();
   });
 });

@@ -108,3 +108,20 @@ export function useMunTopology(uf: string | null) {
     retry: api.retry,
   };
 }
+
+export const WARMUP_MS = 3000;
+
+// Verdadeiro quando a espera passa de `ms` (warehouse frio, SPEC-007 §4). Volta a falso assim que
+// a espera termina ou recomeça do zero ao trocar de consulta.
+export function useSlow(pending: boolean, ms = WARMUP_MS): boolean {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(() => setSlow(true), ms);
+    return () => {
+      clearTimeout(timer);
+      setSlow(false);
+    };
+  }, [pending, ms]);
+  return pending && slow;
+}

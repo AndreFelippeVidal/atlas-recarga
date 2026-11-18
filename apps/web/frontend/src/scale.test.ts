@@ -1,5 +1,14 @@
 import { buildStats } from "./mapStats";
-import { classOf, legendClasses, quantileThresholds } from "./scale";
+import {
+  buildScale,
+  classColor,
+  classOf,
+  divergingBound,
+  divergingThresholds,
+  legendClasses,
+  quantileThresholds,
+  scaleClass,
+} from "./scale";
 
 describe("quantis", () => {
   it("com 5 valores cada um cai numa classe própria", () => {
@@ -16,12 +25,12 @@ describe("quantis", () => {
 
   it("não quebra sem valores", () => {
     expect(quantileThresholds([])).toEqual([]);
-    expect(legendClasses([], [])).toEqual([]);
+    expect(legendClasses([], buildScale("gross_revenue", []))).toEqual([]);
   });
 
   it("a legenda traz a faixa observada de cada classe e omite as vazias", () => {
     const values = [10, 20, 30];
-    const classes = legendClasses(values, quantileThresholds(values));
+    const classes = legendClasses(values, buildScale("gross_revenue", values));
     expect(classes.map((c) => [c.from, c.to])).toEqual([
       [10, 10],
       [20, 20],
@@ -50,5 +59,37 @@ describe("ranking", () => {
       { id: "S", name: "Sul", value: "-3.50" },
     ]);
     expect([...stats.keys()]).toEqual(["S"]);
+  });
+});
+
+describe("escala divergente (mom_change)", () => {
+  it("é simétrica em ±max(|min|, |max|) e centrada em 0", () => {
+    const values = [-40, -10, 0, 4, 20];
+    const t = divergingThresholds(values);
+    expect(t).toEqual([-24, -8, 8, 24]);
+    expect(divergingBound(values)).toBe(40);
+  });
+
+  it("a maior queda cai na classe 0 e a maior alta na 4, mesmo com alta pequena", () => {
+    const scale = buildScale("mom_change", [-40, 4]);
+    expect(scaleClass(scale, -40)).toBe(0);
+    expect(scaleClass(scale, 4)).toBe(2);
+    expect(scaleClass(buildScale("mom_change", [-10, 40]), 40)).toBe(4);
+  });
+
+  it("o zero fica na classe do meio e tudo zero não quebra", () => {
+    const scale = buildScale("mom_change", [-30, 30]);
+    expect(scaleClass(scale, 0)).toBe(2);
+    const flat = buildScale("mom_change", [0, 0]);
+    expect(scaleClass(flat, 0)).toBe(2);
+    expect(buildScale("mom_change", []).thresholds).toEqual([0, 0, 0, 0]);
+    expect(legendClasses([0, 0], flat).map((c) => c.index)).toEqual([2]);
+  });
+
+  it("volume segue os quantis e as cores vêm de --seq / --div", () => {
+    const seq = buildScale("gross_revenue", [10, 20, 30, 40, 50]);
+    expect(seq.kind).toBe("sequential");
+    expect(classColor(seq, 0)).toBe("var(--seq-1)");
+    expect(classColor(buildScale("mom_change", [1]), 4)).toBe("var(--div-5)");
   });
 });
