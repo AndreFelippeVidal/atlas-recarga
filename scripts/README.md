@@ -97,3 +97,10 @@ uv run python scripts/fetch_geo.py
 
 O `tests/test_geo_files.py` confere, sem rede, os limites de tamanho da SPEC-007 §2 e o match de
 100% entre as malhas e a referência (5.570 municípios).
+
+## `spike_dashboard_latency.py` e `spike_lakebase_read.py` (P12.10)
+
+Medem a latência do `atlas-web` (por endpoint, com cache e warehouse frios e quentes), testam um
+agregado derivado de `mv_recharges` e a leitura de uma synced table do Lakebase. Quem roda é o
+mantenedor, no `dev`; o roteiro e as tabelas de resultado estão em
+[docs/spikes/P12.10-dashboard-latency.md](../docs/spikes/P12.10-dashboard-latency.md).
