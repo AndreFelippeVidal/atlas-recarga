@@ -83,4 +83,4 @@ databricks bundle run atlas_agent_monitoring -t dev --profile <perfil>
 uv run python scripts/check_agent_monitoring.py --profile <perfil> --warehouse-id <id> --catalog atlas_dev
 ```
 
-Se o Beta não funcionar (o S0.3 não validou o judge em amostra), não ligue nada: o job faz o mesmo sozinho. Teste local da lógica: `uv run pytest tests/test_eval_monitoring.py tests/test_check_agent_monitoring.py tests/test_agent_quality_bundle.py`.
+O Beta **não funcionou** na P10.8 (20 traces, nenhuma assessment anexada pelos 3 judges): o passo opcional acima pode ser pulado, porque o job faz o mesmo sozinho (plano B, o caminho em uso). Teste local da lógica: `uv run pytest tests/test_eval_monitoring.py tests/test_check_agent_monitoring.py tests/test_agent_quality_bundle.py`.

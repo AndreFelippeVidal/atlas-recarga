@@ -9,9 +9,9 @@ scorers de código **não** entram aqui: dependem de `eval/scorers.py` e o job d
 os calcula em 100% dos traces. As assessments dos judges ficam no trace e o job as reaproveita
 (deduplicadas por nome). Sem `--start` só lista o que faria; `--stop` desliga os três.
 
-O que o S0.3 **não** validou e esta task confere: o judge em amostra, a latência trace→feedback e
-se o scorer sobrevive a `stop()` e a um novo deploy. Se o Beta não funcionar, não ligue nada: o
-job faz o mesmo sozinho (plano B). Registre o resultado em `docs/spikes/S0-results.md`.
+**Resultado da P10.8: o Beta não anexou nenhuma assessment** (20 traces, 3 judges a 20%, no
+experiment com trace location no UC). Este script é só uma tentativa opcional; o job faz o trabalho
+sozinho (plano B). Ver SPEC-008 §6 e ADR-0013.
 """
 
 from __future__ import annotations

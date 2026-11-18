@@ -21,7 +21,7 @@ A H4 do discovery exige que o agente seja confiável **e continue confiável**. 
 **Opção 1**, em três camadas (offline, gate de PR, produção). A estratégia de custo: scorers determinísticos de código em 100% dos traces e LLM judges só numa amostra de 20%. O golden set guarda a **SQL de referência**, não o valor.
 
 ## Prós e contras
-**MLflow 3.** 👍 Nativo dos traces que já existem; o feedback fica anexado ao próprio trace; dataset versionado no UC; o mesmo scorer em todo lugar. 👎 Production monitoring em Beta (o S0.3 pode exigir o plano B); a API ainda evolui.
+**MLflow 3.** 👍 Nativo dos traces que já existem; o feedback fica anexado ao próprio trace; dataset versionado no UC; o mesmo scorer em todo lugar. 👎 Production monitoring em Beta (não funcionou na P10.8: o plano B é o caminho); a API ainda evolui.
 **Só offline.** 👍 Barato. 👎 Não detecta a degradação real nem perguntas novas fora do golden set.
 **Manual.** 👍 Julgamento humano rico. 👎 Não escala, não bloqueia PR, depende de disciplina.
 **Externo.** 👍 Métricas prontas e portáveis. 👎 Duplica a infraestrutura de traces; os resultados ficam fora do UC; não integra com o monitoramento do Databricks.
@@ -30,5 +30,6 @@ A H4 do discovery exige que o agente seja confiável **e continue confiável**. 
 - **Positivas:** a métrica de acurácia do PRD vira um **gate de merge**; as falhas de produção alimentam o golden set (ciclo de melhoria).
 - **Negativas aceitas:** o gate custa ~30 chamadas ao agente por PR relevante e precisa de um token do workspace como GitHub secret (escopo mínimo). O scorer `numeric_match` depende de extrair o número principal da resposta, por isso o formato do bloco `Fonte:` é contrato (SPEC-005 §4).
 - **Spike S0.3 (2026-11-12):** um scorer de código agendado (`start()`) anexou feedback `CODE` a traces novos, sem `evaluate`, e o plano B abaixo também foi validado. **Não validado no S0.3:** LLM judge em amostra de 20%, latência trace→feedback e persistência do scorer após `stop()`/redeploy; reconfirmar na P10.8. Ver `docs/spikes/S0-results.md`.
-- **Plano B (S0.3):** job diário com `mlflow.search_traces` gravando em `atlas.observability.agent_quality_scores` (SPEC-008 §6, P10.8); `agent_quality_daily` é uma view sobre essa tabela. O job roda nos dois caminhos, porque o painel e a fila precisam de tabelas; o Beta cobre só os LLM judges.
+- **P10.8 (2026-11-17): o Beta não funcionou.** Os 3 LLM judges foram registrados com `start()` a 20% no experiment `atlas_agent_traces` (que tem trace location no UC) e nenhum dos 20 traces criados depois ganhou assessment. A causa (atraso ou limitação do Beta) não foi isolada. Efeito: o plano B é o caminho em uso, e o `eval/start_monitoring.py` é só uma tentativa opcional. Reconfirmar se o production monitoring virar GA.
+- **Plano B (S0.3, em uso):** job diário com `mlflow.search_traces` gravando em `atlas.observability.agent_quality_scores` (SPEC-008 §6, P10.8); `agent_quality_daily` é uma view sobre essa tabela. O painel e a fila precisam de tabelas, então o job roda de qualquer forma; no `dev` ele pontuou 20 traces reais, com os scorers de código em 100% e os judges em ~20%.
 - **Revisitar se:** o production monitoring virar GA, ou o custo dos judges passar da cota (reduzir a amostra para 10%).
