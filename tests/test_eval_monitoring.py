@@ -65,6 +65,16 @@ def test_extract_answer_from_responses_output() -> None:
     assert mon.extract_answer(json.dumps(response)) == ANSWER
 
 
+def test_extract_answer_and_question_handle_a_double_encoded_trace() -> None:
+    # No workspace, `trace.data.response` chega como JSON dentro de uma string JSON.
+    response = {
+        "output": [{"type": "message", "content": [{"type": "output_text", "text": ANSWER}]}]
+    }
+    assert mon.extract_answer(json.dumps(json.dumps(response))) == ANSWER
+    request = {"input": [{"role": "user", "content": [{"type": "input_text", "text": "oi?"}]}]}
+    assert mon.extract_question(json.dumps(json.dumps(request))) == "oi?"
+
+
 def test_extract_answer_keeps_real_newlines_so_the_source_block_is_found() -> None:
     # Se o JSON inteiro fosse serializado, o `\n` viraria `\\n` e o `Fonte:` não seria achado.
     text = mon.extract_answer({"output": [{"type": "output_text", "text": ANSWER}]})

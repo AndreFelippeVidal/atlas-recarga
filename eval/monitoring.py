@@ -73,6 +73,18 @@ class Score:
 # ---------------------------------------------------------------------------------------------
 
 
+def _decode(value: Any) -> Any:
+    """Decodifica o JSON de um trace até sair da `str`: o MLflow o guarda codificado 2 vezes."""
+    for _ in range(3):
+        if not isinstance(value, str):
+            return value
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
 def extract_answer(response: Any) -> str:
     """O texto da resposta de um trace do agente.
 
@@ -80,11 +92,9 @@ def extract_answer(response: Any) -> str:
     "output_text", "text": ...}]}]}`. Junta os textos das mensagens do assistente; qualquer outro
     formato cai no `answer_text` dos scorers. Aceita o JSON como `str`, como vem do trace.
     """
+    response = _decode(response)
     if isinstance(response, str):
-        try:
-            response = json.loads(response)
-        except ValueError:
-            return str(response)
+        return response
     texts: list[str] = []
 
     def walk(node: Any) -> None:
@@ -104,11 +114,9 @@ def extract_answer(response: Any) -> str:
 
 def extract_question(request: Any) -> str:
     """O texto da última mensagem do usuário na requisição do trace (`""` se não achar)."""
+    request = _decode(request)
     if isinstance(request, str):
-        try:
-            request = json.loads(request)
-        except ValueError:
-            return str(request)
+        return request
     found: list[str] = []
 
     def walk(node: Any) -> None:

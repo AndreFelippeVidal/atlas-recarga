@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 import sys
 import time
 from collections.abc import Sequence
@@ -72,8 +73,12 @@ def build_judges(model: str) -> dict[str, Any]:
     }
 
 
-def run_judge(judge: Any, question: str, answer: str) -> Any:
-    feedback = judge(inputs={"question": question}, outputs=answer)
+def run_judge(name: str, judge: Any, question: str, answer: str) -> Any:
+    # `Safety` só olha a resposta (não aceita `inputs`); os outros julgam pergunta e resposta.
+    if name == "safety":
+        feedback = judge(outputs=answer)
+    else:
+        feedback = judge(inputs={"question": question}, outputs=answer)
     if feedback.value is None or getattr(feedback, "error", None):
         # Sem veredito não é "n/a": levanta para o trace ser tentado de novo na próxima execução.
         raise RuntimeError(f"judge sem veredito: {getattr(feedback, 'error', None)}")
@@ -119,6 +124,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     global mon
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("catalog")
+    parser.add_argument(
+        "--warehouse-id",
+        required=True,
+        help="SQL warehouse que o MLflow usa para ler os traces das trace tables do UC",
+    )
     parser.add_argument("--eval-dir", required=True, help="pasta eval/ sincronizada pelo bundle")
     parser.add_argument(
         "--experiment-id",
@@ -142,9 +152,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     traces_table, scores_table = f"{obs}.agent_quality_traces", f"{obs}.agent_quality_scores"
     queue_table = f"{args.catalog}.eval.review_queue"
 
+    # O experiment tem trace location no UC (P10.5): o MLflow lê os traces por um SQL warehouse.
+    os.environ["MLFLOW_TRACING_SQL_WAREHOUSE_ID"] = args.warehouse_id
     since_ms = int((time.time() - args.window_days * 86400) * 1000)
     traces = mlflow.search_traces(
-        experiment_ids=[args.experiment_id],
+        locations=[args.experiment_id],
         filter_string=f"trace.timestamp_ms > {since_ms}",
         max_results=MAX_TRACES,
         return_type="list",
@@ -158,12 +170,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     score_rows: list[list[str]] = []
     queue_rows: list[list[str]] = []
     judge_failures = 0
+    skipped: dict[str, int] = {}
 
     for trace in traces:
         info = trace.info
         trace_id = info.trace_id
         status = str(getattr(info.state, "value", info.state))
         if status not in TERMINAL_STATES:
+            skipped[status] = skipped.get(status, 0) + 1
             continue  # em andamento: entra quando terminar, enquanto estiver na janela
         day = mon.day_brt(info.request_time)
         answer = mon.extract_answer(trace.data.response)
@@ -184,7 +198,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 try:
                     if judges is None:
                         judges = build_judges(args.judge_model)
-                    result = run_judge(judges[name], question, answer)
+                    result = run_judge(name, judges[name], question, answer)
                 except Exception as error:
                     judge_failures += 1
                     print(f"judge {name} falhou em {trace_id}: {type(error).__name__}: {error}")
@@ -245,10 +259,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         spark.sql(f"INSERT INTO {traces_table} VALUES\n{_rows_sql(trace_rows)}")
     print(
         f"traces lidos={len(traces)} novos={len(trace_rows)} scores={len(score_rows)} "
-        f"fila={len(queue_rows)} judges com falha={judge_failures}"
+        f"fila={len(queue_rows)} judges com falha={judge_failures} ignorados por estado={skipped}"
     )
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # O serverless trata `SystemExit(0)` como falha: só sai com erro de verdade.
+    if code := main():
+        raise SystemExit(code)

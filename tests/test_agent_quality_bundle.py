@@ -34,6 +34,7 @@ def test_job_runs_daily_at_7_after_atlas_daily() -> None:
     params = task["spark_python_task"]["parameters"]
     assert params[0] == "${var.catalog}"
     # Sem __file__ no serverless: o caminho de eval/ e o id do experiment vêm do bundle.
+    assert params[params.index("--warehouse-id") + 1] == "${var.warehouse_id}"
     assert params[params.index("--eval-dir") + 1] == "${workspace.file_path}/eval"
     assert (
         params[params.index("--experiment-id") + 1]

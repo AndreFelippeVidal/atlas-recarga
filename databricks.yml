@@ -378,6 +378,8 @@ resources:
             python_file: eval/run_agent_monitoring.py
             parameters:
               - ${var.catalog}
+              - --warehouse-id
+              - ${var.warehouse_id}
               - --eval-dir
               - ${workspace.file_path}/eval
               # No dev o bundle prefixa o nome do experiment; o id é o que vale.

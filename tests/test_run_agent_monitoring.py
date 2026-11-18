@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import types
 from pathlib import Path
@@ -75,9 +76,20 @@ def run(monkeypatch: pytest.MonkeyPatch, traces: list[FakeTrace]) -> FakeSpark:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     code = module.main(
-        ["atlas_dev", "--eval-dir", str(EVAL), "--experiment-id", "1", "--judge-rate", "0"]
+        [
+            "atlas_dev",
+            "--warehouse-id",
+            "wh1",
+            "--eval-dir",
+            str(EVAL),
+            "--experiment-id",
+            "1",
+            "--judge-rate",
+            "0",
+        ]
     )
     assert code == 0
+    assert os.environ["MLFLOW_TRACING_SQL_WAREHOUSE_ID"] == "wh1"
     return spark
 
 
