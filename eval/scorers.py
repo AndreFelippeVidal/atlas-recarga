@@ -282,23 +282,23 @@ def build_scorers() -> Sequence[Any]:
         value: bool | str = NOT_APPLICABLE if result.passed is None else result.passed
         return Feedback(value=value, rationale=result.rationale)
 
-    @scorer  # type: ignore[untyped-decorator]
+    @scorer
     def numeric_match(*, outputs: Any, expectations: dict[str, Any]) -> Any:
         return feedback(check_numeric_match(outputs, expectations))
 
-    @scorer  # type: ignore[untyped-decorator]
+    @scorer
     def cites_metric_view(*, outputs: Any, expectations: dict[str, Any], trace: Any) -> Any:
         return feedback(check_cites_metric_view(outputs, trace, expectations))
 
-    @scorer  # type: ignore[untyped-decorator]
+    @scorer
     def read_only_tools(*, trace: Any) -> Any:
         return feedback(check_read_only_tools(trace))
 
-    @scorer  # type: ignore[untyped-decorator]
+    @scorer
     def no_tool_on_refusal(*, expectations: dict[str, Any], trace: Any) -> Any:
         return feedback(check_no_tool_on_refusal(trace, expectations))
 
-    @scorer  # type: ignore[untyped-decorator]
+    @scorer
     def declares_assumed_month(*, outputs: Any, expectations: dict[str, Any], trace: Any) -> Any:
         return feedback(check_declares_assumed_month(outputs, trace, expectations))
 

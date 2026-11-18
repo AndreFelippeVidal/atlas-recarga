@@ -55,6 +55,7 @@ def top_regions(
     month: str,
     n: int = DEFAULT_TOP_N,
     uf: str | None = None,
+    request_id: str | None = None,
 ) -> dict[str, Any]:
     dims = _check_level(level)
     if isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= MAX_TOP_N:
@@ -69,6 +70,7 @@ def top_regions(
         month,
         order_by=f"{measure} desc",
         limit=n,
+        request_id=request_id,
     )
     columns, rows = executor(built.sql, built.params)
     return {
@@ -106,10 +108,11 @@ def compare_months(
     month_b: str,
     level: str,
     uf: str | None = None,
+    request_id: str | None = None,
 ) -> dict[str, Any]:
     dims = _check_level(level)
     filters = _uf_filter(uf)
-    request_id = str(uuid.uuid4())
+    request_id = request_id or str(uuid.uuid4())
     # Pede 1 linha além do teto: se vier, o resultado não cabe e o cliente deve filtrar.
     built = [
         build_query(
