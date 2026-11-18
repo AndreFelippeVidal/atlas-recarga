@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
-import type { MapMeasure, Region } from "../api";
-import { useRegionMap, useUfTopology } from "../hooks";
+import { useEffect, useMemo, useState } from "react";
+import type { MapFocus, MapMeasure, Region } from "../api";
+import { buildGeometry } from "../geoShapes";
+import { useMapData, useMunTopology, useUfTopology } from "../hooks";
 import { buildStats } from "../mapStats";
-import { REGIONS } from "../regions";
+import { REGION_NAMES, REGIONS } from "../regions";
 import { legendClasses, quantileThresholds } from "../scale";
 import ErrorBanner from "./ErrorBanner";
 import Legend from "./Legend";
@@ -14,58 +15,160 @@ interface Props {
   measure: MapMeasure;
 }
 
-export default function MapPanel({ month, measure }: Props) {
-  const geo = useUfTopology();
-  const regionMap = useRegionMap(month, measure);
-  const [highlighted, setHighlighted] = useState<Region | null>(null);
+const BRAZIL: MapFocus = { level: "brazil" };
 
-  // Em erro mantém o mapa anterior (com a medida a que ele pertence); carregando, mostra skeleton.
-  const shown = regionMap.data ?? (regionMap.error ? regionMap.stale : null);
+// Sobe um nível: município → região da UF → Brasil.
+function parentOf(focus: MapFocus): MapFocus {
+  if (focus.level === "uf") return { level: "region", region: focus.region };
+  return BRAZIL;
+}
+
+const NOUNS = { brazil: "regiões", region: "UFs da região", uf: "municípios da UF" } as const;
+const MAP_LABELS = {
+  brazil: "Mapa do Brasil por região",
+  region: "Mapa da região por UF",
+  uf: "Mapa da UF por município",
+} as const;
+
+function focusId(focus: MapFocus): string {
+  if (focus.level === "uf") return `uf:${focus.uf}`;
+  return focus.level === "region" ? `region:${focus.region}` : "brazil";
+}
+
+export default function MapPanel({ month, measure }: Props) {
+  const [focus, setFocus] = useState<MapFocus>(BRAZIL);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const geo = useUfTopology();
+  const mapData = useMapData(month, measure, focus);
+
+  // Em erro mantém o mapa anterior (com mês, medida e foco a que ele pertence); carregando,
+  // mostra o esqueleto do foco pedido.
+  const shown = mapData.data ?? (mapData.error ? mapData.stale : null);
+  const view = shown?.focus ?? focus;
+  const mun = useMunTopology(view.level === "uf" ? view.uf : null);
+
+  const geometry = useMemo(
+    () => buildGeometry(geo.topology, mun.topology, view),
+    [geo.topology, mun.topology, view],
+  );
   const stats = useMemo(() => (shown ? buildStats(shown.items) : null), [shown]);
   const classes = useMemo(() => {
     if (!stats) return [];
     const values = [...stats.values()].map((s) => Number(s.value));
     return legendClasses(values, quantileThresholds(values));
   }, [stats]);
+  const expected = useMemo(() => {
+    if (view.level === "brazil") return REGIONS.map((r) => ({ id: r, name: REGION_NAMES[r] }));
+    if (view.level === "region" && geometry) {
+      return geometry.shapes.map((s) => ({ id: s.statKey, name: s.title }));
+    }
+    return [];
+  }, [view, geometry]);
 
-  const error = geo.error ?? regionMap.error;
+  // Esc sobe um nível a partir do que está na tela (SPEC-007 §4).
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape" && view.level !== "brazil") {
+        setHighlighted(null);
+        setFocus(parentOf(view));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view]);
+
+  const goTo = (next: MapFocus) => {
+    setHighlighted(null);
+    setFocus(next);
+  };
+  const select = (id: string) => {
+    if (view.level === "brazil") goTo({ level: "region", region: id as Region });
+    else if (view.level === "region") goTo({ level: "uf", uf: id, region: view.region });
+  };
+
+  const error = geo.error ?? mapData.error ?? mun.error;
   const retry = () => {
     if (geo.error) geo.retry();
-    if (regionMap.error) regionMap.retry();
+    if (mapData.error) mapData.retry();
+    if (mun.error) mun.retry();
   };
   const shownMeasure = shown?.measure ?? measure;
+  const totalItems =
+    expected.length > 0 ? expected.length : new Set(geometry?.shapes.map((x) => x.statKey)).size;
+  const hasEmpty = geometry !== null && stats !== null && stats.size < totalItems;
 
   return (
     <>
       <section className="map-area" aria-label="Mapa">
         {error && <ErrorBanner code={error} onRetry={retry} />}
-        {geo.topology ? (
-          <RegionMap
-            topology={geo.topology}
-            measure={shownMeasure}
-            stats={stats}
-            total={REGIONS.length}
-            highlighted={highlighted}
-            onHighlight={setHighlighted}
-          />
+        {view.level !== "brazil" && (
+          <button type="button" className="back-button" onClick={() => goTo(BRAZIL)}>
+            ← Ver o Brasil inteiro
+          </button>
+        )}
+        {geometry ? (
+          <div key={focusId(view)} className="map-zoom">
+            <RegionMap
+              geometry={geometry}
+              measure={shownMeasure}
+              stats={stats}
+              label={MAP_LABELS[view.level]}
+              interactive={view.level !== "uf"}
+              highlighted={highlighted}
+              onHighlight={setHighlighted}
+              onSelect={select}
+            />
+          </div>
         ) : (
           <p className="placeholder" aria-busy="true">
             Carregando o mapa…
           </p>
         )}
-        {stats && (
-          <Legend measure={shownMeasure} classes={classes} hasEmpty={stats.size < REGIONS.length} />
+        {stats && geometry && (
+          <Legend measure={shownMeasure} classes={classes} hasEmpty={hasEmpty} />
         )}
       </section>
       <aside className="side" aria-label="Ranking">
         <nav aria-label="Navegação do mapa" className="breadcrumb">
-          Brasil
+          {view.level === "brazil" ? (
+            <span aria-current="page">Brasil</span>
+          ) : (
+            <button type="button" className="crumb" onClick={() => goTo(BRAZIL)}>
+              Brasil
+            </button>
+          )}
+          {view.level !== "brazil" && (
+            <>
+              {" › "}
+              {view.level === "region" ? (
+                <span aria-current="page">{REGION_NAMES[view.region]}</span>
+              ) : (
+                <button
+                  type="button"
+                  className="crumb"
+                  onClick={() => goTo({ level: "region", region: view.region })}
+                >
+                  {REGION_NAMES[view.region]}
+                </button>
+              )}
+            </>
+          )}
+          {view.level === "uf" && (
+            <>
+              {" › "}
+              <span aria-current="page">{view.uf}</span>
+            </>
+          )}
         </nav>
         <Ranking
           measure={shownMeasure}
           stats={stats}
+          noun={NOUNS[view.level]}
+          expected={expected}
           highlighted={highlighted}
+          interactive={view.level !== "uf"}
           onHighlight={setHighlighted}
+          onSelect={select}
         />
       </aside>
     </>

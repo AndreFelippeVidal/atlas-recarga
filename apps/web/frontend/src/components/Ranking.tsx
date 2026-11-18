@@ -1,16 +1,31 @@
-import type { MapMeasure, Region } from "../api";
+import type { MapMeasure } from "../api";
 import { formatMeasure } from "../format";
-import { REGION_NAMES, REGIONS } from "../regions";
-import type { RegionStat } from "../mapStats";
+import type { Stat } from "../mapStats";
+
+const TOP = 10;
 
 interface Props {
   measure: MapMeasure;
-  stats: Map<Region, RegionStat> | null;
-  highlighted: Region | null;
-  onHighlight: (region: Region | null) => void;
+  stats: Map<string, Stat> | null;
+  noun: string;
+  // Itens esperados no nível (regiões ou UFs) que ficam de fora quando não têm recarga.
+  expected?: { id: string; name: string }[];
+  highlighted: string | null;
+  interactive: boolean;
+  onHighlight: (id: string | null) => void;
+  onSelect: (id: string) => void;
 }
 
-export default function Ranking({ measure, stats, highlighted, onHighlight }: Props) {
+export default function Ranking({
+  measure,
+  stats,
+  noun,
+  expected = [],
+  highlighted,
+  interactive,
+  onHighlight,
+  onSelect,
+}: Props) {
   if (!stats) {
     return (
       <p className="placeholder" aria-busy="true">
@@ -18,31 +33,32 @@ export default function Ranking({ measure, stats, highlighted, onHighlight }: Pr
       </p>
     );
   }
-  const ranked = [...stats.values()].sort((a, b) => a.rank - b.rank);
-  const missing = REGIONS.filter((r) => !stats.has(r));
+  const ranked = [...stats.values()].sort((a, b) => a.rank - b.rank).slice(0, TOP);
+  const missing = expected.filter((e) => !stats.has(e.id));
   return (
-    <ol className="ranking" aria-label="Ranking das regiões">
+    <ol className="ranking" aria-label={`Ranking: ${noun}`}>
       {ranked.map((s) => (
-        <li key={s.region}>
+        <li key={s.id}>
           <button
             type="button"
-            className={highlighted === s.region ? "active" : ""}
-            aria-label={`${s.rank}º ${REGION_NAMES[s.region]}: ${formatMeasure(measure, s.value)}`}
-            onMouseEnter={() => onHighlight(s.region)}
+            className={highlighted === s.id ? "active" : ""}
+            aria-label={`${s.rank}º ${s.name}: ${formatMeasure(measure, s.value)}`}
+            onClick={interactive ? () => onSelect(s.id) : undefined}
+            onMouseEnter={() => onHighlight(s.id)}
             onMouseLeave={() => onHighlight(null)}
-            onFocus={() => onHighlight(s.region)}
+            onFocus={() => onHighlight(s.id)}
             onBlur={() => onHighlight(null)}
           >
             <span className="rank-name">
-              {s.rank}º {REGION_NAMES[s.region]}
+              {s.rank}º {s.name}
             </span>
             <span className="rank-value">{formatMeasure(measure, s.value)}</span>
           </button>
         </li>
       ))}
-      {missing.map((r) => (
-        <li key={r} className="rank-empty">
-          {REGION_NAMES[r]}: sem recargas
+      {missing.map((e) => (
+        <li key={e.id} className="rank-empty">
+          {e.name}: sem recargas
         </li>
       ))}
     </ol>
