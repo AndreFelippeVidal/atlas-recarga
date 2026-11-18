@@ -42,9 +42,21 @@
 - **Depende de:** P12.6
 - **Pronto quando:** Critério 6 da SPEC-007 §6 + navegação por teclado
 
-### P12.8 🤝 Deploy do App `atlas-web` + medição de p95
+### P12.10 🤝 Spike: medir a latência do dashboard e avaliar o Lakebase como fonte de leitura
 
 - **Depende de:** P12.7
+- **Pronto quando:** Latência por endpoint (cache frio e quente, warehouse frio e quente) registrada; o teste de uma synced table do Lakebase com resultado; ADR com a decisão (adotar, descartar ou adotar só o plano mais barato)
+- **Passos:**
+  - Medir onde está o tempo: `/api/months`, `/api/kpis` e `/api/map/*` (região, UF, município), com o warehouse parado e aquecido, e a geometria de `geo/mun/<UF>.json`. Registrar em `docs/spikes/`
+  - Avaliar as alternativas mais baratas primeiro: agregado pré-calculado derivado de `mv_recharges` e lido pelo warehouse, aquecimento do cache na subida do App com atualização em segundo plano, consultas do mapa agrupadas
+  - Testar o Lakebase com **uma** tabela agregada: `databricks postgres create-synced-table` (modo `SNAPSHOT`) sobre um Delta derivado da metric view; conferir (1) se há cota para o projeto, (2) se o pipeline gerenciado da sync conflita com o limite de 1 pipeline ativo e o `atlas_medallion`, (3) a latência de leitura por `psycopg` contra a do warehouse
+  - Conferir o princípio 1: o Postgres não executa `MEASURE()`, então o agregado só pode ser **derivado** da metric view (uma definição por métrica) e precisa morar em `semantic`
+  - Escrever o ADR com pelo menos 2 alternativas descartadas. Adotar o Lakebase exige atualizar `tech-stack.md`, o ADR-0009 e a SPEC-007 §2 e §3 (commit `docs(specs)` anterior ao código) e abre uma task de implementação própria
+  - Perfil e warehouse do `dev` ficam com o mantenedor; o agente prepara os scripts e as consultas
+
+### P12.8 🤝 Deploy do App `atlas-web` + medição de p95
+
+- **Depende de:** P12.10
 - **Pronto quando:** p95 < 3s registrado
 
 ### P12.9 🤝 Revalidar o production monitoring do MLflow (Beta) da P10.8

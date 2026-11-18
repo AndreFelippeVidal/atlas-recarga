@@ -27,7 +27,7 @@
 | 9 | Avaliação do agente: golden set antes do agente | [008-agent-evaluation](008-agent-evaluation/spec.md) | 3 |
 | 10 | Agente de negócio | [005-business-agent](005-business-agent/spec.md) | 8 |
 | 11 | MCP server | [006-mcp-server](006-mcp-server/spec.md) | 4 (a P11.5 fica no fim da Fase 12) |
-| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 9 + P11.5 |
+| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 10 + P11.5 |
 | 13 | Demo e release v1.0 | — | 5 |
 
 ## Fase 0 — Fundação do repositório → [009-repo-foundation](009-repo-foundation/spec.md)
@@ -174,7 +174,8 @@ _KPIs + mapa coroplético UF → município, p95 < 3s._
 - [x] **P12.5** 🤖 Mapa por região (UFs pintadas pela região) com `d3-geo`, escala de quantis, legenda, tooltip — _pronto quando:_ Visual conferido por você (#85) — `RegionMap` com as 27 UFs pintadas pela região, quantis em 5 classes, legenda, tooltip, ranking e seletor das 4 medidas; testes e build no CI. **Não conferido:** o visual no `dev` (fica com o mantenedor); clique e foco por teclado nos polígonos vêm na P12.6 · depende de P12.1, P12.3, P12.4
 - [x] **P12.6** 🤖 Drill-down: Brasil → região → UF → municípios, com zoom; breadcrumb e Esc — _pronto quando:_ Critério 1 da SPEC-007 §6 (queda no PA visível) (#86) — clique na região ou na UF (polígono ou ranking) busca `/api/map/uf` e `/api/map/municipality` e carrega `geo/mun/<UF>.json` sob demanda; o que fica fora do foco some, o recorte é enquadrado no mapa, e há botão "Ver o Brasil inteiro", breadcrumb e Esc (sobe um nível); `mom_change` entrou no seletor com os quantis sequenciais (a divergente é da P12.7); teste com malha sintética de 3 municípios cobre a classe de maior queda (a malha real do PA só tem o teste de 144 polígonos); o ranking top 10 é por valor decrescente, então com `mom_change` as maiores quedas ficam no fim e fora do top 10 até a P12.7; município sem recarga mostra o código IBGE, pois a malha não tem nome. **Não conferido:** o visual no `dev` e o critério com o `regional_drop` real (ficam com o mantenedor) · depende de P12.5
 - [ ] **P12.7** 🤖 Escala divergente `mom_change`, estados de loading e erro (inclui "Aquecendo o banco de dados…" após 3s, SPEC-007 §4), acessibilidade — _pronto quando:_ Critério 6 da SPEC-007 §6 + navegação por teclado · depende de P12.6
-- [ ] **P12.8** 🤝 Deploy do App `atlas-web` (o FastAPI serve o build estático e `public/geo/`) + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.7
+- [ ] **P12.10** 🤝 Spike: medir a latência do dashboard e avaliar o Lakebase como fonte de leitura — _pronto quando:_ Latência por endpoint (cache e warehouse frios e quentes) registrada em `docs/spikes/`; uma synced table testada (cota e conflito com o limite de 1 pipeline); ADR com a decisão. O Lakebase só entra se vencer as alternativas mais baratas e respeitar o princípio 1 (agregado derivado da metric view); se entrar, vira uma task nova · depende de P12.7
+- [ ] **P12.8** 🤝 Deploy do App `atlas-web` (o FastAPI serve o build estático e `public/geo/`) + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.10
 - [ ] **P12.9** 🤝 Revalidar o production monitoring do MLflow (Beta) da P10.8 — _pronto quando:_ O comando de contagem de assessments é rodado no `dev` e o resultado (mudou ou não) fica registrado na SPEC-008 §6 e no ADR-0013 · depende de P12.8
 - [ ] **P11.5** 🤝 Conectar ao Claude Code/Desktop e documentar no README (movida para o fim da Fase 12, antes da demo; o agente prepara a integração com você) — _pronto quando:_ Você pergunta no Claude e recebe a resposta com `source` · depende de P11.4, P12.8
 
