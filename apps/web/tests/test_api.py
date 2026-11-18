@@ -319,3 +319,22 @@ def test_map_responses_are_cached_and_failures_are_503() -> None:
 
     r = TestClient(create_app(executor=boom, cache=TTLCache())).get("/api/map/uf", params=params)
     assert r.status_code == 503 and "secret" not in r.text
+
+
+def test_filter_without_rows_in_an_existing_month_is_empty_list_not_404() -> None:
+    c, _ = map_client()
+    r = c.get(
+        "/api/map/uf", params={"month": "2026-10", "measure": "gross_revenue", "region": "CO"}
+    )
+    assert r.status_code == 200 and r.json() == []
+
+
+def test_null_municipality_names_do_not_break_the_ordering() -> None:
+    from atlas_web.map_data import _sorted
+
+    items = [
+        {"municipality_ibge_code": "2", "municipality_name": None, "value": Decimal("1")},
+        {"municipality_ibge_code": "1", "municipality_name": None, "value": Decimal("1")},
+    ]
+    keys = ("municipality_ibge_code", "municipality_name")
+    assert [i["municipality_ibge_code"] for i in _sorted(items, keys)] == ["1", "2"]

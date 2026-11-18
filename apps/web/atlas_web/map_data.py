@@ -102,16 +102,27 @@ def _sorted(items: list[dict[str, Any]], keys: tuple[str, ...]) -> list[dict[str
     """Maior valor primeiro, sem valor por último, desempate pela chave (ordem estável)."""
     return sorted(
         items,
-        key=lambda i: (i["value"] is None, -(i["value"] or Decimal(0)), tuple(i[k] for k in keys)),
+        key=lambda i: (
+            i["value"] is None,
+            -(i["value"] or Decimal(0)),
+            tuple("" if i[k] is None else str(i[k]) for k in keys),
+        ),
     )
+
+
+def _checked(
+    items: list[dict[str, Any]], catalog: str, execute: Executor, month: str
+) -> list[dict[str, Any]]:
+    """Lista vazia só é 404 se o mês não existe; região, UF ou medida sem valor é lista vazia."""
+    if not items and month not in list_months(catalog, execute):
+        raise MonthNotFound(month)
+    return items
 
 
 def map_region(catalog: str, execute: Executor, month: str, measure: str) -> list[dict[str, Any]]:
     keys = ("region",)
     items = _values(catalog, execute, month, measure, keys, None)
-    if not items:
-        raise MonthNotFound(month)
-    return _sorted(items, keys)
+    return _sorted(_checked(items, catalog, execute, month), keys)
 
 
 def map_uf(
@@ -120,9 +131,7 @@ def map_uf(
     keys = ("uf",)
     where = None if region is None else ("region", "region", region)
     items = _values(catalog, execute, month, measure, keys, where)
-    if not items:
-        raise MonthNotFound(month)
-    return _sorted(items, keys)
+    return _sorted(_checked(items, catalog, execute, month), keys)
 
 
 def map_municipality(
@@ -130,6 +139,4 @@ def map_municipality(
 ) -> list[dict[str, Any]]:
     keys = ("municipality_ibge_code", "municipality_name")
     items = _values(catalog, execute, month, measure, keys, ("uf", "uf", uf))
-    if not items and month not in list_months(catalog, execute):
-        raise MonthNotFound(month)  # UF sem recarga no mês é lista vazia; mês sem dados é 404
-    return _sorted(items, keys)
+    return _sorted(_checked(items, catalog, execute, month), keys)

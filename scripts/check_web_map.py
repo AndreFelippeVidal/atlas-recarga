@@ -61,7 +61,9 @@ def main(argv: list[str] | None = None) -> int:
             ),
             None,
         )
-        if muns != uf_value:
+        if uf_value is None:
+            problems.append(f"{measure}: {args.uf} não aparece em /api/map/uf")
+        elif muns != uf_value:
             problems.append(f"{measure}: municípios de {args.uf} {muns} != UF {uf_value}")
 
     for path, extra in (
