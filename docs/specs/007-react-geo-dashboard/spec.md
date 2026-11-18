@@ -64,7 +64,7 @@ Cada polígono tem `role="button"`, `aria-label` com o nome e o valor, e navega�
 - **Dado** um clique numa região, **então** só as UFs dela ficam visíveis e centralizadas; **dado** um clique numa UF, **então** o mapa mostra direto os municípios dela.
 - **Dado** um clique numa UF, **então** a renderização dos municípios termina em p95 < 3s com cache frio de API e geometria em cache do navegador.
 - **Dado** `measure=foo`, **então** a API retorna 400.
-- **Dado** qualquer UF, **então** 100% dos municípios da malha do IBGE têm match por `municipality_ibge_code` (teste automatizado entre geometria e `dim_municipality`).
+- **Dado** qualquer UF, **então** 100% dos municípios da referência (a mesma que alimenta `dim_municipality`) têm polígono por `municipality_ibge_code`, e o único polígono da malha do IBGE sem linha na referência (Boa Esperança do Norte, MT) é descartado (teste automatizado entre geometria e referência).
 - **Dado** a API fora do ar, **então** o banner de erro aparece e a página não quebra.
 
 ## 7. Fora de escopo
