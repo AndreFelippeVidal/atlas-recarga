@@ -9,14 +9,16 @@ logs estruturados (SPEC-006 §6).
 
 - **Rate limit:** 30 chamadas de tool por minuto por usuário (`x-forwarded-email`), em memória, antes
   de qualquer query. A 31ª recebe `RATE_LIMITED: ... retry_after_s=<s> request_id=<uuid>` e nenhuma
-  query roda. Vale por instância e zera num restart.
+  query roda. Vale por instância e zera num restart. Sem os cabeçalhos do proxy, todas as chamadas
+  caem no usuário `unknown` e dividem um único balde.
 - **Traces:** cada chamada abre um span manual (`mlflow.start_span`) no experiment
   `/Shared/atlas/mcp` com **só atributos** (`request_id`, `user`, `tool`, `app_version`,
   `sql_fingerprint`, `rows`, `error_code`, `duration_ms`); nunca `@mlflow.trace`, então nenhum valor
   de resultado vai ao trace. Sem `MLFLOW_EXPERIMENT_ID` ou sem MLflow, o span vira no-op e a tool
   continua.
 - **Auditoria:** o SQL das tools de consulta começa com `/* atlas-mcp request_id=<uuid> */`, o mesmo
-  `request_id` do trace, visível na `system.query.history`.
+  `request_id` do trace, visível na `system.query.history`. O `compare_months` roda 2 queries (um
+  mês cada) com o mesmo `request_id`: uma chamada pode ter 2 linhas na history.
 - **Logs:** uma linha JSON por chamada no stdout (`tool`, `user`, `duration_ms`, `rows`,
   `sql_fingerprint`, `error_code`, `request_id`).
 

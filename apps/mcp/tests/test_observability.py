@@ -158,7 +158,6 @@ def test_every_tool_call_opens_a_span_with_attributes_only(
     assert re.fullmatch(UUID, span.attributes["request_id"])
     # Nenhum valor de resultado entra no trace.
     assert "9999.99" not in json.dumps(span.attributes, default=str)
-    assert not hasattr(span, "outputs") and not hasattr(span, "set_outputs")
 
 
 def test_error_code_goes_to_the_span_and_the_error_still_propagates() -> None:
@@ -310,3 +309,26 @@ def test_configure_tracing_is_a_noop_without_experiment(
 def test_user_of_prefers_email_header() -> None:
     assert observability.user_of({"x-forwarded-email": "a@x.com"}) == "a@x.com"
     assert observability.user_of({sql_client.TOKEN_HEADER: "tok"}) == "unknown"
+
+
+def test_real_mlflow_span_has_attributes_and_no_inputs_or_outputs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """Critério 8 com o MLflow de verdade (store local): nem entradas nem saídas, só atributos."""
+    import mlflow
+
+    monkeypatch.setenv("MLFLOW_DISABLE_AGENT_HINT", "1")
+    mlflow.set_tracking_uri(f"sqlite:///{tmp_path}/mlflow.db")
+    mlflow.set_experiment("mcp-test")
+    observer = Observer(spans=lambda name: mlflow.start_span(name=name))
+    observer.run(
+        "query_metric",
+        {"x-forwarded-email": "ana@x.com"},
+        lambda rid: {"rows": [["SP", "9999.99"]], "sql_fingerprint": "f1"},
+    )
+    mlflow.flush_trace_async_logging()
+    (trace,) = mlflow.search_traces(return_type="list")
+    (span,) = trace.data.spans
+    assert span.inputs is None and span.outputs is None
+    assert span.attributes["tool"] == "query_metric" and span.attributes["rows"] == 1
+    assert "9999.99" not in json.dumps(dict(span.attributes), default=str)
