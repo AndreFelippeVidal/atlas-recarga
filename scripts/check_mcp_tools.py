@@ -112,7 +112,9 @@ async def _run(url: str, token: str, month_a: str, month_b: str) -> list[str]:
         except ToolError as exc:
             municipality = str(exc)
         try:
-            await client.call_tool("top_regions", {**cmp_args, "level": "pais", "month": month_b})
+            await client.call_tool(
+                "top_regions", {"measure": MEASURE, "level": "pais", "month": month_b}
+            )
             invalid_error = None
         except ToolError as exc:
             invalid_error = str(exc)
