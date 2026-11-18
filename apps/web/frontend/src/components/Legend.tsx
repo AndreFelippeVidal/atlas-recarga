@@ -15,7 +15,7 @@ function title(measure: MapMeasure, scale: Scale): string {
   return `Escala divergente centrada em 0%${bound} (${MEASURE_UNITS[measure]})`;
 }
 
-const DIRECTION = ["maior queda", "queda", "estável", "alta", "maior alta"];
+const DIRECTION = ["maior queda", "queda", "perto de 0%", "alta", "maior alta"];
 
 export default function Legend({ measure, scale, classes, hasEmpty }: Props) {
   return (

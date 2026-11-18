@@ -45,6 +45,9 @@ export default function Ranking({
     <ol className="ranking" aria-label={`Ranking: ${noun}`}>
       {ranked.map((s, i) => (
         <li key={s.id} className={split && i === TOP / 2 ? "rank-gap" : undefined}>
+          {split && (i === 0 || i === TOP / 2) && (
+            <span className="sr-only">{i === 0 ? "Maiores altas" : "Maiores quedas"}</span>
+          )}
           <button
             type="button"
             className={highlighted === s.id ? "active" : ""}
