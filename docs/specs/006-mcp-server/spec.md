@@ -28,6 +28,15 @@ Todas são somente leitura e todas montam SQL **parametrizado** a partir de list
 
 O campo `source` de toda resposta repete o contrato de citação do agente (view, medidas, filtros, período).
 
+**Detalhes de `query_metric` (P11.2):**
+- `month_from` e `month_to` são obrigatórios, no formato `YYYY-MM` e inclusivos; filtram a dimensão de mês da view (`recharge_month` em `mv_recharges`, `reference_month` em `mv_commission`), com os valores vinculados.
+- `filters`: valor escalar vira `= :p`; lista vira `IN (:p0, :p1, …)`, com no máximo 100 valores. Chaves são dimensões da view; valores são `str`, `int` ou `float` (não `bool`, `null` nem objetos).
+- `order_by`: uma coluna do resultado (medida ou dimensão) com `asc` ou `desc` opcional; sem direção, medida em `desc` e dimensão em `asc`. Sem `order_by`, a ordem é a primeira medida em `desc`, para o `limit` não cortar linhas arbitrárias.
+- `limit` acima de 500 é `INVALID_ARGUMENT`; o `RESULT_TOO_LARGE` do §4 fica para as tools que não têm esse teto (`top_regions` e `compare_months` com `n`).
+- `sql_fingerprint` é o sha1 do SQL parametrizado, sem o comentário `request_id` e sem os valores.
+- A lista fechada de medidas e dimensões vem de `apps/mcp/atlas_mcp/catalog.json`, gerado de `semantic/*.yaml` por `scripts/build_mcp_catalog.py` (o App só leva `apps/mcp` no deploy); um teste falha se o snapshot ficar velho.
+- O erro de argumento chega ao cliente como erro de tool com a mensagem prefixada por `INVALID_ARGUMENT:`.
+
 ## 4. Erros (padronizados, nunca stack trace)
 
 | Código | Quando |
