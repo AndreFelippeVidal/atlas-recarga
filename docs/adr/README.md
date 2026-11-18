@@ -25,3 +25,4 @@ Formato [MADR](https://adr.github.io/madr/). Cada ADR registra o contexto, **pel
 | [0019](0019-agent-chat-ui-from-template.md) | Chat UI do `agent-atlas` vem do template oficial, clonada na subida | proposto |
 | [0020](0020-genie-agent-mcp-for-ask-genie.md) | `ask_genie` usa o Genie Agent MCP, restrito ao Space | proposto |
 | [0021](0021-agent-gateway-limits-and-pii-fallback.md) | Limites do agente no gateway; PII no App; gasto só com alerta | proposto |
+| [0022](0022-dashboard-read-path-connection-reuse.md) | Dashboard lê do warehouse com conexão reaproveitada; Lakebase descartado | proposto |

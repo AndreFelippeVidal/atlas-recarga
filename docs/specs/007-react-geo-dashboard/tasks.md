@@ -54,9 +54,18 @@
   - Escrever o ADR com pelo menos 2 alternativas descartadas. Adotar o Lakebase exige atualizar `tech-stack.md`, o ADR-0009 e a SPEC-007 §2 e §3 (commit `docs(specs)` anterior ao código) e abre uma task de implementação própria
   - Perfil e warehouse do `dev` ficam com o mantenedor; o agente prepara os scripts e as consultas
 
+### P12.11 🤖 `sql_client` com conexão reaproveitada e aquecimento do cache
+
+- **Depende de:** P12.10 (ADR-0022)
+- **Pronto quando:** Testes unitários cobrem reconexão e threads; `scripts/spike_dashboard_latency.py reuse` mostra p50 < 500 ms; os `check_web_*` seguem ok no `dev`
+- **Passos:**
+  - Trocar o `make_executor` (hoje abre `Config()` e `dbsql.connect` a cada `execute`) por uma conexão por thread, aberta na 1ª consulta e reaproveitada; em erro de conexão, fechar, reabrir e tentar uma vez
+  - Aquecer o cache na subida do App (as consultas da tela do último mês, em paralelo, sem bloquear a subida) e atualizar em segundo plano antes do TTL de 10 minutos
+  - Manter parâmetros vinculados e o contrato de erros (`503 WAREHOUSE_UNAVAILABLE`) da SPEC-007 §3
+
 ### P12.8 🤝 Deploy do App `atlas-web` + medição de p95
 
-- **Depende de:** P12.10
+- **Depende de:** P12.11
 - **Pronto quando:** p95 < 3s registrado
 
 ### P12.9 🤝 Revalidar o production monitoring do MLflow (Beta) da P10.8
