@@ -96,6 +96,12 @@ def test_compare_months_pct_rounds_half_even() -> None:
     assert out["rows"][0][4] == "0.12"  # 0.125 -> 0.12 (half-even)
 
 
+def test_compare_months_negative_base_keeps_the_sign_of_the_change() -> None:
+    rec = Recorder([["SP", Decimal("-10")]], [["SP", Decimal("-5")]])
+    out = compare_months("atlas", rec, "gross_revenue", "2026-09", "2026-10", "uf")
+    assert out["rows"][0][3:] == ["5", "50.00"]
+
+
 def test_compare_months_too_many_rows_is_result_too_large() -> None:
     big = [[str(i), Decimal(1)] for i in range(501)]
     with pytest.raises(ResultTooLarge, match="uf"):

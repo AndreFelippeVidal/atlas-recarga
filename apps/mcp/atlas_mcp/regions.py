@@ -94,7 +94,7 @@ def _number(value: Any) -> Decimal | None:
 def _delta(a: Decimal | None, b: Decimal | None) -> tuple[Decimal | None, Decimal | None]:
     if a is None or b is None:
         return None, None
-    pct = None if a == 0 else ((b - a) / a * 100).quantize(PCT, rounding=ROUND_HALF_EVEN)
+    pct = None if a == 0 else ((b - a) / abs(a) * 100).quantize(PCT, rounding=ROUND_HALF_EVEN)
     return b - a, pct
 
 
@@ -149,7 +149,7 @@ def compare_months(
     return {
         "columns": [*dims, "value_a", "value_b", "delta_abs", "delta_pct"],
         "rows": [
-            [*key, *(None if v is None else str(v) for v in (a, b, d_abs, d_pct))]
+            [*key, *(None if v is None else format(v, "f") for v in (a, b, d_abs, d_pct))]
             for key, a, b, d_abs, d_pct in table
         ],
         "source": {

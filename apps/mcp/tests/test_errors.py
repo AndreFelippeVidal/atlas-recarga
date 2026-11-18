@@ -30,7 +30,7 @@ from fastmcp.exceptions import ToolError
         ),
         (RuntimeError("PERMISSION_DENIED: nope"), PermissionDenied),
         (TimeoutError("read timed out"), WarehouseUnavailable),
-        (RuntimeError("MaxRetryError: host=segredo.cloud.databricks.com"), WarehouseUnavailable),
+        (ConnectionError("reset"), WarehouseUnavailable),
         (RuntimeError("TEMPORARILY_UNAVAILABLE: warehouse is starting"), WarehouseUnavailable),
         (InvalidArgument("x"), InvalidArgument),
         (ResultTooLarge("x"), ResultTooLarge),
@@ -38,6 +38,16 @@ from fastmcp.exceptions import ToolError
 )
 def test_classify_maps_known_failures(exc: Exception, expected: type) -> None:
     assert isinstance(classify(exc), expected)
+
+
+def test_classify_does_not_widen_on_loose_phrases() -> None:
+    for text in (
+        "column x does not have a value",
+        "no warehouse mentioned here is a bug",
+        "timeout",
+    ):
+        assert classify(RuntimeError(text)) is None
+    assert classify(type("MaxRetryError", (Exception,), {})("x")) is not None
 
 
 def test_classify_unknown_is_none_and_messages_are_fixed() -> None:
@@ -171,3 +181,98 @@ def test_tools_surface_standard_codes_without_stack_trace(
 
     message = asyncio.run(call())
     assert code in message and "Traceback" not in message
+
+
+def _raising_tool_call(
+    monkeypatch: pytest.MonkeyPatch, raised: Exception, sleeps: list[float]
+) -> Any:
+    """Liga o servidor ao `sql_client.run` real com um conector que levanta `raised`."""
+    _fake_connector(monkeypatch, [raised, raised])
+    monkeypatch.setattr(time, "sleep", sleeps.append)
+
+    async def call(tool: str, args: dict[str, Any]) -> str:
+        async with Client(server.mcp) as client:
+            with pytest.raises(ToolError) as info:
+                await client.call_tool(tool, args)
+            return str(info.value)
+
+    return call
+
+
+TOP = {"measure": "gross_revenue", "level": "uf", "month": "2026-10"}
+
+
+def test_raw_connector_failures_reach_the_client_as_fixed_messages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DATABRICKS_APP_NAME", raising=False)
+    monkeypatch.setattr(server, "get_http_headers", lambda: {sql_client.TOKEN_HEADER: "tok"})
+    conn_detail = "host=segredo.cloud.databricks.com SELECT * FROM atlas.semantic.x"
+    sleeps: list[float] = []
+    call = _raising_tool_call(
+        monkeypatch, RuntimeError(f"[INSUFFICIENT_PERMISSIONS] {conn_detail}"), sleeps
+    )
+    message = asyncio.run(call("top_regions", TOP))
+    assert message == "PERMISSION_DENIED: sem permissão de SELECT na metric view consultada"
+    assert sleeps == []
+
+    call = _raising_tool_call(monkeypatch, TimeoutError(conn_detail), sleeps)
+    message = asyncio.run(call("top_regions", TOP))
+    assert message == (
+        "WAREHOUSE_UNAVAILABLE: o SQL warehouse está parado ou não respondeu; tente de novo"
+    )
+    assert sleeps == [20]
+
+    call = _raising_tool_call(monkeypatch, ValueError(conn_detail), sleeps)
+    message = asyncio.run(call("top_regions", TOP))
+    assert message == "falha ao executar a consulta; veja os logs do App"
+
+
+def test_missing_user_token_is_reported_without_details(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABRICKS_APP_NAME", "atlas-mcp")
+    monkeypatch.setattr(server, "get_http_headers", dict)
+
+    async def call() -> str:
+        async with Client(server.mcp) as client:
+            with pytest.raises(ToolError) as info:
+                await client.call_tool("top_regions", TOP)
+            return str(info.value)
+
+    assert "on-behalf-of" in asyncio.run(call())
+
+
+def test_invalid_argument_and_too_large_through_the_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def executor(_headers: Any) -> Any:
+        def run(sql: str, _params: Any) -> Any:
+            calls.append(sql)
+            return [], [[str(i), 1] for i in range(501)]
+
+        return run
+
+    monkeypatch.setattr(server, "make_executor", executor)
+
+    async def call(tool: str, args: dict[str, Any]) -> str:
+        async with Client(server.mcp) as client:
+            with pytest.raises(ToolError) as info:
+                await client.call_tool(tool, args)
+            return str(info.value)
+
+    assert asyncio.run(call("top_regions", {**TOP, "level": "pais"})).startswith(
+        "INVALID_ARGUMENT: "
+    )
+    assert asyncio.run(
+        call(
+            "compare_months",
+            {"measure": "x; DROP", "month_a": "2026-09", "month_b": "2026-10", "level": "uf"},
+        )
+    ).startswith("INVALID_ARGUMENT: ")
+    assert calls == []  # argumento inválido nunca chega ao warehouse
+    message = asyncio.run(
+        call(
+            "compare_months",
+            {"measure": "gross_revenue", "month_a": "2026-09", "month_b": "2026-10", "level": "uf"},
+        )
+    )
+    assert message.startswith("RESULT_TOO_LARGE: ")

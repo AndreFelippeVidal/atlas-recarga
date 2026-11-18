@@ -39,22 +39,12 @@ class ResultTooLarge(McpError):
     code = "RESULT_TOO_LARGE"
 
 
-_PERMISSION_MARKERS = (
-    "PERMISSION_DENIED",
-    "INSUFFICIENT_PERMISSIONS",
-    "PERMISSION DENIED",
-    "DOES NOT HAVE",
-    "NOT AUTHORIZED",
-)
-_WAREHOUSE_MARKERS = (
-    "TEMPORARILY_UNAVAILABLE",
-    "TIMED OUT",
-    "TIMEOUT",
-    "WAREHOUSE",
-    "MAXRETRYERROR",
-    "REQUESTERROR",
-    "CONNECTIONERROR",
-    "SERVICE UNAVAILABLE",
+# Só códigos de erro do Databricks (não frases soltas): uma falha nossa não vira "sem permissão".
+_PERMISSION_CODES = ("PERMISSION_DENIED", "INSUFFICIENT_PERMISSIONS")
+_UNAVAILABLE_CODES = ("TEMPORARILY_UNAVAILABLE", "SERVICE_UNAVAILABLE")
+# Tipos do conector SQL e do transporte HTTP (urllib3/requests), por nome para não importá-los aqui.
+_TRANSPORT_TYPES = frozenset(
+    {"RequestError", "MaxRetryError", "ConnectTimeout", "ReadTimeout", "ConnectionError"}
 )
 
 
@@ -66,10 +56,14 @@ def classify(exc: BaseException) -> McpError | None:
     """
     if isinstance(exc, McpError):
         return exc
-    text = f"{type(exc).__name__} {exc}".upper()
-    if any(marker in text for marker in _PERMISSION_MARKERS):
+    text = str(exc).upper()
+    if any(code in text for code in _PERMISSION_CODES):
         return PermissionDenied("sem permissão de SELECT na metric view consultada")
-    if isinstance(exc, TimeoutError) or any(marker in text for marker in _WAREHOUSE_MARKERS):
+    if (
+        isinstance(exc, TimeoutError | ConnectionError)
+        or type(exc).__name__ in _TRANSPORT_TYPES
+        or any(code in text for code in _UNAVAILABLE_CODES)
+    ):
         return WarehouseUnavailable("o SQL warehouse está parado ou não respondeu; tente de novo")
     return None
 
