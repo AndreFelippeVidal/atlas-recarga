@@ -27,7 +27,7 @@
 | 9 | Avaliação do agente: golden set antes do agente | [008-agent-evaluation](008-agent-evaluation/spec.md) | 3 |
 | 10 | Agente de negócio | [005-business-agent](005-business-agent/spec.md) | 8 |
 | 11 | MCP server | [006-mcp-server](006-mcp-server/spec.md) | 5 |
-| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 8 |
+| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 9 |
 | 13 | Demo e release v1.0 | — | 5 |
 
 ## Fase 0 — Fundação do repositório → [009-repo-foundation](009-repo-foundation/spec.md)
@@ -152,7 +152,7 @@ _Agente somente leitura, via Unity Gateway, com tracing, aprovado no golden set.
 - [x] **P10.5** 🤝 Rate limit, spend cap e guardrails no gateway + trace tables em `atlas.observability` — _pronto quando:_ 429 testado; política de PII ativa (#69) — o gateway não tem guardrail de PII nem teto mensal que bloqueie (ADR-0021): model service `agent_llm` com 30 req/min e 500.000 tokens/hora, PII mascarada no App; conferido no `dev` pelo mantenedor: `scripts/check_agent_guardrails.py` ok (config, 148 respostas 429 do gateway na inference table, `agent_llm_payload` com linhas), `scripts/setup_agent_trace_tables.py` aplicado no experiment `/Shared/atlas/agent-traces`, e no App a resposta aparece na chat UI e o CPF é mascarado. **Em aberto:** a mensagem de 429 e a tag `error_type = rate_limited` no trace do App (só o gateway foi testado) e o orçamento mensal de conta (alerta que não bloqueia) · depende de P10.2
 - [x] **P10.6** 🤖 Avaliação offline completa: acurácia ≥ 90%, incluindo um caso e um scorer para o período ausente (a regra que o `v1` cumpre em 60–75%) — _pronto quando:_ Run do MLflow linkado no PR (#70) — GS-031 e `declares_assumed_month` na SPEC-008; `eval/run_offline_eval.py` roda o agente real no `dev`: o `v1` fez 88,2% de média (mín 80,6%) e o `v2` (números por inteiro, `Fonte:` sempre, comissão só pelo `ask_genie`) fez 93,5 / 90,3 / 90,3% (média 91,4%), sem falha em recusa; `v2` virou o padrão. **Ressalva:** o `no_period` ainda falhou em 2 de 3 rodadas do `v2` (limite do modelo) e a acurácia só conta scorers de código (sem LLM judges) · depende de P9.3, P10.4
 - [x] **P10.7** 🤖 Gate de CI `agent-eval.yml` com path filter + comentário no PR — _pronto quando:_ Critérios 2 e 3 da SPEC-008 §7 (#71) — `agent-eval.yml` é chamado pelo `ci.yml` (o `ci-ok` aguarda, então bloqueia); `eval/gate.py` cobre acurácia ≥ 90%, recusa e queda de 5 pontos, com testes unitários. Conferido no `dev` com dois PRs descartáveis (#72, #73, fechados): o prompt `v3` sem `Fonte:` reprovou o gate em `cites_metric_view` (16,1% de acurácia), e uma tool `run_sql` fora da lista reprovou em `read_only_tools` (GS-023), o que levou a SPEC-008 §5 a tratar qualquer falha em `read_only_tools` como bloqueio. **Ressalvas:** a linha de base da `main` só existe depois do primeiro push na `main` após o merge (até lá a regra da queda é pulada); 1 rodada por execução, então a acurácia varia de 90 a 97% entre execuções com o mesmo código · depende de P10.6
-- [ ] **P10.8** 🤝 Production monitoring (ou o plano B) + página "Qualidade do agente" + alerta — _pronto quando:_ Critérios 5 e 6 da SPEC-008 §7 · depende de P10.6
+- [x] **P10.8** 🤝 Production monitoring (ou o plano B) + página "Qualidade do agente" + alerta — _pronto quando:_ Critérios 5 e 6 da SPEC-008 §7 (#74) — job `atlas_agent_monitoring`, dashboard "Atlas — Qualidade do agente" e SQL alert no bundle; judges no Beta por `eval/start_monitoring.py`, com o plano B no próprio job. Conferido no `dev` pelo mantenedor (deploy, job SUCCESS, `scripts/check_agent_monitoring.py` ok): 20 traces reais (13 de dados, 5 sem tool de dados, recusas e período ausente) com os 2 scorers de código em 100%; `cites_metric_view` `n/a` nos sem tool de dados e `true` nos demais (`mv_recharges` e `mv_commission`); `read_only_tools` `true` em todos; judges em 7 de 20 traces (35%, plano B por hash) e todos `true`; views com dados; `review_queue` vazia porque nada reprovou. **Não conferido:** 100 traces para o critério 5 (só 20); a fila com uma falha real em produção (só vista com os falsos reprovados da leitura dupla do JSON, já corrigida); o Beta do MLflow, que **não anexou nenhuma assessment** aos 20 traces com os 3 judges registrados a 20%, então o caminho que vale é o plano B; a página do dashboard e o e-mail do alerta · depende de P10.6
 
 ## Fase 11 — MCP server → [006-mcp-server](006-mcp-server/spec.md)
 
@@ -176,6 +176,7 @@ _KPIs + mapa coroplético UF → município, p95 < 3s._
 - [ ] **P12.6** 🤖 Drill-down: Brasil → região → UF → municípios, com zoom; breadcrumb e Esc — _pronto quando:_ Critério 1 da SPEC-007 §6 (queda no PA visível) · depende de P12.5
 - [ ] **P12.7** 🤖 Escala divergente `mom_change`, estados de loading e erro, acessibilidade — _pronto quando:_ Critério 6 da SPEC-007 §6 + navegação por teclado · depende de P12.6
 - [ ] **P12.8** 🤝 Deploy do App `atlas-web` + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.7
+- [ ] **P12.9** 🤝 Revalidar o production monitoring do MLflow (Beta) da P10.8 — _pronto quando:_ O comando de contagem de assessments é rodado no `dev` e o resultado (mudou ou não) fica registrado na SPEC-008 §6 e no ADR-0013 · depende de P12.8
 
 ## Fase 13 — Demo e release v1.0
 
@@ -195,6 +196,7 @@ _Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medida
 | v1.1 | Medidas com janela nas metric views; filtros de distribuidor e tipo de PDV no mapa |
 | v1.1 | Painel "Leitura do mapa" / "Onde crescer" no dashboard React, sem IA: texto determinístico calculado no backend (maior UF do mês, maior queda contra o mês anterior) |
 | v1.1 | Filtros de recorte e escopo no dashboard React (hoje só mês e medida) |
+| v1.1 | Alerta de frescor do monitoramento do agente: o alerta de qualidade não dispara se o job `atlas_agent_monitoring` parar (a view fica vazia) |
 | v2 | Forecast e metas regionais com backtesting |
 | v2 | Personas do agente (Helena, Analista, Regional) com golden set por persona |
 | v2 | DQ por camada + Lakehouse Monitoring; expectations de volume bloqueantes |

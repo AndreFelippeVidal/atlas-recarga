@@ -46,3 +46,15 @@
 
 - **Depende de:** P12.7
 - **Pronto quando:** p95 < 3s registrado
+
+### P12.9 🤝 Revalidar o production monitoring do MLflow (Beta) da P10.8
+
+- **Depende de:** P12.8
+- **Pronto quando:** O comando de contagem de assessments é rodado no `dev` e o resultado (mudou ou não) fica registrado na SPEC-008 §6 e no ADR-0013
+- **Passos:**
+  - Contexto: na P10.8 os 3 LLM judges foram registrados a 20% (`eval/start_monitoring.py`) e nenhum dos 20 traces recebeu assessment. O plano B (job `atlas_agent_monitoring`) é o caminho em uso. Esta task só verifica se algo mudou; não troca o caminho
+  - Confirmar que os judges ainda estão registrados em `atlas_agent_traces` (se não, `start_monitoring.py --experiment-id <id> --start`)
+  - Com tráfego novo no agente (algumas dezenas de perguntas), rodar a contagem de assessments: `MLFLOW_DISABLE_AGENT_HINT=1 MLFLOW_TRACING_SQL_WAREHOUSE_ID=<warehouse> DATABRICKS_CONFIG_PROFILE=<perfil> uv run --project apps/agent python -c "import mlflow; mlflow.set_tracking_uri('databricks'); ts=mlflow.search_traces(locations=['<id de atlas_agent_traces>'],return_type='list',max_results=200); print(len(ts), sum(bool(t.info.assessments) for t in ts))"`
+  - Se continuar 0 assessments: registrar a nova data na SPEC-008 §6 e no ADR-0013 (o Beta segue sem efeito) e parar
+  - Se houver assessments: registrar a latência trace→assessment e conferir que o job as reaproveita sem duplicar (deduplicação por nome); só então propor, em PR separado e com confirmação do mantenedor, mudar o texto da SPEC-008 §6 e do ADR-0013
+

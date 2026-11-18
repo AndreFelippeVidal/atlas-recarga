@@ -117,7 +117,7 @@ Tudo no catálogo `atlas` (no target `dev`, `atlas_dev`), um schema por camada e
 | `commission` | `batches`, `batch_lines`, `batch_events` e `locked_lines` (append-only), `reconciliation`, Volume `remittance/` | Task 2 do `atlas_daily` (rascunho) e `atlas_commission_review` (transições) | Analista e diretora pelo relatório `commission_review` (os grants de leitura ainda não estão definidos na SPEC-003); `mv_commission`, só sobre `locked_lines` + `batches` de lotes `locked` |
 | `semantic` | Metric views `mv_recharges`, `mv_commission` e UC functions `fn_*` | Bundle, a partir de `semantic/*.yaml` | Grupo `atlas_readers`: Helena, gerentes e os service principals dos 3 Apps (SPEC-004 §7); o Genie Space consulta só as metric views |
 | `eval` | `agent_golden_set` (sincronizado do YAML), `review_queue` | Script de sync e monitoramento (SPEC-008) | Avaliação offline, gate de PR, revisor humano |
-| `observability` | `pipeline_freshness`, trace tables `agent_*` e `mcp_*`, `agent_quality_daily` | Task 3 do `atlas_daily`, MLflow, job de monitoramento | Páginas "Qualidade do agente" e "Uso do MCP" do AI/BI |
+| `observability` | `pipeline_freshness`, trace tables `agent_*` e `mcp_*`, `agent_quality_*` (tabelas e views de qualidade do agente) | Task 3 do `atlas_daily`, MLflow, job de monitoramento | Páginas "Qualidade do agente" e "Uso do MCP" do AI/BI |
 
 Fora do catálogo: experiments MLflow `/Shared/atlas/agent` e `/Shared/atlas/mcp`, a system table `system.query.history` (auditoria das queries do MCP) e a system table `system.ai_gateway.usage`, onde o Unity Gateway registra o uso do LLM.
 
