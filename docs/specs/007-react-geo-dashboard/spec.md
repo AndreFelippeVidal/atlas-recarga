@@ -43,8 +43,8 @@ Arquivos de geometria:
 | Carregar a página | Último mês fechado; medida `gross_revenue`; nível Brasil (5 regiões) |
 | Trocar mês ou medida | Recolore o mapa e atualiza KPIs e ranking, sem recarregar a geometria |
 | Hover numa UF ou município | Tooltip: nome, valor formatado (`R$ 1,2 mi`, `12.345`), posição no ranking |
-| **Clique numa região** | Busca `/api/map/uf?region=<R>`; transição de zoom de 600 ms até o bounding box das UFs da região; só as UFs da região ficam no centro, coloridas por UF; as outras regiões somem ou ficam esmaecidas |
-| **Clique numa UF** (a partir do nível região ou do ranking) | Busca `geo/mun/<UF>.json` e `/api/map/municipality`; transição de zoom de 600 ms até o bounding box da UF; municípios coloridos; as outras UFs ficam esmaecidas |
+| **Clique numa região** | Busca `/api/map/uf?region=<R>`; transição de zoom de 600 ms até o bounding box das UFs da região; só as UFs da região ficam no centro, coloridas por UF; as outras regiões **somem**. Um botão "← Ver o Brasil inteiro" acima do mapa volta direto ao nível Brasil |
+| **Clique numa UF** (a partir do nível região ou do ranking) | Busca `geo/mun/<UF>.json` e `/api/map/municipality`; transição de zoom de 600 ms até o bounding box da UF; municípios coloridos e centralizados; as outras UFs **somem** |
 | Clicar na breadcrumb ("Brasil", região) ou apertar Esc | Sobe um nível (município → UF → região → Brasil) com a transição inversa |
 | Clicar num item do ranking | Mesmo efeito de clicar no polígono do nível atual |
 
