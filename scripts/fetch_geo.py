@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import http.client
 import json
 import shutil
 import subprocess
@@ -62,20 +63,18 @@ def load_reference(path: Path = REFERENCE) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def uf_of(code: str, reference: list[dict[str, str]]) -> str:
-    """Sigla of an IBGE UF code (the first 2 digits of any municipality code)."""
-    for row in reference:
-        if row["municipality_ibge_code"].startswith(code):
-            return row["uf"]
-    raise ValueError(f"UF code {code} not in the reference")
+def uf_by_code(reference: list[dict[str, str]]) -> dict[str, str]:
+    """IBGE UF code (first 2 digits of the municipality code) -> sigla."""
+    return {row["municipality_ibge_code"][:2]: row["uf"] for row in reference}
 
 
 def tag_ufs(collection: Collection, reference: list[dict[str, str]]) -> Collection:
     """Replace ``codarea`` by ``uf`` + ``region`` on the UF mesh."""
     region_by_uf = {row["uf"]: row["region"] for row in reference}
+    ufs = uf_by_code(reference)
     features: list[Feature] = []
     for feature in collection["features"]:
-        uf = uf_of(str(feature["properties"]["codarea"]), reference)
+        uf = ufs[str(feature["properties"]["codarea"])]
         features.append(
             {
                 "type": "Feature",
@@ -124,15 +123,20 @@ def tag_municipalities(
 
 
 def download(url: str, retries: int = 3) -> Collection:
+    """GET a GeoJSON; retry transient failures, fail at once on an HTTP 4xx."""
     last: Exception | None = None
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310  (https, fixed host)
                 data: Collection = json.load(response)
                 return data
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+        except urllib.error.HTTPError as error:
+            if 400 <= error.code < 500:
+                raise RuntimeError(f"download failed: {url}: HTTP {error.code}") from error
             last = error
-            time.sleep(2 * (attempt + 1))
+        except (OSError, http.client.HTTPException, json.JSONDecodeError) as error:
+            last = error
+        time.sleep(2 * (attempt + 1))
     raise RuntimeError(f"download failed: {url}: {last}")
 
 
@@ -177,8 +181,8 @@ def build(output: Path, reference: list[dict[str, str]]) -> dict[str, int]:
         simplify(raw, output / "br-uf.json", "uf", UF_KEEP)
         sizes["br-uf.json"] = (output / "br-uf.json").stat().st_size
 
-        for uf in sorted({row["uf"] for row in reference}):
-            code = uf_of_code(uf, reference)
+        code_by_uf = {uf: code for code, uf in uf_by_code(reference).items()}
+        for uf, code in sorted(code_by_uf.items()):
             collection = download(mesh_url(f"estados/{code}", "municipio"))
             tagged, dropped = tag_municipalities(collection, uf, reference)
             if dropped:
@@ -189,14 +193,6 @@ def build(output: Path, reference: list[dict[str, str]]) -> dict[str, int]:
             simplify(raw, target, "municipalities", MUN_KEEP)
             sizes[f"mun/{uf}.json"] = target.stat().st_size
     return sizes
-
-
-def uf_of_code(uf: str, reference: list[dict[str, str]]) -> str:
-    """IBGE UF code (2 digits) of a sigla."""
-    for row in reference:
-        if row["uf"] == uf:
-            return row["municipality_ibge_code"][:2]
-    raise ValueError(f"unknown UF {uf}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -218,6 +214,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"over the SPEC-007 §2 limit: {too_big}; lower UF_KEEP/MUN_KEEP", file=sys.stderr)
             return 1
         # Only a complete, within-limit build replaces the committed files.
+        stale = args.output / "mun"
+        if stale.exists():
+            shutil.rmtree(stale)  # a UF no longer generated must not linger
         shutil.copytree(staging, args.output, dirs_exist_ok=True)
     return 0
 
