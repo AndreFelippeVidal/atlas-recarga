@@ -1,7 +1,8 @@
 import { useState } from "react";
 import ErrorBanner from "./components/ErrorBanner";
 import KpiCard from "./components/KpiCard";
-import { formatMonth } from "./format";
+import MapPanel from "./components/MapPanel";
+import { formatMonth, MEASURE_LABELS } from "./format";
 import { useKpis, useMonths } from "./hooks";
 import type { KpiMeasure } from "./api";
 
@@ -10,6 +11,7 @@ const MEASURES: KpiMeasure[] = ["gross_revenue", "recharge_count", "avg_ticket",
 export default function App() {
   const months = useMonths();
   const [chosen, setChosen] = useState<string | null>(null);
+  const [measure, setMeasure] = useState<KpiMeasure>("gross_revenue");
   // Padrão: último mês fechado (o mais recente da lista).
   const month = chosen ?? months.months[0] ?? null;
   const kpis = useKpis(month);
@@ -23,20 +25,32 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1>Atlas Recarga</h1>
-        <label className="month-picker">
-          Mês{" "}
-          <select
-            value={month ?? ""}
-            disabled={months.months.length === 0}
-            onChange={(e) => setChosen(e.target.value)}
-          >
-            {months.months.map((m) => (
-              <option key={m} value={m}>
-                {formatMonth(m)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="pickers">
+          <label className="month-picker">
+            Mês{" "}
+            <select
+              value={month ?? ""}
+              disabled={months.months.length === 0}
+              onChange={(e) => setChosen(e.target.value)}
+            >
+              {months.months.map((m) => (
+                <option key={m} value={m}>
+                  {formatMonth(m)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="month-picker">
+            Medida{" "}
+            <select value={measure} onChange={(e) => setMeasure(e.target.value as KpiMeasure)}>
+              {MEASURES.map((m) => (
+                <option key={m} value={m}>
+                  {MEASURE_LABELS[m]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </header>
 
       {error && <ErrorBanner code={error} onRetry={retry} />}
@@ -53,15 +67,7 @@ export default function App() {
       </section>
 
       <main className="content">
-        <section className="map-area" aria-label="Mapa">
-          <p className="placeholder">O mapa por região entra na P12.5.</p>
-        </section>
-        <aside className="side" aria-label="Ranking">
-          <nav aria-label="Navegação do mapa" className="breadcrumb">
-            Brasil
-          </nav>
-          <p className="placeholder">O ranking entra na P12.5.</p>
-        </aside>
+        <MapPanel month={month} measure={measure} />
       </main>
     </div>
   );

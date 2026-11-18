@@ -1,54 +1,85 @@
-import { useCallback, useEffect, useState } from "react";
-import { ApiError, fetchKpis, fetchMonths, type KpisResponse } from "./api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ApiError,
+  fetchKpis,
+  fetchMonths,
+  fetchRegionMap,
+  fetchUfTopology,
+  type KpisResponse,
+  type MapMeasure,
+  type RegionValue,
+} from "./api";
 
 function errorCode(err: unknown): string {
   return err instanceof ApiError ? err.code : "UNKNOWN";
 }
 
-// Mantém o dado anterior em erro (SPEC-007 §4: o banner não apaga o que já estava na tela).
-export function useMonths() {
-  const [months, setMonths] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+// Busca com chave. `data` é o resultado da chave atual (ou null enquanto carrega); `stale` é o
+// último resultado de qualquer chave, para manter o mapa anterior em erro (SPEC-007 §4). O erro
+// guarda a chave a que pertence: ao trocar a chave, o erro antigo some sozinho.
+export function useApi<T>(cacheKey: string | null, fetcher: (signal: AbortSignal) => Promise<T>) {
+  const [result, setResult] = useState<{ id: string; data: T } | null>(null);
+  const [failure, setFailure] = useState<{ id: string; code: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const fetcherRef = useRef(fetcher);
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  });
 
   useEffect(() => {
+    if (cacheKey === null) return;
     const ctrl = new AbortController();
-    fetchMonths(ctrl.signal)
-      .then((m) => {
-        setMonths(m);
-        setError(null);
-      })
-      .catch((e) => {
-        if (!ctrl.signal.aborted) setError(errorCode(e));
-      });
-    return () => ctrl.abort();
-  }, [attempt]);
-
-  return { months, error, retry: useCallback(() => setAttempt((n) => n + 1), []) };
-}
-
-export function useKpis(month: string | null) {
-  const [kpis, setKpis] = useState<KpisResponse | null>(null);
-  // O erro guarda o mês a que pertence: ao trocar de mês, o erro antigo some sozinho.
-  const [failure, setFailure] = useState<{ month: string; code: string } | null>(null);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    if (!month) return;
-    const ctrl = new AbortController();
-    fetchKpis(month, ctrl.signal)
-      .then((k) => {
-        setKpis(k);
+    fetcherRef
+      .current(ctrl.signal)
+      .then((data) => {
+        if (ctrl.signal.aborted) return;
+        setResult({ id: cacheKey, data });
         setFailure(null);
       })
       .catch((e) => {
-        if (!ctrl.signal.aborted) setFailure({ month, code: errorCode(e) });
+        if (!ctrl.signal.aborted) setFailure({ id: `${cacheKey}#${attempt}`, code: errorCode(e) });
       });
     return () => ctrl.abort();
-  }, [month, attempt]);
+  }, [cacheKey, attempt]);
 
-  // Só mostra o KPI se for do mês pedido; senão, skeleton.
-  const current = kpis && kpis.month === month ? kpis : null;
-  const error = failure && failure.month === month ? failure.code : null;
-  return { kpis: current, error, retry: useCallback(() => setAttempt((n) => n + 1), []) };
+  return {
+    data: result !== null && result.id === cacheKey ? result.data : null,
+    stale: result?.data ?? null,
+    // O erro vale só para a chave e a tentativa atuais: ao tentar de novo, o banner some.
+    error: failure !== null && failure.id === `${cacheKey}#${attempt}` ? failure.code : null,
+    retry: useCallback(() => setAttempt((n) => n + 1), []),
+  };
+}
+
+export function useMonths() {
+  const api = useApi<string[]>("months", fetchMonths);
+  return { months: api.data ?? [], error: api.error, retry: api.retry };
+}
+
+export function useKpis(month: string | null) {
+  const api = useApi<KpisResponse>(month, (s) => fetchKpis(month as string, s));
+  return { kpis: api.data, error: api.error, retry: api.retry };
+}
+
+export interface RegionMapData {
+  month: string;
+  measure: MapMeasure;
+  items: RegionValue[];
+}
+
+// O resultado carrega o mês e a medida a que pertence, para que o mapa anterior mantido em erro
+// continue com a legenda e a unidade certas.
+export function useRegionMap(month: string | null, measure: MapMeasure) {
+  const cacheKey = month === null ? null : `${month}|${measure}`;
+  const api = useApi<RegionMapData>(cacheKey, async (s) => ({
+    month: month as string,
+    measure,
+    items: await fetchRegionMap(month as string, measure, s),
+  }));
+  return { data: api.data, stale: api.stale, error: api.error, retry: api.retry };
+}
+
+export function useUfTopology() {
+  const api = useApi<unknown>("br-uf", fetchUfTopology);
+  return { topology: api.data, error: api.error, retry: api.retry };
 }

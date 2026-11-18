@@ -57,3 +57,24 @@ export async function fetchMonths(signal?: AbortSignal): Promise<string[]> {
 export function fetchKpis(month: string, signal?: AbortSignal): Promise<KpisResponse> {
   return getJson<KpisResponse>(`/api/kpis?month=${encodeURIComponent(month)}`, signal);
 }
+
+export type Region = "N" | "NE" | "CO" | "SE" | "S";
+export type MapMeasure = KpiMeasure;
+
+export interface RegionValue {
+  region: Region;
+  value: string;
+}
+
+export function fetchRegionMap(
+  month: string,
+  measure: MapMeasure,
+  signal?: AbortSignal,
+): Promise<RegionValue[]> {
+  const qs = `month=${encodeURIComponent(month)}&measure=${encodeURIComponent(measure)}`;
+  return getJson<RegionValue[]>(`/api/map/region?${qs}`, signal);
+}
+
+export function fetchUfTopology(signal?: AbortSignal): Promise<unknown> {
+  return getJson<unknown>("/geo/br-uf.json", signal);
+}

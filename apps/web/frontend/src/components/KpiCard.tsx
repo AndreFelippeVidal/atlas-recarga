@@ -1,12 +1,5 @@
 import type { Kpi, KpiMeasure } from "../api";
-import { formatDelta, formatMeasure, roundedDelta } from "../format";
-
-export const KPI_LABELS: Record<KpiMeasure, string> = {
-  gross_revenue: "Receita bruta",
-  recharge_count: "Recargas",
-  avg_ticket: "Ticket médio",
-  active_pos: "PDVs ativos",
-};
+import { formatDelta, formatMeasure, MEASURE_LABELS, roundedDelta } from "../format";
 
 interface Props {
   measure: KpiMeasure;
@@ -15,7 +8,7 @@ interface Props {
 }
 
 export default function KpiCard({ measure, kpi, previousMonthLabel }: Props) {
-  const label = KPI_LABELS[measure];
+  const label = MEASURE_LABELS[measure];
   if (!kpi) {
     return (
       <div className="card skeleton" aria-busy="true" aria-label={`${label}: carregando`}>
