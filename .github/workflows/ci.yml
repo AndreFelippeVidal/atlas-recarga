@@ -25,6 +25,7 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       bundle: ${{ steps.filter.outputs.bundle }}
       agent: ${{ steps.filter.outputs.agent }}
+      web: ${{ steps.filter.outputs.web }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -51,6 +52,10 @@ jobs:
               - 'eval/**'
               - 'semantic/**'
               - '.github/workflows/agent-eval.yml'
+            web:
+              - 'apps/web/frontend/**'
+              - 'apps/web/public/**'
+              - '.github/workflows/ci.yml'
 
   lint:
     needs: changes
@@ -150,8 +155,33 @@ jobs:
       contents: read
       pull-requests: write  # teto; só o job `comment` do workflow chamado o usa
 
+  # SPEC-007: build do frontend (tsc, eslint, prettier, vitest, vite build).
+  web-frontend:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web/frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: apps/web/frontend/package.json
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test
+      - run: pnpm build
+
   ci-ok:
-    needs: [changes, lint, types, test, secrets, docs, bundle-validate, agent-eval]
+    needs: [changes, lint, types, test, secrets, docs, bundle-validate, agent-eval, web-frontend]
     if: always()
     runs-on: ubuntu-latest
     steps:

@@ -15,3 +15,15 @@ uv run pytest apps/web
 uv run python scripts/check_web_kpis.py   # no dev, pelo mantenedor (ver o docstring)
 uv run python scripts/check_web_map.py    # idem; confere soma das regiões e UFs = KPI
 ```
+
+## Frontend (P12.4)
+
+`frontend/` é o Vite + React 18 + TypeScript (pnpm, Node 22). Em desenvolvimento, `vite` faz proxy de `/api` para `localhost:8000` (o FastAPI) e serve `public/geo/` pelo `publicDir`. O FastAPI ainda não serve o build estático (P12.8).
+
+```bash
+cd apps/web/frontend
+pnpm install && pnpm dev            # http://localhost:5173
+pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build   # o mesmo job `web-frontend` do CI
+```
+
+Os valores chegam como string decimal e o frontend só formata; nenhuma métrica é calculada aqui.
