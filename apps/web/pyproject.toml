@@ -1,0 +1,19 @@
+[project]
+name = "atlas-web"
+version = "0.1.0"
+description = "Backend FastAPI do dashboard com mapa (Databricks App atlas-web)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "databricks-sdk>=0.60.0",
+    "databricks-sql-connector>=4.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["atlas_web"]

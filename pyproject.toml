@@ -3,7 +3,7 @@ name = "atlas-recarga"
 version = "0.0.0"
 description = "Atlas Recarga — Databricks data & AI platform (workspace root)"
 requires-python = ">=3.12"
-dependencies = ["atlas-cli", "atlas-mcp"]
+dependencies = ["atlas-cli", "atlas-mcp", "atlas-web"]
 
 [dependency-groups]
 dev = [
@@ -15,11 +15,12 @@ dev = [
 
 # Workspace members are added as packages are created (SPEC-009 §2).
 [tool.uv.workspace]
-members = ["cli", "apps/mcp"]
+members = ["cli", "apps/mcp", "apps/web"]
 
 [tool.uv.sources]
 atlas-cli = { workspace = true }
 atlas-mcp = { workspace = true }
+atlas-web = { workspace = true }
 
 [tool.ruff]
 line-length = 100
@@ -37,6 +38,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 "commission/tests/**" = ["S101"]
 "apps/agent/tests/**" = ["S101"]
 "apps/mcp/tests/**" = ["S101"]
+"apps/web/tests/**" = ["S101"]
 # DDL/consultas montados só com identificadores validados e listas fechadas (SPEC-005 §3)
 "semantic/apply_functions.py" = ["S608"]
 "eval/monitoring.py" = ["S608"]  # DDL com o catálogo validado
@@ -48,7 +50,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_golden_set.py", "scripts/check_agent_golden_set.py", "eval/sync_golden_set.py", "eval/scorers.py", "eval/gate.py", "eval/monitoring.py", "scripts/check_commission_append_only.py", "scripts/check_commission_draft.py", "scripts/check_commission_reconciliation.py", "scripts/check_commission_review.py", "cli/src", "cli/tests", "scripts/check_agent_skeleton.py", "commission", "apps/agent/agent_server/config.py", "apps/agent/agent_server/tools.py", "apps/agent/agent_server/prompts.py", "apps/agent/tests", "apps/mcp", "scripts/check_mcp_health.py", "scripts/build_mcp_catalog.py", "scripts/check_mcp_query.py", "scripts/check_agent_tools.py", "scripts/check_agent_refusals.py", "scripts/check_agent_monitoring.py", "scripts/check_mcp_parity.py", "scripts/check_mcp_observability.py", "scripts/setup_mcp_trace_tables.py", "scripts/fetch_geo.py"]
+files = ["tests", ".claude/hooks", "scripts/setup_workspace.py", "scripts/check_bronze_counts.py", "scripts/check_golden_set.py", "scripts/check_agent_golden_set.py", "eval/sync_golden_set.py", "eval/scorers.py", "eval/gate.py", "eval/monitoring.py", "scripts/check_commission_append_only.py", "scripts/check_commission_draft.py", "scripts/check_commission_reconciliation.py", "scripts/check_commission_review.py", "cli/src", "cli/tests", "scripts/check_agent_skeleton.py", "commission", "apps/agent/agent_server/config.py", "apps/agent/agent_server/tools.py", "apps/agent/agent_server/prompts.py", "apps/agent/tests", "apps/mcp", "apps/web/atlas_web", "apps/web/tests", "scripts/check_mcp_health.py", "scripts/build_mcp_catalog.py", "scripts/check_mcp_query.py", "scripts/check_agent_tools.py", "scripts/check_agent_refusals.py", "scripts/check_agent_monitoring.py", "scripts/check_mcp_parity.py", "scripts/check_mcp_observability.py", "scripts/setup_mcp_trace_tables.py", "scripts/fetch_geo.py", "scripts/check_web_kpis.py"]
 
 [[tool.mypy.overrides]]
 module = ["pyarrow", "pyarrow.*"]
@@ -59,6 +61,6 @@ module = ["pyspark", "pyspark.*", "mlflow", "mlflow.*", "databricks.connect", "d
 ignore_missing_imports = true  # só existe no workspace; o import é feito dentro de main()
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "cli/tests", "commission/tests", "apps/agent/tests", "apps/mcp/tests"]
-pythonpath = [".", "apps/agent", "apps/mcp"]
+testpaths = ["tests", "cli/tests", "commission/tests", "apps/agent/tests", "apps/mcp/tests", "apps/web/tests"]
+pythonpath = [".", "apps/agent", "apps/mcp", "apps/web"]
 addopts = "-q"
