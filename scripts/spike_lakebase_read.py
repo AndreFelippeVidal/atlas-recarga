@@ -19,8 +19,9 @@ import re
 import subprocess
 import sys
 import time
+from pathlib import Path
 
-sys.path.insert(0, __import__("os").path.dirname(__file__))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from spike_dashboard_latency import format_row
 
 TABLE_RE = re.compile(r"[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*")

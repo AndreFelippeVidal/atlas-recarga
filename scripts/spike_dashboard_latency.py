@@ -30,6 +30,7 @@ import sys
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -129,6 +130,9 @@ def run_endpoints(args: argparse.Namespace) -> int:
     print("\n## Aquecer o cache na subida (todas as consultas da tela)\n")
     print("| modo | total ms |")
     print("|---|---|")
+    statuses = [warm(par_client, item) for item in plan]  # cache quente: confere os códigos
+    if any(code != 200 for code in statuses):
+        print(f"\nATENÇÃO: o aquecimento teve respostas != 200 ({statuses}); ignore a tabela")
     print(f"| sequencial | {seq * 1000:.0f} |")
     print(f"| 4 em paralelo | {par * 1000:.0f} |")
 
@@ -203,7 +207,9 @@ def run_aggregate(args: argparse.Namespace, drop: bool) -> int:
     agg = [timed(lambda: execute(agg_sql, {"month": first}))[0] for _ in range(args.repeat)]
     _, d_rows = execute(direct_sql, {"month": first})
     _, a_rows = execute(agg_sql, {"month": first})
-    same = sorted((r[0], str(r[1])) for r in d_rows) == sorted((r[0], str(r[1])) for r in a_rows)
+    same = sorted((r[0], Decimal(str(r[1]))) for r in d_rows) == sorted(
+        (r[0], Decimal(str(r[1]))) for r in a_rows
+    )
     print("\n| consulta | n | mín ms | p50 ms | p95 ms | máx ms |")
     print("|---|---|---|---|---|---|")
     print(format_row("UFs direto na metric view", direct))
@@ -253,13 +259,28 @@ def run_reuse(args: argparse.Namespace) -> int:
     return 0
 
 
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("deve ser >= 1")
+    return number
+
+
+def _uf(value: str) -> str:
+    if not re.fullmatch(r"[A-Z]{2}", value):
+        raise argparse.ArgumentTypeError("UF deve ter 2 letras maiúsculas")
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("endpoints", "aggregate", "reuse", "drop"))
     parser.add_argument("--label", default="warehouse-quente", help="rótulo da execução")
     parser.add_argument("--month", default=None, help="YYYY-MM (padrão: o mais recente)")
-    parser.add_argument("--uf", default="SP", help="UF do nível município")
-    parser.add_argument("--repeat", type=int, default=20, help="chamadas quentes por endpoint")
+    parser.add_argument("--uf", type=_uf, default="SP", help="UF do nível município")
+    parser.add_argument(
+        "--repeat", type=_positive_int, default=20, help="chamadas quentes por endpoint"
+    )
     args = parser.parse_args(argv)
     if args.mode == "endpoints":
         return run_endpoints(args)
