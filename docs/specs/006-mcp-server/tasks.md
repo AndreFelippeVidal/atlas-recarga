@@ -18,7 +18,13 @@
 ### P11.3 🤖 `top_regions` + `compare_months` + erros padronizados
 
 - **Depende de:** P11.2
-- **Pronto quando:** Contrato de erros da SPEC-006 §4 coberto
+- **Pronto quando:** Contrato de erros da SPEC-006 §4 coberto (os 4 códigos que não dependem do limitador; o `RATE_LIMITED` é da P11.4)
+- **Passos:**
+  - `errors.py` com `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `WAREHOUSE_UNAVAILABLE` e `RESULT_TOO_LARGE`; nunca stack trace ao cliente; aplicado também ao `query_metric`
+  - `sql_client.py` classifica as falhas do warehouse nesses códigos; `WAREHOUSE_UNAVAILABLE` só depois de 1 nova tentativa (20s)
+  - `top_regions` e `compare_months` só sobre `mv_recharges`, reaproveitando `build_query` (lista fechada, binds); `level` mapeia para `region`, `uf`, `municipality_ibge_code` + `municipality_name` e `ddd`
+  - `compare_months` com Δ absoluto e Δ% (nulo se a base é 0) e `RESULT_TOO_LARGE` acima de 500 linhas
+  - Testes unitários com o cliente SQL mockado e `scripts/check_mcp_tools.py` para o mantenedor conferir no `dev`
 
 ### P11.4 🤖 Traces MLflow, rate limit por usuário, logs estruturados + teste de paridade com o golden set
 

@@ -32,10 +32,16 @@ O campo `source` de toda resposta repete o contrato de citação do agente (view
 - `month_from` e `month_to` são obrigatórios, no formato `YYYY-MM` e inclusivos; filtram a dimensão de mês da view (`recharge_month` em `mv_recharges`, `reference_month` em `mv_commission`), com os valores vinculados.
 - `filters`: valor escalar vira `= :p`; lista vira `IN (:p0, :p1, …)`, com no máximo 100 valores. Chaves são dimensões da view; valores são `str`, `int` ou `float` (não `bool`, `null` nem objetos).
 - `order_by`: uma coluna do resultado (medida ou dimensão) com `asc` ou `desc` opcional; sem direção, medida em `desc` e dimensão em `asc`. Sem `order_by`, a ordem é a primeira medida em `desc`, para o `limit` não cortar linhas arbitrárias.
-- `limit` acima de 500 é `INVALID_ARGUMENT`; o `RESULT_TOO_LARGE` do §4 fica para as tools que não têm esse teto (`top_regions` e `compare_months` com `n`).
+- `limit` acima de 500 é `INVALID_ARGUMENT`; o `RESULT_TOO_LARGE` do §4 fica para o `compare_months`, que não tem `limit` (o `top_regions` é limitado por `n ≤ 50`).
 - `sql_fingerprint` é o sha1 do SQL parametrizado, sem o comentário `request_id` e sem os valores.
 - A lista fechada de medidas e dimensões vem de `apps/mcp/atlas_mcp/catalog.json`, gerado de `semantic/*.yaml` por `scripts/build_mcp_catalog.py` (o App só leva `apps/mcp` no deploy); um teste falha se o snapshot ficar velho.
 - O erro de argumento chega ao cliente como erro de tool com a mensagem prefixada por `INVALID_ARGUMENT:`.
+
+**Detalhes de `top_regions` e `compare_months` (P11.3):**
+- Só leem `mv_recharges` (a única view com `ddd`); `measure` é uma medida dela. `level` mapeia para as dimensões `region`, `uf`, `municipality_ibge_code` + `municipality_name` e `ddd`. `month`, `month_a` e `month_b` são `YYYY-MM`; `uf` (opcional) é um filtro escalar vinculado.
+- `top_regions` ordena a medida em `desc` e corta em `n` (1 a 50); nunca dá `RESULT_TOO_LARGE`.
+- `compare_months` roda a mesma consulta nos dois meses (mesmo SQL, só os binds mudam) e devolve, por região, `value_a`, `value_b`, `delta_abs` (b − a) e `delta_pct` (arredondado a 2 casas, `ROUND_HALF_EVEN`; nulo se a base é 0 ou falta um dos meses; o denominador é `abs(base)`), com a maior variação absoluta primeiro. Se qualquer mês ou a união das regiões passar de 500 linhas: `RESULT_TOO_LARGE`, sugerindo filtrar por `uf` ou usar um `level` mais agregado.
+- A mensagem de `PERMISSION_DENIED` e de `WAREHOUSE_UNAVAILABLE` é fixa: o texto original do conector (host, caminho, SQL) não vai ao cliente.
 
 ## 4. Erros (padronizados, nunca stack trace)
 

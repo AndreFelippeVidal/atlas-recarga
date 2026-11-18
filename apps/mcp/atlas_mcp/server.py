@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from typing import Any
 
 from fastmcp import FastMCP
@@ -11,9 +12,13 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_http_headers
 
 from atlas_mcp.catalog import list_metrics as build_list_metrics
+from atlas_mcp.errors import McpError
 from atlas_mcp.health import health as build_health
-from atlas_mcp.query import DEFAULT_LIMIT, InvalidArgument
+from atlas_mcp.query import DEFAULT_LIMIT
 from atlas_mcp.query import query_metric as run_query_metric
+from atlas_mcp.regions import DEFAULT_TOP_N
+from atlas_mcp.regions import compare_months as run_compare_months
+from atlas_mcp.regions import top_regions as run_top_regions
 from atlas_mcp.sql_client import MissingUserToken, make_executor
 
 log = logging.getLogger("atlas_mcp")
@@ -49,15 +54,10 @@ def query_metric(
     month_from/month_to: YYYY-MM, inclusivos. filters: dimensão -> valor ou lista de valores.
     order_by: coluna do resultado com asc/desc opcional. limit: 1 a 500.
     """
-    headers = get_http_headers()
-
-    def executor(sql: str, params: Any) -> Any:
-        # Só abre conexão depois da validação: argumento inválido nunca chega ao warehouse.
-        return make_executor(headers)(sql, params)
-
-    try:
-        return run_query_metric(
-            os.environ.get("ATLAS_CATALOG", "atlas"),
+    return _run_tool(
+        "query_metric",
+        lambda catalog, executor: run_query_metric(
+            catalog,
             executor,
             view,
             measures,
@@ -67,18 +67,70 @@ def query_metric(
             month_to,
             order_by,
             limit,
-        )
-    except InvalidArgument as exc:
-        raise ToolError(f"INVALID_ARGUMENT: {exc}") from exc
+        ),
+    )
+
+
+@mcp.tool(annotations={"readOnlyHint": True})
+def top_regions(
+    measure: str,
+    level: str,
+    month: str,
+    n: int = DEFAULT_TOP_N,
+    uf: str | None = None,
+) -> dict[str, Any]:
+    """Ranking de uma medida de mv_recharges por nível, em um mês (YYYY-MM).
+
+    level: region, uf, municipality ou ddd. n: 1 a 50. uf: filtra por UF (opcional).
+    """
+    return _run_tool(
+        "top_regions",
+        lambda catalog, executor: run_top_regions(catalog, executor, measure, level, month, n, uf),
+    )
+
+
+@mcp.tool(annotations={"readOnlyHint": True})
+def compare_months(
+    measure: str,
+    month_a: str,
+    month_b: str,
+    level: str,
+    uf: str | None = None,
+) -> dict[str, Any]:
+    """Compara uma medida de mv_recharges entre dois meses (YYYY-MM), por nível.
+
+    Devolve value_a, value_b, delta_abs (b - a) e delta_pct (nulo se a base é 0).
+    Mais de 500 linhas: RESULT_TOO_LARGE (filtre por uf ou use um level mais agregado).
+    """
+    return _run_tool(
+        "compare_months",
+        lambda catalog, executor: run_compare_months(
+            catalog, executor, measure, month_a, month_b, level, uf
+        ),
+    )
+
+
+def _run_tool(name: str, call: Callable[[str, Any], dict[str, Any]]) -> dict[str, Any]:
+    """Roda uma tool de consulta e traduz toda falha para o contrato do §4 (nunca stack trace)."""
+    headers = get_http_headers()
+
+    def executor(sql: str, params: Any) -> Any:
+        # Só abre conexão depois da validação: argumento inválido nunca chega ao warehouse.
+        return make_executor(headers)(sql, params)
+
+    try:
+        return call(os.environ.get("ATLAS_CATALOG", "atlas"), executor)
+    except McpError as exc:
+        raise ToolError(exc.render()) from exc
     except MissingUserToken as exc:
-        log.error("query_metric sem token do usuário")
+        log.error("%s sem token do usuário", name)
         raise ToolError(
             "o App não recebeu o token do usuário; "
             "habilite a autorização on-behalf-of com o escopo sql"
         ) from exc
-    except Exception as exc:  # o contrato completo de erros é da P11.3; aqui nada de stack trace
+    except Exception as exc:
         # Só o tipo: o conector pode trazer detalhes de conexão (logs estruturados na P11.4).
-        log.error("query_metric falhou: %s", type(exc).__name__)
+        log.error("%s falhou: %s", name, type(exc).__name__)
         raise ToolError("falha ao executar a consulta; veja os logs do App") from exc
 
 

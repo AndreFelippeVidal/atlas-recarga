@@ -3,12 +3,18 @@
 Databricks App `atlas-mcp` (FastMCP, Streamable HTTP em `/mcp`). Governado pela
 [SPEC-006](../../docs/specs/006-mcp-server/spec.md) e pelo [ADR-0008](../../docs/adr/0008-fastmcp-on-databricks-apps.md).
 
-**Estado (P11.2):** `health()`, `list_metrics()` e `query_metric(...)`. `top_regions` e
-`compare_months` entram na P11.3; observabilidade e rate limit na P11.4.
+**Estado (P11.3):** `health()`, `list_metrics()`, `query_metric(...)`, `top_regions(...)` e
+`compare_months(...)`, com os erros padronizados do §4. Observabilidade e rate limit
+(`RATE_LIMITED`) entram na P11.4.
 
 - `query_metric` valida view, medidas, dimensões e chaves de `filters` contra uma **lista fechada**
   (`atlas_mcp/catalog.json`) e vincula todo valor (filtros e meses) como parâmetro; nenhum SQL livre.
-  Erro de argumento: `INVALID_ARGUMENT`, sem executar query. O contrato completo de erros é da P11.3.
+  Erro de argumento: `INVALID_ARGUMENT`, sem executar query.
+- `top_regions` e `compare_months` só leem `mv_recharges`; `level` ∈ `region`, `uf`, `municipality`
+  (código + nome) e `ddd`. `compare_months` devolve `value_a`, `value_b`, `delta_abs` (b − a) e
+  `delta_pct` (nulo se a base é 0).
+- Erros chegam como `CODIGO: mensagem`, sem stack trace: `INVALID_ARGUMENT`, `PERMISSION_DENIED`,
+  `WAREHOUSE_UNAVAILABLE` (depois de 1 nova tentativa em 20s) e `RESULT_TOO_LARGE` (> 500 linhas).
 - `month_from`/`month_to` (`YYYY-MM`, inclusivos) filtram `recharge_month` (`mv_recharges`) ou
   `reference_month` (`mv_commission`). `order_by`: coluna do resultado com `asc`/`desc` opcional.
 - Os dados são lidos **como o usuário** (OBO, escopo `sql`, cabeçalho `x-forwarded-access-token`).

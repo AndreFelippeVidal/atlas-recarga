@@ -11,7 +11,8 @@ from typing import Any
 import pytest
 from atlas_mcp import server
 from atlas_mcp.catalog import list_metrics, load_catalog
-from atlas_mcp.query import MAX_LIMIT, InvalidArgument, build_query, query_metric
+from atlas_mcp.errors import InvalidArgument
+from atlas_mcp.query import MAX_LIMIT, build_query, query_metric
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
@@ -181,7 +182,13 @@ def test_mcp_tools_list_and_injection_is_rejected_end_to_end(
             return names, listed
 
     names, listed = asyncio.run(run())
-    assert names == {"health", "list_metrics", "query_metric"}
+    assert names == {
+        "health",
+        "list_metrics",
+        "query_metric",
+        "top_regions",
+        "compare_months",
+    }
     assert "mv_recharges" in listed.data["views"]
 
 
