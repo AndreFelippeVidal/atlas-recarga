@@ -37,6 +37,12 @@ O campo `source` de toda resposta repete o contrato de citação do agente (view
 - A lista fechada de medidas e dimensões vem de `apps/mcp/atlas_mcp/catalog.json`, gerado de `semantic/*.yaml` por `scripts/build_mcp_catalog.py` (o App só leva `apps/mcp` no deploy); um teste falha se o snapshot ficar velho.
 - O erro de argumento chega ao cliente como erro de tool com a mensagem prefixada por `INVALID_ARGUMENT:`.
 
+**Detalhes de `top_regions` e `compare_months` (P11.3):**
+- Só leem `mv_recharges` (a única view com `ddd`); `measure` é uma medida dela. `level` mapeia para as dimensões `region`, `uf`, `municipality_ibge_code` + `municipality_name` e `ddd`. `month`, `month_a` e `month_b` são `YYYY-MM`; `uf` (opcional) é um filtro escalar vinculado.
+- `top_regions` ordena a medida em `desc` e corta em `n` (1 a 50); nunca dá `RESULT_TOO_LARGE`.
+- `compare_months` roda a mesma consulta nos dois meses (mesmo SQL, só os binds mudam) e devolve, por região, `value_a`, `value_b`, `delta_abs` (b − a) e `delta_pct` (arredondado a 2 casas, `ROUND_HALF_EVEN`; nulo se a base é 0 ou falta um dos meses), com a maior variação absoluta primeiro. Se qualquer mês ou a união das regiões passar de 500 linhas: `RESULT_TOO_LARGE`, sugerindo filtrar por `uf` ou usar um `level` mais agregado.
+- A mensagem de `PERMISSION_DENIED` e de `WAREHOUSE_UNAVAILABLE` é fixa: o texto original do conector (host, caminho, SQL) não vai ao cliente.
+
 ## 4. Erros (padronizados, nunca stack trace)
 
 | Código | Quando |
