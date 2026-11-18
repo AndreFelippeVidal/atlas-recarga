@@ -63,18 +63,26 @@ describe("ranking", () => {
 });
 
 describe("escala divergente (mom_change)", () => {
-  it("é simétrica em ±max(|min|, |max|) e centrada em 0", () => {
-    const values = [-40, -10, 0, 4, 20];
+  it("o limite é o percentil 90 de |valor|, simétrico e centrado em 0", () => {
+    const values = [-1, 2, -3, 4, -5, 6, -7, 8, -9, 10];
+    expect(divergingBound(values)).toBeCloseTo(9.1);
     const t = divergingThresholds(values);
-    expect(t).toEqual([-24, -8, 8, 24]);
-    expect(divergingBound(values)).toBe(40);
+    expect(t[0]).toBeCloseTo(-5.46);
+    expect(t[3]).toBeCloseTo(5.46);
+    expect(t[0]).toBeCloseTo(-t[3]);
   });
 
-  it("a maior queda cai na classe 0 e a maior alta na 4, mesmo com alta pequena", () => {
-    const scale = buildScale("mom_change", [-40, 4]);
-    expect(scaleClass(scale, -40)).toBe(0);
-    expect(scaleClass(scale, 4)).toBe(2);
-    expect(scaleClass(buildScale("mom_change", [-10, 40]), 40)).toBe(4);
+  it("um outlier de +1.400% não apaga a escala: a queda de −77% cai na classe 0", () => {
+    const values = [...Array.from({ length: 95 }, (_, i) => -60 + i), -77, 1400];
+    const scale = buildScale("mom_change", values);
+    expect(scale.clipped).toBe(true);
+    expect(scale.bound).toBeLessThan(100);
+    expect(scaleClass(scale, -77)).toBe(0);
+    expect(scaleClass(scale, 1400)).toBe(4);
+  });
+
+  it("sem outlier não há extremos agrupados", () => {
+    expect(buildScale("mom_change", [-10, -5, 0, 5, 10]).clipped).toBe(false);
   });
 
   it("o zero fica na classe do meio e tudo zero não quebra", () => {
@@ -84,6 +92,11 @@ describe("escala divergente (mom_change)", () => {
     expect(scaleClass(flat, 0)).toBe(2);
     expect(buildScale("mom_change", []).thresholds).toEqual([0, 0, 0, 0]);
     expect(legendClasses([0, 0], flat).map((c) => c.index)).toEqual([2]);
+  });
+
+  it("se o P90 é 0 usa o máximo, para a escala não colapsar", () => {
+    const values = [...Array.from({ length: 19 }, () => 0), 40];
+    expect(divergingBound(values)).toBe(40);
   });
 
   it("volume segue os quantis e as cores vêm de --seq / --div", () => {

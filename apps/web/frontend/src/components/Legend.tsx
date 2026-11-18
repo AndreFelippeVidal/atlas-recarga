@@ -12,7 +12,8 @@ interface Props {
 function title(measure: MapMeasure, scale: Scale): string {
   if (scale.kind === "sequential") return `Classes por quantis (${MEASURE_UNITS[measure]})`;
   const bound = scale.bound ? ` ±${formatCompact(measure, scale.bound).replace("+", "")}` : "";
-  return `Escala divergente centrada em 0%${bound} (${MEASURE_UNITS[measure]})`;
+  const grouped = scale.clipped ? "; extremos agrupados" : "";
+  return `Escala divergente centrada em 0%${bound}${grouped} (${MEASURE_UNITS[measure]})`;
 }
 
 const DIRECTION = ["maior queda", "queda", "perto de 0%", "alta", "maior alta"];

@@ -40,9 +40,19 @@ export function legendClasses(values: number[], scale: Scale, k = CLASS_COUNT): 
 }
 
 // Escala divergente de `mom_change` (SPEC-007 §4): 5 classes de largura igual, centradas em 0 e
-// simétricas em ±max(|min|, |max|). Só classifica valores já devolvidos pela API.
-export function divergingBound(values: number[]): number {
+// simétricas em ±P90(|valor|). O percentil 90, e não o máximo, evita que um município com base
+// minúscula (+1.400%) deixe todo o resto na classe do meio; o que passa do limite cai na classe
+// extrema. Só classifica valores já devolvidos pela API.
+export const DIVERGING_PERCENTILE = 0.9;
+
+export function maxAbs(values: number[]): number {
   return values.length === 0 ? 0 : Math.max(...values.map((v) => Math.abs(v)));
+}
+
+export function divergingBound(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = values.map((v) => Math.abs(v)).sort((a, b) => a - b);
+  return quantile(sorted, DIVERGING_PERCENTILE) || maxAbs(values);
 }
 
 export function divergingThresholds(values: number[], k = CLASS_COUNT): number[] {
@@ -53,8 +63,10 @@ export function divergingThresholds(values: number[], k = CLASS_COUNT): number[]
 export interface Scale {
   kind: "sequential" | "diverging";
   thresholds: number[];
-  // ±max(|min|, |max|); só na divergente (a legenda mostra a simetria).
+  // ±P90(|valor|); só na divergente (a legenda mostra a simetria).
   bound: number | null;
+  // Há valores além do limite, agrupados nas classes extremas.
+  clipped: boolean;
 }
 
 export function buildScale(measure: string, values: number[]): Scale {
@@ -63,9 +75,15 @@ export function buildScale(measure: string, values: number[]): Scale {
       kind: "diverging",
       thresholds: divergingThresholds(values),
       bound: divergingBound(values),
+      clipped: maxAbs(values) > divergingBound(values),
     };
   }
-  return { kind: "sequential", thresholds: quantileThresholds(values), bound: null };
+  return {
+    kind: "sequential",
+    thresholds: quantileThresholds(values),
+    bound: null,
+    clipped: false,
+  };
 }
 
 // Classe (0 a 4) de um valor na escala. Na divergente, tudo zero cai na classe do meio.
