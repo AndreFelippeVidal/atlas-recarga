@@ -40,3 +40,6 @@ data/generated/
 # apps/agent é um projeto uv à parte: o lock gerado por `uv run --project apps/agent` não vai
 # no bundle (o deploy sincroniza o que o git não ignora e mudaria as dependências do App).
 apps/agent/uv.lock
+
+# apps/mcp: o lock do App é gerado no deploy; o do workspace raiz já cobre o dev.
+apps/mcp/uv.lock
