@@ -1,0 +1,464 @@
+{
+  "datasets": [
+    {
+      "name": "ds_usage",
+      "displayName": "Uso do MCP por dia",
+      "asset_name": "mcp_usage_daily"
+    }
+  ],
+  "pages": [
+    {
+      "name": "usage",
+      "displayName": "Uso do MCP",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "u-title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Uso do MCP\n"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "u-sub",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Chamadas, erros por código (SPEC-006 §4) e latência p95 por tool e por dia, lidos dos atributos dos traces do `atlas-mcp` (`observability.mcp_usage_daily`). Nenhum valor de resultado entra nos traces. Dados sintéticos."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "u-calls",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_usage",
+                  "fields": [
+                    {
+                      "name": "sum(calls)",
+                      "expression": "SUM(`calls`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(calls)",
+                  "displayName": "Chamadas",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chamadas"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "u-errors",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_usage",
+                  "fields": [
+                    {
+                      "name": "sum(errors)",
+                      "expression": "SUM(CASE WHEN `error_code` <> '' THEN `calls` ELSE 0 END)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(errors)",
+                  "displayName": "Chamadas com erro",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chamadas com erro"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "u-p95",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_usage",
+                  "fields": [
+                    {
+                      "name": "max(duration_p95_ms)",
+                      "expression": "MAX(`duration_p95_ms`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(duration_p95_ms)",
+                  "displayName": "Pior p95 diário (ms)",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Pior p95 diário (ms)"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "u-calls-day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_usage",
+                  "fields": [
+                    {
+                      "name": "day",
+                      "expression": "`day`"
+                    },
+                    {
+                      "name": "calls",
+                      "expression": "`calls`"
+                    },
+                    {
+                      "name": "tool",
+                      "expression": "`tool`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "Dia",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "calls",
+                  "displayName": "Chamadas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "tool",
+                  "displayName": "Tool",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chamadas por tool e por dia"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "u-p95-day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_usage",
+                  "fields": [
+                    {
+                      "name": "day",
+                      "expression": "`day`"
+                    },
+                    {
+                      "name": "duration_p95_ms",
+                      "expression": "`duration_p95_ms`"
+                    },
+                    {
+                      "name": "tool",
+                      "expression": "`tool`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "Dia",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "duration_p95_ms",
+                  "displayName": "p95 (ms)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "tool",
+                  "displayName": "Tool",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Latência p95 por tool (ms)"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 6,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "u-errors-code",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_usage",
+                  "fields": [
+                    {
+                      "name": "error_code",
+                      "expression": "`error_code`"
+                    },
+                    {
+                      "name": "calls",
+                      "expression": "`calls`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "error_code",
+                  "displayName": "Código",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "calls",
+                  "displayName": "Chamadas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Erros por código"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "u-table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_usage",
+                  "fields": [
+                    {
+                      "name": "day",
+                      "expression": "`day`"
+                    },
+                    {
+                      "name": "tool",
+                      "expression": "`tool`"
+                    },
+                    {
+                      "name": "error_code",
+                      "expression": "`error_code`"
+                    },
+                    {
+                      "name": "calls",
+                      "expression": "`calls`"
+                    },
+                    {
+                      "name": "duration_p95_ms",
+                      "expression": "`duration_p95_ms`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "day",
+                    "displayName": "Dia"
+                  },
+                  {
+                    "fieldName": "tool",
+                    "displayName": "Tool"
+                  },
+                  {
+                    "fieldName": "error_code",
+                    "displayName": "Código de erro"
+                  },
+                  {
+                    "fieldName": "calls",
+                    "displayName": "Chamadas",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "duration_p95_ms",
+                    "displayName": "p95 (ms)",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Uso por dia, tool e código"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 13,
+            "width": 6,
+            "height": 7
+          }
+        }
+      ]
+    }
+  ]
+}

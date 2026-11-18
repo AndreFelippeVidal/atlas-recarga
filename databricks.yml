@@ -9,6 +9,7 @@
 # P8.6: job `atlas_commission_review` (uma transição por execução; só uma pessoa dispara, nunca um agente).
 # P8.7: a aprovação final também trava o lote e grava a remessa; o job de deploy cria o Volume `commission.remittance`.
 # P8.8: dashboard `commission_review` (lê só commission.*; filtro por lote) e notebook commission/commission_review.py.
+# P11.4: experiment `atlas_mcp_traces` e dashboard `mcp_usage` (traces e uso do `atlas-mcp`).
 # P10.8: job `atlas_agent_monitoring` (07:00; pontua os traces do agente), dashboard `agent_quality` e SQL alert.
 # P9.2: job `atlas_eval_sync` (golden set do YAML para <catalog>.eval.agent_golden_set).
 # P7.1: job `atlas_semantic_deploy` (metric views de semantic/*.yaml); P10.1: + UC functions fn_* do agente.
@@ -50,6 +51,14 @@ resources:
       file_path: semantic/dashboards/agent_quality.lvdash.json
       warehouse_id: ${var.warehouse_id}
       # P10.8 (SPEC-008 §6): lê só as views de observability do próprio agente, não o semantic.
+      dataset_catalog: ${var.catalog}
+      dataset_schema: observability
+
+    # P11.4 (SPEC-006 §6): página "Uso do MCP"; lê só a view de observability do próprio MCP.
+    mcp_usage:
+      display_name: "Atlas — Uso do MCP"
+      file_path: semantic/dashboards/mcp_usage.lvdash.json
+      warehouse_id: ${var.warehouse_id}
       dataset_catalog: ${var.catalog}
       dataset_schema: observability
 
@@ -180,6 +189,10 @@ resources:
     # o `atlas_agent` guarda o histórico de teste e o dataset do golden set.
     atlas_agent_traces:
       name: /Shared/atlas/agent-traces
+    # P11.4 (SPEC-006 §6): traces do `atlas-mcp`. Experiment novo, sem traces, pelo mesmo motivo do
+    # agente: o trace location UC (`scripts/setup_mcp_trace_tables.py`) só liga a um experiment limpo.
+    atlas_mcp_traces:
+      name: /Shared/atlas/mcp
 
   # P10.5 (ADR-0021): model service próprio do agente, com destino system.ai.gpt-oss-120b. O serviço
   # de sistema é compartilhado e não se altera. O gateway só vê o service principal do App como
@@ -276,11 +289,20 @@ resources:
             value_from: "sql-warehouse"
           - name: ATLAS_CATALOG
             value: ${var.catalog}
+          - name: MLFLOW_TRACKING_URI
+            value: "databricks"
+          - name: MLFLOW_EXPERIMENT_ID
+            value_from: "experiment"
       resources:
         - name: sql-warehouse
           sql_warehouse:
             id: ${var.warehouse_id}
             permission: CAN_USE
+        # Só o experiment do MCP (objeto do workspace, não dado do UC): grava os traces.
+        - name: experiment
+          experiment:
+            experiment_id: ${resources.experiments.atlas_mcp_traces.id}
+            permission: CAN_EDIT
 
   pipelines:
     atlas_medallion:

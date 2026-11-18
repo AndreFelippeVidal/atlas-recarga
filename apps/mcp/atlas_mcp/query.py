@@ -186,9 +186,19 @@ def query_metric(
     month_to: str = "",
     order_by: str | None = None,
     limit: int = DEFAULT_LIMIT,
+    request_id: str | None = None,
 ) -> dict[str, Any]:
     built = build_query(
-        catalog, view, measures, dimensions or [], filters, month_from, month_to, order_by, limit
+        catalog,
+        view,
+        measures,
+        dimensions or [],
+        filters,
+        month_from,
+        month_to,
+        order_by,
+        limit,
+        request_id=request_id,
     )
     columns, rows = executor(built.sql, built.params)
     return {

@@ -8,6 +8,7 @@ dependencies = [
     "fastmcp>=3.2.4",
     "databricks-sdk>=0.60.0",
     "databricks-sql-connector>=4.0.0",
+    "mlflow>=3.10.0",
 ]
 
 [build-system]

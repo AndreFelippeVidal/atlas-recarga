@@ -1,6 +1,6 @@
 """Erros padronizados do MCP (SPEC-006 §4): um código estável e uma mensagem, nunca stack trace.
 
-O cliente vê `CODIGO: mensagem`. O `RATE_LIMITED` fica para a P11.4 (limitador por usuário).
+O cliente vê `CODIGO: mensagem`. O `RATE_LIMITED` vive em `observability.py` (P11.4).
 """
 
 from __future__ import annotations
