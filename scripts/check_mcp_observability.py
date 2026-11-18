@@ -176,12 +176,16 @@ HISTORY_SQL = (
 )
 
 
-def _trace_spans(experiment_id: str, warehouse_id: str) -> list[dict[str, Any]]:
+def _trace_spans(profile: str, experiment_id: str, warehouse_id: str) -> list[dict[str, Any]]:
     import os
 
+    # Sem isto o MLflow usa um store local e não vê nenhum trace do workspace.
+    os.environ["DATABRICKS_CONFIG_PROFILE"] = profile
+    os.environ["MLFLOW_TRACKING_URI"] = "databricks"
+    os.environ["MLFLOW_TRACING_SQL_WAREHOUSE_ID"] = warehouse_id
     import mlflow
 
-    os.environ["MLFLOW_TRACING_SQL_WAREHOUSE_ID"] = warehouse_id
+    mlflow.set_tracking_uri("databricks")
     since_ms = int((time.time() - 30 * 60) * 1000)
     traces = mlflow.search_traces(
         locations=[experiment_id],
@@ -237,7 +241,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if len(rows) >= 30:  # 30 do burst (+ as da primeira rodada)
             break
         time.sleep(20)
-    spans = _trace_spans(args.experiment_id, args.warehouse_id)
+    spans = _trace_spans(args.profile, args.experiment_id, args.warehouse_id)
     problems += check_spans(spans)
     trace_users = sorted({str(s["attributes"].get("user")) for s in spans})
     problems += check_history(rows, blocked, profile_user, args.mode, trace_users)
