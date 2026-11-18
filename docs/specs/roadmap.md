@@ -158,7 +158,7 @@ _Agente somente leitura, via Unity Gateway, com tracing, aprovado no golden set.
 
 _FastMCP em App, somente leitura, conectado ao Claude._
 
-- [ ] **P11.1** 🤖 Esqueleto FastMCP no App `atlas-mcp` com `health` — _pronto quando:_ Critério 1 da SPEC-006 §7 · depende de P3.8
+- [x] **P11.1** 🤖 Esqueleto FastMCP no App `atlas-mcp` com `health` — _pronto quando:_ Critério 1 da SPEC-006 §7 (#77) — App `atlas-mcp` com a tool `health` (estado do warehouse incluso); a conferência no `dev` fica com o mantenedor via `scripts/check_mcp_health.py` · depende de P3.8
 - [ ] **P11.2** 🤖 `list_metrics` + `query_metric` com validação por lista fechada e parâmetros vinculados — _pronto quando:_ Critérios 3 e 4 (injeção) da SPEC-006 §7 · depende de P11.1, P7.1
 - [ ] **P11.3** 🤖 `top_regions` + `compare_months` + erros padronizados — _pronto quando:_ Contrato de erros da SPEC-006 §4 coberto · depende de P11.2
 - [ ] **P11.4** 🤖 Traces MLflow, rate limit por usuário, logs estruturados + teste de paridade com o golden set — _pronto quando:_ Critérios 6 a 10 da SPEC-006 §7 · depende de P11.3, P9.1, P3.5
