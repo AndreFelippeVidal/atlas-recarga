@@ -80,3 +80,20 @@ Depois de rodar o job `atlas_commission_draft`, confere o rascunho `COM-YYYY-MM-
 ```bash
 uv run python scripts/check_commission_draft.py --target dev --profile <perfil> --warehouse-id <id> --batch-id COM-2026-10-v1
 ```
+
+## `fetch_geo.py` (P12.1)
+
+Baixa as malhas do IBGE (API v3, qualidade `maxima`), simplifica com `mapshaper` (versão fixa, via
+`npx`; precisa de Node) e grava TopoJSON em `apps/web/public/geo/`: `br-uf.json` (27 UFs, com `uf`
+e `region`) e `mun/<UF>.json` (municípios, com `municipality_ibge_code`). Quem roda é o mantenedor,
+uma vez (ou quando a malha mudar); o resultado é versionado e o script nunca roda em runtime
+(ADR-0004). `region` e o conjunto de municípios vêm de `data/reference/municipalities_ibge.csv`,
+a mesma referência da `gold.dim_municipality`; o polígono de Boa Esperança do Norte (MT), que não
+está na referência, é descartado, e um município da referência sem polígono é erro:
+
+```bash
+uv run python scripts/fetch_geo.py
+```
+
+O `tests/test_geo_files.py` confere, sem rede, os limites de tamanho da SPEC-007 §2 e o match de
+100% entre as malhas e a referência (5.570 municípios).
