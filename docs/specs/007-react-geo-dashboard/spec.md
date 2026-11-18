@@ -50,7 +50,7 @@ Arquivos de geometria:
 
 **Escala de cor:**
 - Medidas de volume: escala **sequencial** em 5 classes por **quantis** calculados no nível atual (no zoom, os quantis são recalculados entre as UFs da região ou entre os municípios da UF).
-- `mom_change`: escala **divergente** centrada em 0%, com vermelho para queda e azul para alta e simetria em ±max(|min|, |max|).
+- `mom_change`: escala **divergente** centrada em 0%, com vermelho para queda e azul para alta e simetria em ±max(|min|, |max|). O ranking de `mom_change` mostra as 5 maiores altas e as 5 maiores quedas (com mais de 10 itens), pois o top 10 por valor decrescente esconderia as quedas.
 - Município sem dado: cinza claro com padrão hachurado e o rótulo "sem recargas" no tooltip.
 - A legenda sempre mostra os limites das classes e a unidade. As cores passam em contraste AA e funcionam em tema claro e escuro.
 
