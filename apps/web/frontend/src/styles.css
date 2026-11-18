@@ -29,12 +29,13 @@
     --up: #5fd08f;
     --down: #ff8a80;
     --accent: #7aa8ff;
-    /* Escuro: o valor alto é o mais claro (palette.md, passos 600, 500, 400, 300, 200). */
-    --seq-1: #184f95;
-    --seq-2: #256abf;
+    /* Escuro: mesma direção do claro, maior = mais escuro, para mostrar concentração
+       (palette.md, passos 200, 300, 400, 500, 600; o mais escuro ainda tem 2:1 sobre a superfície). */
+    --seq-1: #9ec5f4;
+    --seq-2: #6da7ec;
     --seq-3: #3987e5;
-    --seq-4: #6da7ec;
-    --seq-5: #9ec5f4;
+    --seq-4: #256abf;
+    --seq-5: #184f95;
     --map-loading: #2a323c;
     --map-empty: #232a33;
     --map-hatch: #4a5563;
