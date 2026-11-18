@@ -13,11 +13,12 @@
   --seq-3: #3987e5;
   --seq-4: #1c5cab;
   --seq-5: #0d366b;
-  /* Divergente (mom_change): vermelho = queda, azul = alta, cinza = estável. */
+  /* Divergente (mom_change): vermelho = queda, azul = alta, cinza claro = perto de 0%.
+     Quanto mais escura a cor, mais extrema a variação, nos dois sentidos e nos dois temas. */
   --div-1: #b42318;
-  --div-2: #e0675a;
-  --div-3: #9aa4b1;
-  --div-4: #4a8fe0;
+  --div-2: #e8938a;
+  --div-3: #d5d9df;
+  --div-4: #7aaae8;
   --div-5: #1c5cab;
   --map-loading: #e3e7ec;
   --map-empty: #eef0f3;
@@ -42,11 +43,11 @@
     --seq-3: #3987e5;
     --seq-4: #256abf;
     --seq-5: #184f95;
-    --div-1: #ff6b5e;
-    --div-2: #b5524a;
-    --div-3: #6b7686;
-    --div-4: #3f78c4;
-    --div-5: #7fb0f5;
+    --div-1: #cc3a2e;
+    --div-2: #e58a80;
+    --div-3: #b9c0cb;
+    --div-4: #7fb0f0;
+    --div-5: #2f6fd0;
     --map-loading: #2a323c;
     --map-empty: #232a33;
     --map-hatch: #4a5563;
