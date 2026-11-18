@@ -10,6 +10,7 @@ Regras (princípio "sem SQL livre"):
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -23,7 +24,8 @@ from atlas_mcp.catalog import load_catalog
 MAX_LIMIT = 500
 DEFAULT_LIMIT = 50
 MAX_FILTER_VALUES = 100
-MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+MAX_INT = 2**63 - 1
+MONTH = re.compile(r"[0-9]{4}-(0[1-9]|1[0-2])")
 SEMANTIC_SCHEMA = "semantic"
 
 Executor = Callable[[str, Mapping[str, Any]], tuple[list[str], list[list[Any]]]]
@@ -52,6 +54,8 @@ def _check_month(value: str, field: str) -> str:
 
 
 def _check_subset(values: Sequence[str], allowed: Sequence[str], field: str) -> list[str]:
+    if isinstance(values, str):
+        raise InvalidArgument(f"{field} deve ser uma lista")
     for value in values:
         if not isinstance(value, str) or value not in allowed:
             raise InvalidArgument(f"{field} fora da lista permitida: use list_metrics")
@@ -71,6 +75,10 @@ def _check_filters(filters: Mapping[str, Any], dimensions: Sequence[str]) -> dic
         for item in values:
             if isinstance(item, bool) or not isinstance(item, str | int | float):
                 raise InvalidArgument(f"filters[{key}] aceita só valores escalares")
+            if isinstance(item, float) and not math.isfinite(item):
+                raise InvalidArgument(f"filters[{key}] não aceita nan nem infinito")
+            if isinstance(item, int) and abs(item) > MAX_INT:
+                raise InvalidArgument(f"filters[{key}] com inteiro fora do intervalo")
         checked[key] = value
     return checked
 
@@ -78,7 +86,8 @@ def _check_filters(filters: Mapping[str, Any], dimensions: Sequence[str]) -> dic
 def _order_clause(order_by: str | None, measures: Sequence[str], dimensions: Sequence[str]) -> str:
     """`order_by`: coluna do resultado + `asc`/`desc` (padrão: medida desc, dimensão asc)."""
     if order_by is None:
-        return ""
+        # Sem order_by o LIMIT cortaria linhas arbitrárias: padrão = primeira medida, desc.
+        return f"ORDER BY `{measures[0]}` DESC"
     column, _, direction = order_by.strip().partition(" ")
     direction = direction.strip().lower()
     if column not in [*measures, *dimensions] or direction not in {"", "asc", "desc"}:

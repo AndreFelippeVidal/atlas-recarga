@@ -14,7 +14,7 @@ from atlas_mcp.catalog import list_metrics as build_list_metrics
 from atlas_mcp.health import health as build_health
 from atlas_mcp.query import DEFAULT_LIMIT, InvalidArgument
 from atlas_mcp.query import query_metric as run_query_metric
-from atlas_mcp.sql_client import make_executor
+from atlas_mcp.sql_client import MissingUserToken, make_executor
 
 log = logging.getLogger("atlas_mcp")
 
@@ -70,6 +70,12 @@ def query_metric(
         )
     except InvalidArgument as exc:
         raise ToolError(f"INVALID_ARGUMENT: {exc}") from exc
+    except MissingUserToken as exc:
+        log.error("query_metric sem token do usuário")
+        raise ToolError(
+            "o App não recebeu o token do usuário; "
+            "habilite a autorização on-behalf-of com o escopo sql"
+        ) from exc
     except Exception as exc:  # o contrato completo de erros é da P11.3; aqui nada de stack trace
         # Só o tipo: o conector pode trazer detalhes de conexão (logs estruturados na P11.4).
         log.error("query_metric falhou: %s", type(exc).__name__)

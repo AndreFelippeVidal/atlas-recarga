@@ -78,6 +78,10 @@ def test_sql_carries_request_id_comment_and_fingerprint_ignores_it() -> None:
         {"filters": {"uf": [None]}},
         {"filters": {"uf": True}},
         {"month_from": "2026-13"},
+        {"month_from": "\u0662\u0660\u0662\u0666-\u0661\u0660"},
+        {"measures": "gross_revenue"},
+        {"filters": {"uf": float("nan")}},
+        {"filters": {"uf": 2**70}},
         {"month_from": "2026-10-01"},
         {"month_to": "2026-1'; DROP"},
         {"month_from": "2026-11", "month_to": "2026-10"},
@@ -122,6 +126,12 @@ def test_period_uses_each_views_month_dimension() -> None:
     sql, _ = rec.calls[0]
     assert "`reference_month` >= CAST(:month_from AS DATE)" in sql
     assert "GROUP BY" not in sql
+
+
+def test_no_order_by_defaults_to_first_measure_desc() -> None:
+    rec = Recorder()
+    _run(rec, measures=["recharge_count", "gross_revenue"])
+    assert " ORDER BY `recharge_count` DESC LIMIT 50" in rec.calls[0][0]
 
 
 def test_order_by_defaults_and_explicit_direction() -> None:
