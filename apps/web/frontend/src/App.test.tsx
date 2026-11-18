@@ -154,7 +154,7 @@ describe("Mapa por região", () => {
     await userEvent.hover(sp);
     const tip = await screen.findByRole("tooltip");
     expect(tip).toHaveTextContent("Sudeste");
-    expect(tip).toHaveTextContent("1º de 2");
+    expect(tip).toHaveTextContent("1º de 5");
   });
 
   it("recolore e busca de novo ao trocar a medida", async () => {

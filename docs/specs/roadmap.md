@@ -174,7 +174,7 @@ _KPIs + mapa coroplético UF → município, p95 < 3s._
 - [ ] **P12.5** 🤖 Mapa por região (UFs pintadas pela região) com `d3-geo`, escala de quantis, legenda, tooltip — _pronto quando:_ Visual conferido por você · depende de P12.1, P12.3, P12.4
 - [ ] **P12.6** 🤖 Drill-down: Brasil → região → UF → municípios, com zoom; breadcrumb e Esc — _pronto quando:_ Critério 1 da SPEC-007 §6 (queda no PA visível) · depende de P12.5
 - [ ] **P12.7** 🤖 Escala divergente `mom_change`, estados de loading e erro (inclui "Aquecendo o banco de dados…" após 3s, SPEC-007 §4), acessibilidade — _pronto quando:_ Critério 6 da SPEC-007 §6 + navegação por teclado · depende de P12.6
-- [ ] **P12.8** 🤝 Deploy do App `atlas-web` + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.7
+- [ ] **P12.8** 🤝 Deploy do App `atlas-web` (o FastAPI serve o build estático e `public/geo/`) + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.7
 - [ ] **P12.9** 🤝 Revalidar o production monitoring do MLflow (Beta) da P10.8 — _pronto quando:_ O comando de contagem de assessments é rodado no `dev` e o resultado (mudou ou não) fica registrado na SPEC-008 §6 e no ADR-0013 · depende de P12.8
 - [ ] **P11.5** 🤝 Conectar ao Claude Code/Desktop e documentar no README (movida para o fim da Fase 12, antes da demo; o agente prepara a integração com você) — _pronto quando:_ Você pergunta no Claude e recebe a resposta com `source` · depende de P11.4, P12.8
 

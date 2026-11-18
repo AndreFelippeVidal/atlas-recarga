@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { MapMeasure, Region } from "../api";
 import { useRegionMap, useUfTopology } from "../hooks";
 import { buildStats } from "../mapStats";
+import { REGIONS } from "../regions";
 import { legendClasses, quantileThresholds } from "../scale";
 import ErrorBanner from "./ErrorBanner";
 import Legend from "./Legend";
@@ -43,7 +44,7 @@ export default function MapPanel({ month, measure }: Props) {
             topology={geo.topology}
             measure={shownMeasure}
             stats={stats}
-            total={stats?.size ?? 0}
+            total={REGIONS.length}
             highlighted={highlighted}
             onHighlight={setHighlighted}
           />
@@ -52,7 +53,9 @@ export default function MapPanel({ month, measure }: Props) {
             Carregando o mapa…
           </p>
         )}
-        {stats && <Legend measure={shownMeasure} classes={classes} hasEmpty={stats.size < 5} />}
+        {stats && (
+          <Legend measure={shownMeasure} classes={classes} hasEmpty={stats.size < REGIONS.length} />
+        )}
       </section>
       <aside className="side" aria-label="Ranking">
         <nav aria-label="Navegação do mapa" className="breadcrumb">

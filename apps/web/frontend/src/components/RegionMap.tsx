@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { feature, mesh } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import type { MapMeasure, Region } from "../api";
+import type { RegionStat } from "../mapStats";
 import { formatMeasure } from "../format";
 import { REGION_NAMES } from "../regions";
 import { classOf, quantileThresholds } from "../scale";
@@ -17,12 +18,6 @@ const HEIGHT = 640;
 interface UfProps {
   uf: string;
   region: Region;
-}
-
-export interface RegionStat {
-  region: Region;
-  value: string;
-  rank: number;
 }
 
 interface Props {
@@ -118,8 +113,8 @@ export default function RegionMap({
                 x: e.clientX - (box?.left ?? 0),
                 y: e.clientY - (box?.top ?? 0),
               });
-              onHighlight(u.region);
             }}
+            onMouseEnter={() => onHighlight(u.region)}
             onMouseLeave={() => {
               setTip(null);
               onHighlight(null);

@@ -1,5 +1,9 @@
 import type { Region, RegionValue } from "./api";
-import type { RegionStat } from "./components/RegionMap";
+export interface RegionStat {
+  region: Region;
+  value: string;
+  rank: number;
+}
 
 // Posição no ranking por valor decrescente. Ordena para exibir; não calcula nenhuma métrica.
 export function buildStats(items: RegionValue[]): Map<Region, RegionStat> {

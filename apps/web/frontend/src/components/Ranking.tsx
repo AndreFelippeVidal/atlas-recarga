@@ -1,7 +1,7 @@
 import type { MapMeasure, Region } from "../api";
 import { formatMeasure } from "../format";
-import { REGION_NAMES } from "../regions";
-import type { RegionStat } from "./RegionMap";
+import { REGION_NAMES, REGIONS } from "../regions";
+import type { RegionStat } from "../mapStats";
 
 interface Props {
   measure: MapMeasure;
@@ -9,8 +9,6 @@ interface Props {
   highlighted: Region | null;
   onHighlight: (region: Region | null) => void;
 }
-
-const ALL: Region[] = ["N", "NE", "CO", "SE", "S"];
 
 export default function Ranking({ measure, stats, highlighted, onHighlight }: Props) {
   if (!stats) {
@@ -21,7 +19,7 @@ export default function Ranking({ measure, stats, highlighted, onHighlight }: Pr
     );
   }
   const ranked = [...stats.values()].sort((a, b) => a.rank - b.rank);
-  const missing = ALL.filter((r) => !stats.has(r));
+  const missing = REGIONS.filter((r) => !stats.has(r));
   return (
     <ol className="ranking" aria-label="Ranking das regiões">
       {ranked.map((s) => (

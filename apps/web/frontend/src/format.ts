@@ -50,7 +50,7 @@ export function formatCompact(measure: KpiMeasure, n: number): string {
   const abs = Math.abs(n);
   let scaled: string;
   if (abs >= 1_000_000_000) scaled = `${compactNum.format(n / 1_000_000_000)} bi`;
-  else if (abs >= 1_000_000) scaled = `${compactNum.format(n / 1_000_000)} mi`;
+  else if (abs >= 999_950) scaled = `${compactNum.format(n / 1_000_000)} mi`;
   else if (abs >= 10_000) scaled = `${compactNum.format(n / 1_000)} mil`;
   else scaled = measure === "avg_ticket" ? ticket.format(n) : int.format(n);
   return money ? `R$ ${scaled}` : scaled;

@@ -7,3 +7,5 @@ export const REGION_NAMES: Record<Region, string> = {
   SE: "Sudeste",
   S: "Sul",
 };
+
+export const REGIONS = Object.keys(REGION_NAMES) as Region[];

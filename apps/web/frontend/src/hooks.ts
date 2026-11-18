@@ -32,11 +32,12 @@ export function useApi<T>(cacheKey: string | null, fetcher: (signal: AbortSignal
     fetcherRef
       .current(ctrl.signal)
       .then((data) => {
+        if (ctrl.signal.aborted) return;
         setResult({ id: cacheKey, data });
         setFailure(null);
       })
       .catch((e) => {
-        if (!ctrl.signal.aborted) setFailure({ id: cacheKey, code: errorCode(e) });
+        if (!ctrl.signal.aborted) setFailure({ id: `${cacheKey}#${attempt}`, code: errorCode(e) });
       });
     return () => ctrl.abort();
   }, [cacheKey, attempt]);
@@ -44,7 +45,8 @@ export function useApi<T>(cacheKey: string | null, fetcher: (signal: AbortSignal
   return {
     data: result !== null && result.id === cacheKey ? result.data : null,
     stale: result?.data ?? null,
-    error: failure !== null && failure.id === cacheKey ? failure.code : null,
+    // O erro vale só para a chave e a tentativa atuais: ao tentar de novo, o banner some.
+    error: failure !== null && failure.id === `${cacheKey}#${attempt}` ? failure.code : null,
     retry: useCallback(() => setAttempt((n) => n + 1), []),
   };
 }
