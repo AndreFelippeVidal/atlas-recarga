@@ -1,0 +1,5 @@
+command: ['uv', 'run', 'atlas-mcp']
+# Apps escutam em $DATABRICKS_APP_PORT (padrão 8000); o MCP fica em /mcp (SPEC-006 §2).
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: "sql-warehouse"
