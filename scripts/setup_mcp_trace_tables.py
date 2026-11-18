@@ -58,6 +58,11 @@ def grant_statements(catalog: str, principal: str, objects: Sequence[tuple[str, 
     return statements
 
 
+def _attr(name: str) -> str:
+    """Atributo do span (coluna `attributes` é VARIANT); tira aspas JSON das pontas se houver."""
+    return f"NULLIF(TRIM(BOTH '\"' FROM variant_get(attributes, '$.{name}', 'string')), '')"
+
+
 def usage_view_sql(catalog: str) -> str:
     """View da página "Uso do MCP": um span raiz por chamada de tool, dia em America/Sao_Paulo."""
     if not _IDENT.fullmatch(catalog):
@@ -70,17 +75,20 @@ def usage_view_sql(catalog: str) -> str:
   calls COMMENT 'chamadas',
   duration_p95_ms COMMENT 'latência p95 em ms')
 COMMENT 'Uso do atlas-mcp por tool, dia e código de erro (SPEC-006 §6). Só atributos dos spans.' AS
-SELECT
-  CAST(from_utc_timestamp(timestamp_nanos(start_time_unix_nano), 'America/Sao_Paulo') AS DATE)
-    AS day,
-  attributes['tool'] AS tool,
-  COALESCE(attributes['error_code'], '') AS error_code,
-  COUNT(*) AS calls,
-  percentile_cont(0.95) WITHIN GROUP (
-    ORDER BY CAST(attributes['duration_ms'] AS DOUBLE)) AS duration_p95_ms
-FROM {obs}.{SPANS_TABLE}
-WHERE parent_span_id IS NULL OR parent_span_id = ''
-GROUP BY 1, 2, 3"""  # noqa: S608 - catálogo validado por regex; o resto é constante
+WITH spans AS (
+  SELECT
+    CAST(from_utc_timestamp(timestamp_nanos(start_time_unix_nano), 'America/Sao_Paulo') AS DATE)
+      AS day,
+    {_attr("tool")} AS tool,
+    COALESCE({_attr("error_code")}, '') AS error_code,
+    CAST({_attr("duration_ms")} AS DOUBLE) AS duration_ms
+  FROM {obs}.{SPANS_TABLE}
+  WHERE parent_span_id IS NULL OR parent_span_id = ''
+)
+SELECT day, tool, error_code, COUNT(*) AS calls,
+  percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS duration_p95_ms
+FROM spans
+GROUP BY day, tool, error_code"""  # noqa: S608 - catálogo validado por regex; o resto é constante
 
 
 def _sql(profile: str, warehouse_id: str, statement: str) -> list[list[str | None]]:

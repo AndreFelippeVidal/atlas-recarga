@@ -67,7 +67,9 @@ def test_dashboard_shows_calls_errors_by_code_and_p95_per_tool() -> None:
 def test_usage_view_reads_only_span_attributes() -> None:
     sql = mod.usage_view_sql("atlas_dev")
     assert "FROM atlas_dev.observability.mcp_otel_spans" in sql
-    assert "attributes['tool']" in sql and "attributes['error_code']" in sql
+    assert "variant_get(attributes, '$.tool', 'string')" in sql
+    assert "variant_get(attributes, '$.error_code', 'string')" in sql
+    assert "attributes['" not in sql  # a coluna é VARIANT, não MAP
     assert "outputs" not in sql and "inputs" not in sql
 
 
