@@ -12,7 +12,7 @@ Uma tela executiva de impacto: KPIs do mês e um **mapa coroplético do Brasil p
 | Frontend | React 18 + TypeScript + Vite; mapa em **SVG com `d3-geo`** (projeção `geoMercator` com `fitSize`), sem tiles nem chave de API externa |
 | Backend | FastAPI no mesmo Databricks App, servindo o build estático e `/api/*` |
 | Dados | `databricks-sql-connector` → SQL warehouse → `atlas.semantic.mv_recharges` |
-| Geometria | Malhas do IBGE (API de malhas v3), baixadas **no build** por `scripts/fetch_geo.py`, simplificadas (mapshaper, ~1–5% dos vértices) e versionadas em `web/public/geo/` |
+| Geometria | Malhas do IBGE (API de malhas v3), baixadas **no build** por `scripts/fetch_geo.py`, simplificadas (mapshaper, ~1–5% dos vértices) e versionadas em `apps/web/public/geo/` |
 | Auth | Autenticação nativa do Databricks App; o backend consulta com o service principal (`SELECT` em `semantic`) |
 
 Arquivos de geometria:
