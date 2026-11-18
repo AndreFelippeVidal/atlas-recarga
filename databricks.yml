@@ -260,17 +260,22 @@ resources:
             id: ${var.warehouse_id}
             permission: CAN_USE
 
-    # P11.1: App do MCP (SPEC-006, ADR-0008). Só o `health` por enquanto; o acesso a dados vem na
-    # P11.2. O service principal só consulta o estado do warehouse (CAN_USE).
+    # App do MCP (SPEC-006, ADR-0008). Os dados são lidos como o usuário (on-behalf-of, escopo
+    # `sql`), então o `SELECT` em `semantic` é o do próprio usuário. O service principal só
+    # consulta o estado do warehouse no `health` (CAN_USE).
     atlas_mcp:
       name: atlas-mcp
       description: "MCP server somente leitura do Atlas Recarga (FastMCP)"
       source_code_path: ./apps/mcp
+      user_api_scopes:
+        - sql
       config:
         command: ["uv", "run", "atlas-mcp"]
         env:
           - name: DATABRICKS_WAREHOUSE_ID
             value_from: "sql-warehouse"
+          - name: ATLAS_CATALOG
+            value: ${var.catalog}
       resources:
         - name: sql-warehouse
           sql_warehouse:

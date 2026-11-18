@@ -1,0 +1,136 @@
+{
+  "views": {
+    "mv_recharges": {
+      "description": "Recargas de celular da rede Eaí? Telecom (dados sintéticos). Grão: recarga. Receita, quantidade e PDVs ativos consideram só recargas aprovadas; a taxa de estorno considera todas.",
+      "period_dimension": "recharge_month",
+      "measures": [
+        {
+          "name": "gross_revenue",
+          "description": "Receita bruta em reais (BRL): soma do valor de face das recargas aprovadas."
+        },
+        {
+          "name": "recharge_count",
+          "description": "Quantidade de recargas aprovadas."
+        },
+        {
+          "name": "avg_ticket",
+          "description": "Ticket médio em reais (BRL): receita bruta dividida pela quantidade de recargas aprovadas."
+        },
+        {
+          "name": "active_pos",
+          "description": "PDVs ativos: PDV com pelo menos 1 recarga aprovada no período filtrado."
+        },
+        {
+          "name": "revenue_per_active_pos",
+          "description": "Receita por PDV ativo em reais (BRL): receita bruta dividida pelos PDVs ativos."
+        },
+        {
+          "name": "reversal_rate",
+          "description": "Taxa de estorno: recargas estornadas divididas por todas as recargas (fração de 0 a 1)."
+        },
+        {
+          "name": "distinct_subscribers",
+          "description": "Assinantes distintos com pelo menos 1 recarga aprovada no período filtrado."
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "recharge_date",
+          "description": "Dia de negócio da recarga, em America/Sao_Paulo."
+        },
+        {
+          "name": "recharge_month",
+          "description": "Mês de negócio da recarga, em America/Sao_Paulo."
+        },
+        {
+          "name": "recharge_hour_local",
+          "description": "Hora da recarga, de 0 a 23, no fuso da UF do PDV."
+        },
+        {
+          "name": "region",
+          "description": "Código da região do Brasil do município do PDV: N (Norte), NE (Nordeste), CO (Centro-Oeste), SE (Sudeste) ou S (Sul). Filtre sempre pelo código, nunca pelo nome."
+        },
+        {
+          "name": "uf",
+          "description": "Sigla da UF do município do PDV."
+        },
+        {
+          "name": "municipality_ibge_code",
+          "description": "Código IBGE do município do PDV, 7 dígitos."
+        },
+        {
+          "name": "municipality_name",
+          "description": "Nome do município do PDV."
+        },
+        {
+          "name": "ddd",
+          "description": "DDD aproximado do município do PDV."
+        },
+        {
+          "name": "pos_type",
+          "description": "Tipo do PDV: newsstand (banca), pharmacy (farmácia), grocery (mercearia), lottery (lotérica) ou partner_app (app parceiro)."
+        },
+        {
+          "name": "distributor_name",
+          "description": "Nome do distribuidor que atende o PDV."
+        }
+      ]
+    },
+    "mv_commission": {
+      "description": "Comissão paga da rede Eaí? Telecom (dados sintéticos). Só lotes travados (locked); os ajustes pós-lock entram como linhas de diferença. Grão: linha de comissão (PDV ou distribuidor) do lote.",
+      "period_dimension": "reference_month",
+      "measures": [
+        {
+          "name": "commission_total",
+          "description": "Comissão paga em reais (BRL): soma das comissões das linhas dos lotes travados."
+        },
+        {
+          "name": "commission_base",
+          "description": "Base de cálculo em reais (BRL): volume aprovado dos PDVs sobre o qual a taxa incide. Só linhas de PDV; a base do distribuidor repete o volume dos PDVs dele e não entra."
+        },
+        {
+          "name": "effective_rate",
+          "description": "Taxa efetiva dos PDVs: comissão paga aos PDVs dividida pela base dos PDVs (fração de 0 a 1); não inclui a comissão de distribuidor."
+        },
+        {
+          "name": "paid_beneficiaries",
+          "description": "Beneficiários (PDVs e distribuidores) distintos com comissão nos lotes travados."
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "reference_month",
+          "description": "Mês de referência da comissão (primeiro dia do mês civil, America/Sao_Paulo)."
+        },
+        {
+          "name": "beneficiary_type",
+          "description": "Tipo do beneficiário da comissão, pos (PDV) ou distributor (distribuidor)."
+        },
+        {
+          "name": "tier",
+          "description": "Faixa do PDV (bronze, silver, gold, diamond); vazia para distribuidor."
+        },
+        {
+          "name": "uf",
+          "description": "Sigla da UF do município do PDV; vazia para distribuidor."
+        },
+        {
+          "name": "region",
+          "description": "Código da região do município do PDV: N (Norte), NE (Nordeste), CO (Centro-Oeste), SE (Sudeste) ou S (Sul); vazio para distribuidor. Filtre sempre pelo código, nunca pelo nome."
+        },
+        {
+          "name": "municipality_name",
+          "description": "Nome do município do PDV; vazio para distribuidor."
+        },
+        {
+          "name": "distributor_name",
+          "description": "Nome do distribuidor (o próprio beneficiário, ou o que atende o PDV)."
+        },
+        {
+          "name": "batch_id",
+          "description": "Lote travado (COM-YYYY-MM-vN, ou COM-YYYY-MM-ADJ-n no ajuste)."
+        }
+      ]
+    }
+  }
+}

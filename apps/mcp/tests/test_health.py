@@ -52,7 +52,7 @@ def test_mcp_client_calls_health(monkeypatch: pytest.MonkeyPatch) -> None:
             return names, await client.call_tool("health", {})
 
     names, result = asyncio.run(run())
-    assert names == {"health"}
+    assert "health" in names
     assert result.data["status"] == "healthy"
 
 

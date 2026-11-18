@@ -3,3 +3,5 @@ command: ['uv', 'run', 'atlas-mcp']
 env:
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: "sql-warehouse"
+  - name: ATLAS_CATALOG
+    value: "atlas"  # o bundle sobrescreve (atlas_dev no target dev)
