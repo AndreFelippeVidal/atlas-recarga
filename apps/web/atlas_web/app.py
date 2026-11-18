@@ -1,4 +1,4 @@
-"""FastAPI do `atlas-web`: `/api/months`, `/api/kpis`, `/api/health` (SPEC-007 §3)."""
+"""FastAPI do `atlas-web`: `/api/months`, `/api/kpis`, `/api/map/*`, `/api/health` (SPEC-007 §3)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Query
 
 from atlas_web import kpis as kpis_mod
+from atlas_web import map_data
 from atlas_web.cache import TTLCache
 from atlas_web.sql_client import Executor, make_executor
 
@@ -90,5 +91,63 @@ def create_app(
         except Exception:
             log.exception("consulta falhou")
             raise unavailable() from None
+
+    def invalid(exc: Exception) -> HTTPException:
+        return HTTPException(400, {"code": "INVALID_ARGUMENT", "message": str(exc)})
+
+    def serve(key: tuple[Any, ...], compute: Callable[[], list[dict[str, Any]]]) -> Any:
+        try:
+            return store.get_or_set(key, compute)
+        except kpis_mod.MonthNotFound:
+            raise HTTPException(404, {"code": "NOT_FOUND", "message": "mês sem dados"}) from None
+        except Exception:
+            log.exception("consulta falhou")
+            raise unavailable() from None
+
+    @app.get("/api/map/region")
+    def map_region(month: str = Query(...), measure: str = Query(...)) -> list[dict[str, Any]]:
+        try:
+            kpis_mod.parse_month(month)
+            map_data.check_measure(measure)
+        except (kpis_mod.InvalidMonth, map_data.InvalidArgument) as exc:
+            raise invalid(exc) from None
+        result: list[dict[str, Any]] = serve(
+            ("map", "region", month, measure),
+            lambda: map_data.map_region(catalog, run, month, measure),
+        )
+        return result
+
+    @app.get("/api/map/uf")
+    def map_uf(
+        month: str = Query(...), measure: str = Query(...), region: str | None = Query(None)
+    ) -> list[dict[str, Any]]:
+        try:
+            kpis_mod.parse_month(month)
+            map_data.check_measure(measure)
+            if region is not None:
+                map_data.check_region(region)
+        except (kpis_mod.InvalidMonth, map_data.InvalidArgument) as exc:
+            raise invalid(exc) from None
+        result: list[dict[str, Any]] = serve(
+            ("map", "uf", month, measure, region),
+            lambda: map_data.map_uf(catalog, run, month, measure, region),
+        )
+        return result
+
+    @app.get("/api/map/municipality")
+    def map_municipality(
+        month: str = Query(...), measure: str = Query(...), uf: str | None = Query(None)
+    ) -> list[dict[str, Any]]:
+        try:
+            kpis_mod.parse_month(month)
+            map_data.check_measure(measure)
+            map_data.check_uf(uf or "")
+        except (kpis_mod.InvalidMonth, map_data.InvalidArgument) as exc:
+            raise invalid(exc) from None
+        result: list[dict[str, Any]] = serve(
+            ("map", "municipality", month, measure, uf),
+            lambda: map_data.map_municipality(catalog, run, month, measure, uf or ""),
+        )
+        return result
 
     return app
