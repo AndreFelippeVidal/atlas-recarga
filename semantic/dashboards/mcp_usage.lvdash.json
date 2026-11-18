@@ -4,6 +4,13 @@
       "name": "ds_usage",
       "displayName": "Uso do MCP por dia",
       "asset_name": "mcp_usage_daily"
+    },
+    {
+      "name": "ds_errors",
+      "displayName": "Erros do MCP por código",
+      "queryLines": [
+        "SELECT day, tool, error_code, calls FROM mcp_usage_daily WHERE error_code <> ''"
+      ]
     }
   ],
   "pages": [
@@ -323,7 +330,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_usage",
+                  "datasetName": "ds_errors",
                   "fields": [
                     {
                       "name": "error_code",

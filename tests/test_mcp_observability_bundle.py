@@ -46,7 +46,10 @@ def test_dashboard_reads_only_the_mcp_usage_view() -> None:
     assert dash["dataset_schema"] == "observability"
     assert dash["file_path"] == "semantic/dashboards/mcp_usage.lvdash.json"
     assert (ROOT / dash["file_path"]).exists()
-    assert [d["asset_name"] for d in DASH["datasets"]] == [mod.USAGE_VIEW]
+    assert DASH["datasets"][0]["asset_name"] == mod.USAGE_VIEW
+    (errors,) = [d for d in DASH["datasets"] if d["name"] == "ds_errors"]
+    # Só erros: sem o filtro, as chamadas com sucesso (error_code vazio) viram uma barra sem rótulo.
+    assert f"FROM {mod.USAGE_VIEW} WHERE error_code <> ''" in " ".join(errors["queryLines"])
     (page,) = DASH["pages"]
     assert page["displayName"] == "Uso do MCP"
 
