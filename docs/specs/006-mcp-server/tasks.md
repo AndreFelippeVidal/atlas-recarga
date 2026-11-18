@@ -36,7 +36,8 @@
   - Limitador de 30 chamadas/min por usuário antes da query, com `RATE_LIMITED`
   - Página "Uso do MCP" no AI/BI sobre `atlas.observability.mcp_*`
 
-### P11.5 👤 Conectar ao Claude Code/Desktop e documentar no README
+### P11.5 🤝 Conectar ao Claude Code/Desktop e documentar no README
 
-- **Depende de:** P11.4
+- **Ordem:** executada no fim da Fase 12 (depois da P12.9, antes da Fase 13); o agente prepara a integração e o mantenedor executa.
+- **Depende de:** P11.4, P12.8
 - **Pronto quando:** Você pergunta no Claude e recebe a resposta com `source`

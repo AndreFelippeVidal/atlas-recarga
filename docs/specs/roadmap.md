@@ -26,8 +26,8 @@
 | 8 | Fechamento de comissão | [003-commission-closing](003-commission-closing/spec.md) | 11 |
 | 9 | Avaliação do agente: golden set antes do agente | [008-agent-evaluation](008-agent-evaluation/spec.md) | 3 |
 | 10 | Agente de negócio | [005-business-agent](005-business-agent/spec.md) | 8 |
-| 11 | MCP server | [006-mcp-server](006-mcp-server/spec.md) | 5 |
-| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 9 |
+| 11 | MCP server | [006-mcp-server](006-mcp-server/spec.md) | 4 (a P11.5 fica no fim da Fase 12) |
+| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 9 + P11.5 |
 | 13 | Demo e release v1.0 | — | 5 |
 
 ## Fase 0 — Fundação do repositório → [009-repo-foundation](009-repo-foundation/spec.md)
@@ -162,13 +162,12 @@ _FastMCP em App, somente leitura, conectado ao Claude._
 - [x] **P11.2** 🤖 `list_metrics` + `query_metric` com validação por lista fechada e parâmetros vinculados — _pronto quando:_ Critérios 3 e 4 (injeção) da SPEC-006 §7 (#78) — lista fechada em `catalog.json` gerado de `semantic/*.yaml`; testes unitários cobrem medida/dimensão/filtro inválidos e aspas e `;` vinculados; conferido no `dev` pelo mantenedor via `scripts/check_mcp_query.py`: `list_metrics` com as duas views, `query_metric` por UF (27 linhas) somando o total de outubro (R$ 4.122.460,00, igual ao GS-001), medida fora da lista recusada com `INVALID_ARGUMENT` e filtro com aspas e `;` vinculado (sem linha casada). Não conferido: `executed_by` na `system.query.history` (P11.4) e o OAuth interativo (P11.5) · depende de P11.1, P7.1
 - [x] **P11.3** 🤖 `top_regions` + `compare_months` + erros padronizados — _pronto quando:_ Contrato de erros da SPEC-006 §4 coberto (#79) — `top_regions` e `compare_months` só sobre `mv_recharges`; erros `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `WAREHOUSE_UNAVAILABLE` (1 nova tentativa em 20s) e `RESULT_TOO_LARGE` cobertos por testes unitários, inclusive de ponta a ponta com o conector simulado. conferido no `dev` pelo mantenedor via `scripts/check_mcp_tools.py`: top 5 por UF em ordem decrescente (SP R$ 1.376.835,00, RJ R$ 469.790,00), `compare_months` por UF com 27 linhas e `delta_abs` correto, município com `RESULT_TOO_LARGE` e `level` inválido com `INVALID_ARGUMENT`. Não conferido: se um usuário sem `SELECT` recebe `INSUFFICIENT_PERMISSIONS` ou `TABLE_OR_VIEW_NOT_FOUND`; `RATE_LIMITED` é da P11.4 · depende de P11.2
 - [x] **P11.4** 🤖 Traces MLflow, rate limit por usuário, logs estruturados + teste de paridade com o golden set — _pronto quando:_ Critérios 6 a 10 da SPEC-006 §7 (#80) — limitador de 30 chamadas/min por usuário e span manual só com atributos em todas as tools; experiment `atlas_mcp_traces` e dashboard "Atlas — Uso do MCP" no bundle. Conferido no `dev` pelo mantenedor: `scripts/check_mcp_parity.py` (20 casos `metric` iguais ao SQL de referência, GS-001 = R$ 4.122.460,00) e `scripts/check_mcp_observability.py` (72 traces com os atributos do §6 e sem outputs; a 31ª chamada deu `RATE_LIMITED` sem aparecer na `system.query.history`; `executed_by` é o usuário, modo OBO); `setup_mcp_trace_tables.py` criou as tabelas `mcp_*` e a view `mcp_usage_daily` (`attributes` é VARIANT), e o dashboard mostra as 5 tools, o `RATE_LIMITED` e o p95. **Não conferido:** os 5 casos `comparison` do golden set (só os 20 `metric`; `compare_months` é conferido em `check_mcp_tools.py`); o OAuth interativo do cliente (P11.5) · depende de P11.3, P9.1, P3.5
-- [ ] **P11.5** 👤 Conectar ao Claude Code/Desktop e documentar no README — _pronto quando:_ Você pergunta no Claude e recebe a resposta com `source` · depende de P11.4
 
 ## Fase 12 — Dashboard React com mapa → [007-react-geo-dashboard](007-react-geo-dashboard/spec.md)
 
 _KPIs + mapa coroplético UF → município, p95 < 3s._
 
-- [ ] **P12.1** 🤖 `scripts/fetch_geo.py`: malhas do IBGE → TopoJSON simplificado em `apps/web/public/geo/` — _pronto quando:_ Tamanhos dentro do limite; teste de match de 100% com `dim_municipality` · depende de P4.2
+- [x] **P12.1** 🤖 `scripts/fetch_geo.py`: malhas do IBGE → TopoJSON simplificado em `apps/web/public/geo/` — _pronto quando:_ Tamanhos dentro do limite; teste de match de 100% com `dim_municipality` (#81) — `br-uf.json` com 12 KB (limite 300 KB), maior UF (MG) ~250 KB (limite 1,5 MB); `tests/test_geo_files.py` confere os tamanhos e o match exato de 5.570 municípios com `data/reference/municipalities_ibge.csv` (o polígono de Boa Esperança do Norte, MT, fica de fora). **Não conferido:** o match contra a tabela `gold.dim_municipality` no workspace (a referência é a mesma fonte) e o desenho no mapa (P12.5) · depende de P4.2
 - [ ] **P12.2** 🤖 Backend FastAPI: `/api/months`, `/api/kpis`, `/api/health` + cache — _pronto quando:_ Os KPIs batem com o AI/BI · depende de P7.1
 - [ ] **P12.3** 🤖 `/api/map/region`, `/api/map/uf` e `/api/map/municipality` (com `mom_change`) + validação de `measure` — _pronto quando:_ 400 para medida inválida; a soma das regiões e a das UFs são iguais ao KPI · depende de P12.2
 - [ ] **P12.4** 🤖 Frontend: esqueleto Vite + React + TS, layout, KPI cards — _pronto quando:_ Build no CI (`tsc`, `eslint`, `vitest`) · depende de P0.5
@@ -177,6 +176,7 @@ _KPIs + mapa coroplético UF → município, p95 < 3s._
 - [ ] **P12.7** 🤖 Escala divergente `mom_change`, estados de loading e erro, acessibilidade — _pronto quando:_ Critério 6 da SPEC-007 §6 + navegação por teclado · depende de P12.6
 - [ ] **P12.8** 🤝 Deploy do App `atlas-web` + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.7
 - [ ] **P12.9** 🤝 Revalidar o production monitoring do MLflow (Beta) da P10.8 — _pronto quando:_ O comando de contagem de assessments é rodado no `dev` e o resultado (mudou ou não) fica registrado na SPEC-008 §6 e no ADR-0013 · depende de P12.8
+- [ ] **P11.5** 🤝 Conectar ao Claude Code/Desktop e documentar no README (movida para o fim da Fase 12, antes da demo; o agente prepara a integração com você) — _pronto quando:_ Você pergunta no Claude e recebe a resposta com `source` · depende de P11.4, P12.8
 
 ## Fase 13 — Demo e release v1.0
 

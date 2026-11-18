@@ -12,7 +12,7 @@ Uma tela executiva de impacto: KPIs do mês e um **mapa coroplético do Brasil p
 | Frontend | React 18 + TypeScript + Vite; mapa em **SVG com `d3-geo`** (projeção `geoMercator` com `fitSize`), sem tiles nem chave de API externa |
 | Backend | FastAPI no mesmo Databricks App, servindo o build estático e `/api/*` |
 | Dados | `databricks-sql-connector` → SQL warehouse → `atlas.semantic.mv_recharges` |
-| Geometria | Malhas do IBGE (API de malhas v3), baixadas **no build** por `scripts/fetch_geo.py`, simplificadas (mapshaper, ~1–5% dos vértices) e versionadas em `web/public/geo/` |
+| Geometria | Malhas do IBGE (API de malhas v3), baixadas **no build** por `scripts/fetch_geo.py`, simplificadas (mapshaper, ~1–5% dos vértices) e versionadas em `apps/web/public/geo/` |
 | Auth | Autenticação nativa do Databricks App; o backend consulta com o service principal (`SELECT` em `semantic`) |
 
 Arquivos de geometria:
@@ -64,7 +64,7 @@ Cada polígono tem `role="button"`, `aria-label` com o nome e o valor, e navega�
 - **Dado** um clique numa região, **então** só as UFs dela ficam visíveis e centralizadas; **dado** um clique numa UF, **então** o mapa mostra direto os municípios dela.
 - **Dado** um clique numa UF, **então** a renderização dos municípios termina em p95 < 3s com cache frio de API e geometria em cache do navegador.
 - **Dado** `measure=foo`, **então** a API retorna 400.
-- **Dado** qualquer UF, **então** 100% dos municípios da malha do IBGE têm match por `municipality_ibge_code` (teste automatizado entre geometria e `dim_municipality`).
+- **Dado** qualquer UF, **então** 100% dos municípios da referência (a mesma que alimenta `dim_municipality`) têm polígono por `municipality_ibge_code`, e o único polígono da malha do IBGE sem linha na referência (Boa Esperança do Norte, MT) é descartado (teste automatizado entre geometria e referência).
 - **Dado** a API fora do ar, **então** o banner de erro aparece e a página não quebra.
 
 ## 7. Fora de escopo
