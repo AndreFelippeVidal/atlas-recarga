@@ -1,5 +1,5 @@
 import type { Kpi, KpiMeasure } from "../api";
-import { formatDelta, formatMeasure } from "../format";
+import { formatDelta, formatMeasure, roundedDelta } from "../format";
 
 export const KPI_LABELS: Record<KpiMeasure, string> = {
   gross_revenue: "Receita bruta",
@@ -24,7 +24,7 @@ export default function KpiCard({ measure, kpi, previousMonthLabel }: Props) {
       </div>
     );
   }
-  const delta = kpi.delta_pct === null ? 0 : Number(kpi.delta_pct);
+  const delta = kpi.delta_pct === null ? 0 : roundedDelta(kpi.delta_pct);
   // A informação não depende só da cor: o sinal e a seta repetem o sentido.
   const trend = kpi.delta_pct === null ? "flat" : delta > 0 ? "up" : delta < 0 ? "down" : "flat";
   const arrow = trend === "up" ? "▲" : trend === "down" ? "▼" : "■";

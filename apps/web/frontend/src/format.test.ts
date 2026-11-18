@@ -1,8 +1,11 @@
 import { formatDelta, formatMeasure, formatMonth } from "./format";
 
 describe("format", () => {
-  it("abrevia receita em milhões", () => {
-    expect(formatMeasure("gross_revenue", "4122460.00")).toBe("R$ 4,1 mi");
+  it("mostra a receita exata em reais", () => {
+    expect(formatMeasure("gross_revenue", "4122460.00")).toMatch(/R\$\s4\.122\.460,00/);
+  });
+  it("não deixa o delta arredondado a zero com sinal", () => {
+    expect(formatDelta("-0.004")).toBe("0,00%");
   });
   it("formata ticket em reais", () => {
     expect(formatMeasure("avg_ticket", "27.5")).toMatch(/R\$\s27,50/);

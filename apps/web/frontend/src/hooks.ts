@@ -29,7 +29,8 @@ export function useMonths() {
 
 export function useKpis(month: string | null) {
   const [kpis, setKpis] = useState<KpisResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // O erro guarda o mês a que pertence: ao trocar de mês, o erro antigo some sozinho.
+  const [failure, setFailure] = useState<{ month: string; code: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -38,15 +39,16 @@ export function useKpis(month: string | null) {
     fetchKpis(month, ctrl.signal)
       .then((k) => {
         setKpis(k);
-        setError(null);
+        setFailure(null);
       })
       .catch((e) => {
-        if (!ctrl.signal.aborted) setError(errorCode(e));
+        if (!ctrl.signal.aborted) setFailure({ month, code: errorCode(e) });
       });
     return () => ctrl.abort();
   }, [month, attempt]);
 
   // Só mostra o KPI se for do mês pedido; senão, skeleton.
   const current = kpis && kpis.month === month ? kpis : null;
+  const error = failure && failure.month === month ? failure.code : null;
   return { kpis: current, error, retry: useCallback(() => setAttempt((n) => n + 1), []) };
 }

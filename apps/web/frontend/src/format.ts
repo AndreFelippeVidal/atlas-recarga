@@ -3,24 +3,27 @@ import type { KpiMeasure } from "./api";
 
 const int = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const compact = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 
 export function formatMeasure(measure: KpiMeasure, value: string): string {
   const n = Number(value);
   switch (measure) {
     case "gross_revenue":
-      if (Math.abs(n) >= 1_000_000) return `R$ ${compact.format(n / 1_000_000)} mi`;
-      return brl.format(n);
     case "avg_ticket":
-      return brl.format(n);
+      // Intl aceita a string decimal: o valor DECIMAL(14,2) sai exato, sem passar por float.
+      return brl.format(value as unknown as number);
     default:
       return int.format(n);
   }
 }
 
+// Arredonda como o texto exibido, para que sinal, seta e cor nunca contradigam o número.
+export function roundedDelta(deltaPct: string): number {
+  return Number(Number(deltaPct).toFixed(2)) + 0;
+}
+
 export function formatDelta(deltaPct: string | null): string {
   if (deltaPct === null) return "sem base";
-  const n = Number(deltaPct);
+  const n = roundedDelta(deltaPct);
   const sign = n > 0 ? "+" : "";
   return `${sign}${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }

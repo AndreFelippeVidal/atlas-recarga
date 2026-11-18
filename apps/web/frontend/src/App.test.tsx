@@ -34,7 +34,7 @@ describe("App", () => {
     );
     render(<App />);
     expect(screen.getAllByLabelText(/carregando/)).toHaveLength(4);
-    expect(await screen.findByText("R$ 4,1 mi")).toBeInTheDocument();
+    expect(await screen.findByText(/4\.122\.460,00/)).toBeInTheDocument();
     expect(screen.getByText("150.000")).toBeInTheDocument();
     expect(screen.getByText("+5,70%")).toBeInTheDocument();
     expect(screen.getByText("-6,25%")).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe("App", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
-    await screen.findByText("R$ 4,1 mi");
+    await screen.findByText(/4\.122\.460,00/);
     await userEvent.selectOptions(screen.getByRole("combobox"), "2026-09");
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/kpis?month=2026-09", expect.anything()),
@@ -70,7 +70,7 @@ describe("App", () => {
     );
     fail = false;
     await userEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
-    expect(await screen.findByText("R$ 4,1 mi")).toBeInTheDocument();
+    expect(await screen.findByText(/4\.122\.460,00/)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
