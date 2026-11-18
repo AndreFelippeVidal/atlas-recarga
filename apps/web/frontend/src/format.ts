@@ -37,3 +37,35 @@ export function formatMonth(month: string): string {
   });
   return name.replace(".", "");
 }
+
+const compactNum = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+const ticket = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+// Forma curta para legenda e tooltip (`R$ 1,2 mi`, `12.345`). Só exibição.
+export function formatCompact(measure: KpiMeasure, n: number): string {
+  const money = measure === "gross_revenue" || measure === "avg_ticket";
+  const abs = Math.abs(n);
+  let scaled: string;
+  if (abs >= 1_000_000_000) scaled = `${compactNum.format(n / 1_000_000_000)} bi`;
+  else if (abs >= 1_000_000) scaled = `${compactNum.format(n / 1_000_000)} mi`;
+  else if (abs >= 10_000) scaled = `${compactNum.format(n / 1_000)} mil`;
+  else scaled = measure === "avg_ticket" ? ticket.format(n) : int.format(n);
+  return money ? `R$ ${scaled}` : scaled;
+}
+
+export const MEASURE_UNITS: Record<KpiMeasure, string> = {
+  gross_revenue: "R$",
+  recharge_count: "recargas",
+  avg_ticket: "R$ por recarga",
+  active_pos: "PDVs",
+};
+
+export const MEASURE_LABELS: Record<KpiMeasure, string> = {
+  gross_revenue: "Receita bruta",
+  recharge_count: "Recargas",
+  avg_ticket: "Ticket médio",
+  active_pos: "PDVs ativos",
+};

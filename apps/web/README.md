@@ -27,3 +27,7 @@ pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build   # 
 ```
 
 Os valores chegam como string decimal e o frontend só formata; nenhuma métrica é calculada aqui.
+
+## Mapa por região (P12.5)
+
+`frontend/src/components/RegionMap.tsx` desenha as 27 UFs em SVG com `d3-geo` (`geoMercator` + `fitSize`) a partir de `public/geo/br-uf.json`, pintando cada UF com o valor da **sua região** (`/api/map/region`). As fronteiras das regiões ficam em destaque. A escala é de quantis em 5 classes (`scale.ts`), azul sequencial (claro para escuro no tema claro; invertido no escuro), e a legenda mostra a faixa de cada classe e a unidade. O ranking e o tooltip repetem o valor, então a cor nunca é a única informação. Região sem valor no mês aparece hachurada e como "sem recargas". Seletor de medida: `gross_revenue`, `recharge_count`, `avg_ticket`, `active_pos` (o `mom_change` e a escala divergente são da P12.7; o drill-down, da P12.6).
