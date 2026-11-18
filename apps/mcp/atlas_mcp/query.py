@@ -20,6 +20,7 @@ from decimal import Decimal
 from typing import Any
 
 from atlas_mcp.catalog import load_catalog
+from atlas_mcp.errors import InvalidArgument
 
 MAX_LIMIT = 500
 DEFAULT_LIMIT = 50
@@ -29,10 +30,6 @@ MONTH = re.compile(r"[0-9]{4}-(0[1-9]|1[0-2])")
 SEMANTIC_SCHEMA = "semantic"
 
 Executor = Callable[[str, Mapping[str, Any]], tuple[list[str], list[list[Any]]]]
-
-
-class InvalidArgument(ValueError):
-    """Argumento fora da lista fechada ou mal formado (código `INVALID_ARGUMENT`, SPEC-006 §4)."""
 
 
 @dataclass(frozen=True)
@@ -107,6 +104,7 @@ def build_query(
     order_by: str | None = None,
     limit: int = DEFAULT_LIMIT,
     request_id: str | None = None,
+    max_limit: int = MAX_LIMIT,
 ) -> BuiltQuery:
     views = load_catalog()["views"]
     if not isinstance(view, str) or view not in views:
@@ -122,8 +120,8 @@ def build_query(
     start, end = _check_month(month_from, "month_from"), _check_month(month_to, "month_to")
     if start > end:
         raise InvalidArgument("month_from deve ser anterior ou igual a month_to")
-    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_LIMIT:
-        raise InvalidArgument(f"limit deve estar entre 1 e {MAX_LIMIT}")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= max_limit:
+        raise InvalidArgument(f"limit deve estar entre 1 e {max_limit}")
 
     params: dict[str, Any] = {"month_from": start, "month_to": end}
     where = [
@@ -169,7 +167,7 @@ def build_query(
     )
 
 
-def _jsonable(value: Any) -> Any:
+def jsonable(value: Any) -> Any:
     if isinstance(value, Decimal):
         return str(value)  # string preserva os centavos
     if isinstance(value, datetime | date):
@@ -195,7 +193,7 @@ def query_metric(
     columns, rows = executor(built.sql, built.params)
     return {
         "columns": columns,
-        "rows": [[_jsonable(v) for v in row] for row in rows],
+        "rows": [[jsonable(v) for v in row] for row in rows],
         "source": built.source,
         "sql_fingerprint": built.fingerprint,
     }
