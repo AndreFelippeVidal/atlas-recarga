@@ -10,7 +10,8 @@ Conecta como cliente MCP real com a credencial do perfil (em memória, nunca imp
 1. `list_metrics` traz `mv_recharges` e `mv_commission`;
 2. `query_metric` por UF soma o mesmo que a consulta sem dimensão (ao centavo);
 3. uma medida fora da lista devolve `INVALID_ARGUMENT`;
-4. um filtro com aspas e `;` não quebra e devolve 0 linhas (foi vinculado, não concatenado).
+4. um filtro com aspas e `;` não quebra e não casa com nada (0 linhas ou só nulos: foi vinculado,
+   não concatenado).
 """
 
 from __future__ import annotations
@@ -57,8 +58,9 @@ def evaluate(
         problems.append("resposta sem source ou sql_fingerprint")
     if not invalid_error or "INVALID_ARGUMENT" not in invalid_error:
         problems.append(f"medida inválida não deu INVALID_ARGUMENT: {invalid_error!r}")
-    if injection.get("rows") != []:
-        problems.append("o filtro com aspas e ';' deveria devolver 0 linhas")
+    # Sem dimensões não há GROUP BY: a agregação sobre zero linhas devolve 1 linha com valor nulo.
+    if any(value is not None for row in injection.get("rows", []) for value in row):
+        problems.append("o filtro com aspas e ';' deveria casar com nada (0 linhas ou só nulos)")
     return problems
 
 

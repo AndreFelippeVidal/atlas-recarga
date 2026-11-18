@@ -45,8 +45,12 @@ def test_missing_invalid_argument_is_reported() -> None:
     assert _eval(invalid_error=None)
 
 
-def test_injection_returning_rows_is_reported() -> None:
+def test_injection_returning_data_is_reported() -> None:
     assert _eval(injection={"rows": [["x"]]})
+
+
+def test_injection_with_single_null_aggregate_row_is_ok() -> None:
+    assert _eval(injection={"rows": [[None]]}) == []
 
 
 def test_missing_view_is_reported() -> None:
