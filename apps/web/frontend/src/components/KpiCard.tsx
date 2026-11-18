@@ -5,10 +5,20 @@ interface Props {
   measure: KpiMeasure;
   kpi?: Kpi;
   previousMonthLabel?: string;
+  // A consulta falhou: sem skeleton eterno; o banner de erro explica e oferece tentar de novo.
+  failed?: boolean;
 }
 
-export default function KpiCard({ measure, kpi, previousMonthLabel }: Props) {
+export default function KpiCard({ measure, kpi, previousMonthLabel, failed }: Props) {
   const label = MEASURE_LABELS[measure];
+  if (!kpi && failed) {
+    return (
+      <div className="card" role="group" aria-label={`${label}: indisponível`}>
+        <div className="card-label">{label}</div>
+        <div className="card-value muted">—</div>
+      </div>
+    );
+  }
   if (!kpi) {
     return (
       <div className="card skeleton" aria-busy="true" aria-label={`${label}: carregando`}>

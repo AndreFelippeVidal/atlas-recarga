@@ -50,7 +50,7 @@ Arquivos de geometria:
 
 **Escala de cor:**
 - Medidas de volume: escala **sequencial** em 5 classes por **quantis** calculados no nível atual (no zoom, os quantis são recalculados entre as UFs da região ou entre os municípios da UF).
-- `mom_change`: escala **divergente** centrada em 0%, com vermelho para queda e azul para alta e simetria em ±max(|min|, |max|).
+- `mom_change`: escala **divergente** centrada em 0%, com vermelho para queda e azul para alta. O limite simétrico é o **percentil 90 de |valor|** no nível atual (não o máximo: um município com base minúscula e +1.400% apagaria o resto da escala); o que passa do limite fica na classe extrema e a legenda avisa "extremos agrupados". Se o percentil 90 for 0, o limite é o máximo de |valor|. Em qualquer tema, **quanto mais escura a cor, mais extrema a variação**, seja queda ou alta; o neutro ("perto de 0%") é a classe mais clara. O ranking de `mom_change` mostra as 5 maiores altas e as 5 maiores quedas (com mais de 10 itens), pois o top 10 por valor decrescente esconderia as quedas.
 - Município sem dado: cinza claro com padrão hachurado e o rótulo "sem recargas" no tooltip.
 - A legenda sempre mostra os limites das classes e a unidade. As cores passam em contraste AA e funcionam em tema claro e escuro.
 
@@ -60,7 +60,7 @@ Arquivos de geometria:
 Cada polígono tem `role="button"`, `aria-label` com o nome e o valor, e navegação por Tab no ranking. A informação nunca depende só da cor, porque o ranking e o tooltip repetem o valor.
 
 ## 6. Critérios de aceite
-- **Dado** o cenário `regional_drop`, **quando** seleciono o penúltimo mês e `mom_change` e clico no PA, **então** os municípios do Baixo Amazonas aparecem na classe de maior queda.
+- **Dado** o cenário `regional_drop` (−14% de recargas nos 13 municípios do Baixo Amazonas no penúltimo mês, SPEC-001 §5), **quando** seleciono o penúltimo mês e `mom_change` e clico no PA, **então** o tooltip e o ranking mostram o Δ% desses municípios (queda em torno de −14%, mais o ruído do dado). A classe de cor segue a escala do §4 (limite no percentil 90) e **não** é critério: uma queda de −14% cai em "perto de 0%" quando outros municípios variam ±70% ou mais.
 - **Dado** um mês, **então** a soma de `/api/map/region` e a de `/api/map/uf` para `gross_revenue` são iguais ao KPI `gross_revenue` e ao valor do AI/BI Dashboard.
 - **Dado** um clique numa região, **então** só as UFs dela ficam visíveis e centralizadas; **dado** um clique numa UF, **então** o mapa mostra direto os municípios dela.
 - **Dado** um clique numa UF, **então** a renderização dos municípios termina em p95 < 3s com cache frio de API e geometria em cache do navegador.

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MapFocus, MapMeasure, Region } from "../api";
 import { buildGeometry } from "../geoShapes";
-import { useMapData, useMunTopology, useUfTopology } from "../hooks";
+import { useMapData, useMunTopology, useSlow, useUfTopology } from "../hooks";
 import { buildStats } from "../mapStats";
 import { REGION_NAMES, REGIONS } from "../regions";
-import { legendClasses, quantileThresholds } from "../scale";
+import { buildScale, legendClasses } from "../scale";
 import ErrorBanner from "./ErrorBanner";
 import Legend from "./Legend";
 import Ranking from "./Ranking";
@@ -13,6 +13,8 @@ import RegionMap from "./RegionMap";
 interface Props {
   month: string | null;
   measure: MapMeasure;
+  // Os meses ainda podem estar chegando (sem erro): conta como espera do warehouse.
+  monthLoading: boolean;
 }
 
 const BRAZIL: MapFocus = { level: "brazil" };
@@ -35,7 +37,7 @@ function focusId(focus: MapFocus): string {
   return focus.level === "region" ? `region:${focus.region}` : "brazil";
 }
 
-export default function MapPanel({ month, measure }: Props) {
+export default function MapPanel({ month, measure, monthLoading }: Props) {
   const [focus, setFocus] = useState<MapFocus>(BRAZIL);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const geo = useUfTopology();
@@ -52,11 +54,24 @@ export default function MapPanel({ month, measure }: Props) {
     [geo.topology, mun.topology, view],
   );
   const stats = useMemo(() => (shown ? buildStats(shown.items) : null), [shown]);
-  const classes = useMemo(() => {
-    if (!stats) return [];
-    const values = [...stats.values()].map((s) => Number(s.value));
-    return legendClasses(values, quantileThresholds(values));
-  }, [stats]);
+  const scale = useMemo(
+    () =>
+      buildScale(
+        shown?.measure ?? measure,
+        stats ? [...stats.values()].map((s) => Number(s.value)) : [],
+      ),
+    [shown, measure, stats],
+  );
+  const classes = useMemo(
+    () =>
+      stats
+        ? legendClasses(
+            [...stats.values()].map((s) => Number(s.value)),
+            scale,
+          )
+        : [],
+    [stats, scale],
+  );
   const expected = useMemo(() => {
     if (view.level === "brazil") return REGIONS.map((r) => ({ id: r, name: REGION_NAMES[r] }));
     if (view.level === "region" && geometry) {
@@ -95,12 +110,22 @@ export default function MapPanel({ month, measure }: Props) {
   const shownMeasure = shown?.measure ?? measure;
   const totalItems =
     expected.length > 0 ? expected.length : new Set(geometry?.shapes.map((x) => x.statKey)).size;
+  const mapPending = month === null ? monthLoading : mapData.data === null && !mapData.error;
+  const warming = useSlow(mapPending);
   const hasEmpty = geometry !== null && stats !== null && stats.size < totalItems;
 
   return (
     <>
       <section className="map-area" aria-label="Mapa">
         {error && <ErrorBanner code={error} onRetry={retry} />}
+        <div className="sr-only" role="status">
+          {`${MAP_LABELS[view.level]}${mapPending || !geometry ? ": carregando" : ""}`}
+        </div>
+        {warming && (
+          <div className="warming" role="status">
+            Aquecendo o banco de dados…
+          </div>
+        )}
         {view.level !== "brazil" && (
           <button type="button" className="back-button" onClick={() => goTo(BRAZIL)}>
             ← Ver o Brasil inteiro
@@ -120,12 +145,10 @@ export default function MapPanel({ month, measure }: Props) {
             />
           </div>
         ) : (
-          <p className="placeholder" aria-busy="true">
-            Carregando o mapa…
-          </p>
+          <div className="skeleton-map" aria-busy="true" aria-label="Carregando o mapa" />
         )}
         {stats && geometry && (
-          <Legend measure={shownMeasure} classes={classes} hasEmpty={hasEmpty} />
+          <Legend measure={shownMeasure} scale={scale} classes={classes} hasEmpty={hasEmpty} />
         )}
       </section>
       <aside className="side" aria-label="Ranking">

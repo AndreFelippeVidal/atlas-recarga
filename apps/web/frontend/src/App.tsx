@@ -63,12 +63,13 @@ export default function App() {
             measure={m}
             kpi={kpis.kpis?.[m]}
             previousMonthLabel={kpis.kpis ? formatMonth(kpis.kpis.previous_month) : undefined}
+            failed={error !== null}
           />
         ))}
       </section>
 
       <main className="content">
-        <MapPanel month={month} measure={measure} />
+        <MapPanel month={month} measure={measure} monthLoading={months.loading} />
       </main>
     </div>
   );

@@ -28,17 +28,26 @@ export default function Ranking({
 }: Props) {
   if (!stats) {
     return (
-      <p className="placeholder" aria-busy="true">
-        Carregando o ranking…
-      </p>
+      <div className="skeleton-list" aria-busy="true" aria-label="Carregando o ranking">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="skeleton-row" />
+        ))}
+      </div>
     );
   }
-  const ranked = [...stats.values()].sort((a, b) => a.rank - b.rank).slice(0, TOP);
+  const all = [...stats.values()].sort((a, b) => a.rank - b.rank);
+  // mom_change: o que interessa são as pontas, então o top 10 traz as 5 maiores altas e as 5
+  // maiores quedas (a ordem segue o valor decrescente, e a posição original é mantida).
+  const split = measure === "mom_change" && all.length > TOP;
+  const ranked = split ? [...all.slice(0, TOP / 2), ...all.slice(-TOP / 2)] : all.slice(0, TOP);
   const missing = expected.filter((e) => !stats.has(e.id));
   return (
     <ol className="ranking" aria-label={`Ranking: ${noun}`}>
-      {ranked.map((s) => (
-        <li key={s.id}>
+      {ranked.map((s, i) => (
+        <li key={s.id} className={split && i === TOP / 2 ? "rank-gap" : undefined}>
+          {split && (i === 0 || i === TOP / 2) && (
+            <span className="sr-only">{i === 0 ? "Maiores altas" : "Maiores quedas"}</span>
+          )}
           <button
             type="button"
             className={highlighted === s.id ? "active" : ""}
