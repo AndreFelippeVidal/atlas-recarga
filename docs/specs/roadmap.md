@@ -167,7 +167,7 @@ _FastMCP em App, somente leitura, conectado ao Claude._
 
 _KPIs + mapa coroplético UF → município, p95 < 3s._
 
-- [ ] **P12.1** 🤖 `scripts/fetch_geo.py`: malhas do IBGE → TopoJSON simplificado em `apps/web/public/geo/` — _pronto quando:_ Tamanhos dentro do limite; teste de match de 100% com `dim_municipality` · depende de P4.2
+- [x] **P12.1** 🤖 `scripts/fetch_geo.py`: malhas do IBGE → TopoJSON simplificado em `apps/web/public/geo/` — _pronto quando:_ Tamanhos dentro do limite; teste de match de 100% com `dim_municipality` (#81) — `br-uf.json` com 12 KB (limite 300 KB), maior UF (MG) ~250 KB (limite 1,5 MB); `tests/test_geo_files.py` confere os tamanhos e o match exato de 5.570 municípios com `data/reference/municipalities_ibge.csv` (o polígono de Boa Esperança do Norte, MT, fica de fora). **Não conferido:** o match contra a tabela `gold.dim_municipality` no workspace (a referência é a mesma fonte) e o desenho no mapa (P12.5) · depende de P4.2
 - [ ] **P12.2** 🤖 Backend FastAPI: `/api/months`, `/api/kpis`, `/api/health` + cache — _pronto quando:_ Os KPIs batem com o AI/BI · depende de P7.1
 - [ ] **P12.3** 🤖 `/api/map/region`, `/api/map/uf` e `/api/map/municipality` (com `mom_change`) + validação de `measure` — _pronto quando:_ 400 para medida inválida; a soma das regiões e a das UFs são iguais ao KPI · depende de P12.2
 - [ ] **P12.4** 🤖 Frontend: esqueleto Vite + React + TS, layout, KPI cards — _pronto quando:_ Build no CI (`tsc`, `eslint`, `vitest`) · depende de P0.5
