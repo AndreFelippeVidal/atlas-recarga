@@ -13,7 +13,7 @@ Uma tela executiva de impacto: KPIs do mês e um **mapa coroplético do Brasil p
 | Backend | FastAPI no mesmo Databricks App, servindo o build estático e `/api/*`. O build do Vite fica **versionado** em `apps/web/static` (o App não tem Node; o CI confere que está atualizado) e as malhas saem de `apps/web/public/geo/` em `/geo` |
 | Dados | `databricks-sql-connector` → SQL warehouse → `atlas.semantic.mv_recharges` |
 | Geometria | Malhas do IBGE (API de malhas v3), baixadas **no build** por `scripts/fetch_geo.py`, simplificadas (mapshaper, ~1–5% dos vértices) e versionadas em `apps/web/public/geo/` |
-| Auth | Autenticação nativa do Databricks App; o backend consulta os dados com o service principal (`SELECT` em `semantic`). O chat é a exceção: repassa o **token do usuário** (OBO, `user_api_scopes`) ao `agent-atlas` (ADR-0023; **escopo a confirmar na P12.14**) |
+| Auth | Autenticação nativa do Databricks App; o backend consulta os dados com o service principal (`SELECT` em `semantic`). O chat é a exceção: repassa o **token do usuário** (OBO, `user_api_scopes`) ao `agent-atlas` (ADR-0023; escopo `apps`, confirmado na P12.14) |
 | Chat | Painel recolhível; `POST /api/chat` repassa a pergunta ao `agent-atlas` e devolve a resposta **em streaming SSE**. O `atlas-web` não roda LLM, não lê o Genie e não calcula métrica; o SP dele não ganha permissão nenhuma no agente |
 
 Arquivos de geometria:
