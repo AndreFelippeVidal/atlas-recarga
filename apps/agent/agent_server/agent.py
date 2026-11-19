@@ -18,6 +18,7 @@ from mlflow.types.responses import (
     ResponsesAgentRequest,
     ResponsesAgentResponse,
     ResponsesAgentStreamEvent,
+    create_text_delta,
     create_text_output_item,
     to_chat_completions_input,
 )
@@ -26,7 +27,7 @@ from agent_server.config import AgentConfig, load_config
 from agent_server.guardrails import (
     RATE_LIMIT_MESSAGE,
     RATE_LIMITED_ERROR_TYPE,
-    guard_event,
+    StreamGuard,
     is_rate_limited,
 )
 from agent_server.prompts import load_prompt
@@ -137,15 +138,19 @@ async def stream_handler(
     _tag_trace(request)
     messages = {"messages": to_chat_completions_input([i.model_dump() for i in request.input])}
     tools = await asyncio.to_thread(_tools)
+    guard = StreamGuard(
+        lambda text, item_id: ResponsesAgentStreamEvent(**create_text_delta(text, item_id))
+    )
+    tagged = False
     try:
         async for event in process_agent_astream_events(
             build_agent(tools).astream(input=messages, stream_mode=["updates", "messages"])
         ):
-            keep, masked = guard_event(event)  # PII na saída (ADR-0021)
-            if masked:
+            for out in guard.process(event):
+                yield out
+            if guard.pii_masked and not tagged:
+                tagged = True
                 mlflow.update_current_trace(tags={"pii_masked": "true"})
-            if keep:
-                yield event
     except Exception as error:
         if not is_rate_limited(error):
             raise

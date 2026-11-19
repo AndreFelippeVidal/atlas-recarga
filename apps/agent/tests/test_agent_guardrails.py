@@ -109,3 +109,128 @@ def test_guard_event_with_a_real_responses_event() -> None:
     )
     assert guard_event(event) == (True, True)
     assert MASK in event.item["content"][0]["text"]
+
+
+# --- StreamMasker (ADR-0023) ---
+
+import random  # noqa: E402
+
+from agent_server.guardrails import HOLD_BACK, StreamMasker  # noqa: E402
+
+_SECRETS = {
+    "cpf": "123.456.789-09",
+    "cpf_label": "CPF: 12345678909",
+    "phone": "(11) 91234-5678",
+    "phone_intl": "+55 11 91234-5678",
+    "phone_label": "celular: 11 91234 5678",
+    "email": "joao.silva@exemplo.com.br",
+}
+
+
+def _stream(text: str, step: int) -> tuple[str, StreamMasker, list[str]]:
+    masker = StreamMasker()
+    parts = [masker.feed(text[i : i + step]) for i in range(0, len(text), step)]
+    parts.append(masker.finish())
+    return "".join(parts), masker, parts
+
+
+@pytest.mark.parametrize("name", sorted(_SECRETS))
+@pytest.mark.parametrize("step", [1, 3, 7, 25])
+def test_stream_pii_cut_at_any_position_is_masked(name: str, step: int) -> None:
+    secret = _SECRETS[name]
+    for pad in range(0, 60):  # o segredo começa em qualquer posição de um texto de ~60+ caracteres
+        text = ("x" * pad) + " " + secret + " " + ("y" * (60 - pad))
+        out, masker, parts = _stream(text, step)
+        assert out == mask_pii(text)[0]
+        # nenhum pedaço parcial do segredo saiu antes do fim
+        joined = ""
+        for part in parts:
+            joined += part
+            for frag in ("123.456", "91234", "joao.silva", "12345678"):
+                assert frag not in joined
+        assert masker.masked_any
+
+
+def test_stream_pii_secret_with_long_tail_without_spaces() -> None:
+    text = "Ligue (11) 91234-5678" + "z" * 80
+    out, _, _ = _stream(text, 5)
+    assert out == mask_pii(text)[0]
+    assert "91234" not in out
+
+
+def test_stream_equals_full_mask_on_clean_text_and_holds_back() -> None:
+    text = "A receita de R$ 4.122.460,00 no mês foi alta. " * 5 + "Fonte: semantic.mv_recharges"
+    masker = StreamMasker()
+    emitted = ""
+    for i in range(0, len(text), 4):
+        emitted += masker.feed(text[i : i + 4])
+        assert len(masker.raw) - len(emitted) >= 0
+    assert emitted != text  # ainda retém o final
+    assert len(text) - len(emitted) >= HOLD_BACK
+    emitted += masker.finish()
+    assert emitted == text
+    assert not masker.masked_any
+
+
+def test_stream_random_fuzz_matches_full_mask() -> None:
+    rng = random.Random(7)  # noqa: S311 (fuzz determinístico, não é criptografia)
+    words = ["receita", "R$ 1.234,56", *sorted(_SECRETS.values()), "PA", "2026-10", "tel", "fim."]
+    for _ in range(200):
+        text = " ".join(rng.choice(words) for _ in range(rng.randint(1, 30)))
+        out, _, _ = _stream(text, rng.randint(1, 9))
+        assert out == mask_pii(text)[0]
+
+
+# --- StreamGuard: fiação no stream de eventos ---
+
+from types import SimpleNamespace  # noqa: E402
+
+from agent_server.guardrails import StreamGuard  # noqa: E402
+
+
+def _delta(text: str, item_id: str = "m1") -> SimpleNamespace:
+    return SimpleNamespace(
+        type="response.output_text.delta", delta=text, item_id=item_id, item=None
+    )
+
+
+def _done(text: str) -> SimpleNamespace:
+    item = {"type": "message", "content": [{"type": "output_text", "text": text}]}
+    return SimpleNamespace(type="response.output_item.done", item=item)
+
+
+def _run(events: list[SimpleNamespace]) -> tuple[list[object], StreamGuard]:
+    guard = StreamGuard(
+        lambda text, item_id: SimpleNamespace(type="delta", delta=text, item_id=item_id)
+    )
+    out: list[object] = []
+    for event in events:
+        out.extend(guard.process(event))
+    return out, guard
+
+
+def test_guard_deltas_equal_the_final_item_and_the_trace_flag_is_set() -> None:
+    raw = "Dono: 123.456.789-09, ligue (11) 91234-5678. " + "Receita R$ 4.122.460,00. " * 4
+    out, guard = _run([_delta(raw[i : i + 6]) for i in range(0, len(raw), 6)] + [_done(raw)])
+    deltas = "".join(e.delta for e in out if getattr(e, "type", "") == "delta")  # type: ignore[attr-defined]
+    final = out[-1].item["content"][0]["text"]  # type: ignore[attr-defined]
+    assert out[-1].type == "response.output_item.done"  # type: ignore[attr-defined]
+    assert deltas == final == mask_pii(raw)[0]  # nada vaza e o que sai bate com o item final
+    assert "123.456" not in deltas and "91234" not in deltas
+    assert guard.pii_masked
+
+
+def test_guard_flushes_held_text_before_each_done_and_resets_between_items() -> None:
+    out, guard = _run(
+        [_delta("Olá, tudo bem"), _done("Olá, tudo bem"), _delta("Segunda"), _done("Segunda")]
+    )
+    kinds = [e.type for e in out]  # type: ignore[attr-defined]
+    assert kinds == ["delta", "response.output_item.done", "delta", "response.output_item.done"]
+    assert out[0].delta == "Olá, tudo bem" and out[2].delta == "Segunda"  # type: ignore[attr-defined]
+    assert not guard.pii_masked
+
+
+def test_guard_passes_other_events_through() -> None:
+    tool = SimpleNamespace(type="response.output_item.done", item={"type": "function_call"})
+    out, _ = _run([tool])
+    assert out == [tool]
