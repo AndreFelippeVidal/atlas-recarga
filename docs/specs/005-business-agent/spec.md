@@ -1,6 +1,6 @@
 # SPEC-005 — Agente de negócio (`atlas-agent`)
 
-> PRD: F6 · ADRs: [0006](../../adr/0006-agent-framework-genie.md), [0007](../../adr/0007-unity-gateway-llm-governance.md), [0009](../../adr/0009-three-apps-allocation.md) · Status: rascunho
+> PRD: F6 · ADRs: [0006](../../adr/0006-agent-framework-genie.md), [0007](../../adr/0007-unity-gateway-llm-governance.md), [0009](../../adr/0009-three-apps-allocation.md), [0023](../../adr/0023-dashboard-agent-chat-streaming.md) · Status: rascunho
 
 ## 1. Objetivo
 Responder a perguntas de negócio da Diretoria Comercial em PT-BR com **números rastreáveis até a metric view**, **sem nenhuma capacidade de escrita**, com todo o tráfego de LLM passando pelo **Unity Gateway** e cada conversa registrada em **MLflow traces**.
@@ -66,6 +66,8 @@ Guardrails e limites ([ADR-0021](../../adr/0021-agent-gateway-limits-and-pii-fal
 - **Freio de gasto:** 500.000 tokens por hora no serviço (`RATE_LIMIT_KEY_SERVICE`), dimensionado pelo pior turno da P10.2 (143.841 tokens). O aviso mensal é um orçamento de conta com alerta por e-mail, que notifica e não bloqueia.
 - **PII na saída:** filtro determinístico no App (CPF, telefone, e-mail) que mascara o trecho e marca o trace com `pii_masked = true`. Tópicos fora do escopo: a recusa do prompt (regra 3), medida pelo golden set.
 - **Inference table** do LLM em `atlas.observability.agent_llm_payload`.
+- **Streaming de texto (ADR-0023, P12.13):** o `atlas-web` consome o stream do agente, então os deltas de texto deixam de ser descartados e passam por um **mascarador de fluxo**: acumula o texto **bruto**; a cada delta, corta na última fronteira de espaço que deixe pelo menos 40 caracteres retidos no fim (mais que qualquer padrão com espaço: telefone com DDD, rótulo de CPF); emite `mask_pii(bruto[:corte])` menos o que já foi emitido, rastreando o tamanho do mascarado emitido. Como nenhum padrão atravessa o corte (e-mail e CPF não têm espaço), o mascarado do prefixo é estável. No fim emite o resto, e o item `response.output_item.done` traz `mask_pii` do texto inteiro (fonte da verdade, avaliada pelo golden set). `pii_masked = true` segue no trace.
+- **Chamado por outro App:** o `atlas-web` chama o `/invocations` com o token do usuário (OBO); o `user` do trace sai desse token como hoje (§5). Os 30 req/min do gateway são compartilhados com a chat UI.
 
 ## 5. Observabilidade
 - `mlflow.langchain.autolog()` com tracing ligado; experiment `/Shared/atlas/agent-traces`. Trace tables no UC em `atlas.observability.agent_*`, ligadas a esse experiment por `scripts/setup_agent_trace_tables.py`. O MLflow só liga um trace location UC a um experiment **sem traces**, por isso é um experiment novo; o `/Shared/atlas/agent` (traces da P10.2 a P10.4 e o dataset do golden set) continua como está.
@@ -90,6 +92,7 @@ Guardrails e limites ([ADR-0021](../../adr/0021-agent-gateway-limits-and-pii-fal
 - **Dado** "como foi a receita?" sem período, **então** usa o último mês fechado e declara isso.
 - **Dado** qualquer conversa, **então** existe um trace no experiment e, em até 2 h (atraso da system table, S0.2), uma linha de uso em `system.ai_gateway.usage`.
 - **Dado** o service principal do App, **então** ele não lê nenhum dado fora de `atlas.semantic` e do Genie Space. As únicas outras permissões são as dos recursos do próprio agente em `atlas.observability`: `EXECUTE` no model service `agent_llm` (ADR-0021) e a escrita nas trace tables `agent_*` (§5).
+- **Dado** o stream de texto, **então** CPF, telefone e e-mail (inclusive de 60 caracteres) cortados em qualquer posição entre deltas saem mascarados e o item final é idêntico ao do modo sem stream.
 - **Dado** a carga de demo (10 perguntas sequenciais), **então** a latência p95 fica abaixo de 15s.
 
 ## 8. Fora de escopo

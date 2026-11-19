@@ -1,6 +1,6 @@
 # SPEC-007 — Dashboard React com mapa do Brasil (`atlas-web`)
 
-> PRD: F8 · ADRs: [0004](../../adr/0004-ibge-code-geojson-geo.md), [0009](../../adr/0009-three-apps-allocation.md) · Status: rascunho
+> PRD: F8 · ADRs: [0004](../../adr/0004-ibge-code-geojson-geo.md), [0009](../../adr/0009-three-apps-allocation.md), [0023](../../adr/0023-dashboard-agent-chat-streaming.md) · Status: rascunho
 
 ## 1. Objetivo
 Uma tela executiva de impacto: KPIs do mês e um **mapa coroplético do Brasil por região**. Ao clicar numa região, o mapa **dá zoom e mostra só as UFs** dela; ao clicar numa UF, **dá zoom e mostra os municípios** daquele estado, tudo colorido pela mesma métrica (Brasil › Região › UF › município). Os dados vêm só das metric views.
@@ -13,7 +13,8 @@ Uma tela executiva de impacto: KPIs do mês e um **mapa coroplético do Brasil p
 | Backend | FastAPI no mesmo Databricks App, servindo o build estático e `/api/*`. O build do Vite fica **versionado** em `apps/web/static` (o App não tem Node; o CI confere que está atualizado) e as malhas saem de `apps/web/public/geo/` em `/geo` |
 | Dados | `databricks-sql-connector` → SQL warehouse → `atlas.semantic.mv_recharges` |
 | Geometria | Malhas do IBGE (API de malhas v3), baixadas **no build** por `scripts/fetch_geo.py`, simplificadas (mapshaper, ~1–5% dos vértices) e versionadas em `apps/web/public/geo/` |
-| Auth | Autenticação nativa do Databricks App; o backend consulta com o service principal (`SELECT` em `semantic`) |
+| Auth | Autenticação nativa do Databricks App; o backend consulta os dados com o service principal (`SELECT` em `semantic`). O chat é a exceção: repassa o **token do usuário** (OBO, `user_api_scopes`) ao `agent-atlas` (ADR-0023; **escopo a confirmar na P12.14**) |
+| Chat | Painel recolhível; `POST /api/chat` repassa a pergunta ao `agent-atlas` e devolve a resposta **em streaming SSE**. O `atlas-web` não roda LLM, não lê o Genie e não calcula métrica; o SP dele não ganha permissão nenhuma no agente |
 
 Arquivos de geometria:
 - `geo/br-uf.json`: 27 UFs (TopoJSON, ≤ 300 KB), com as propriedades `uf` e `region` (`N`, `NE`, `CO`, `SE`, `S`, de `dim_municipality`). Não há geometria própria de região: no nível Brasil as UFs são pintadas com o valor da sua região e as fronteiras das regiões ficam em destaque; o zoom usa o bounding box das UFs da região.
@@ -29,9 +30,11 @@ Arquivos de geometria:
 | `GET /api/map/municipality` | `month`, `measure`, `uf` | `[{municipality_ibge_code, municipality_name, value}]` (`uf` obrigatório) |
 | `GET /api/months` | — | Meses disponíveis (para o seletor) |
 | `GET /api/health` | — | Status do App e do warehouse |
+| `POST /api/chat` | corpo `{message, conversation_id?}` | Stream SSE com a resposta do agente (abaixo) |
 
 `measure ∈ {gross_revenue, recharge_count, avg_ticket, active_pos, mom_change}`. `mom_change` = Δ% de `gross_revenue` contra o mês anterior, calculado no backend a partir de uma consulta com os dois meses; vale `null` quando o mês anterior não tem base (ausente ou zero). O valor de cada nível vem de `MEASURE()` agrupado pela dimensão do nível (`region`, `uf`, `municipality_ibge_code`): o frontend **nunca** soma UFs para obter a região, porque `avg_ticket` e `active_pos` não são aditivos. Qualquer outro valor retorna **400**, assim como `region` fora de `N`, `NE`, `CO`, `SE`, `S` e `uf` ausente ou fora das 27 siglas. As listas trazem só as linhas com valor no mês (regiões, UFs ou municípios sem recarga ficam de fora; o frontend os trata como "sem recargas"); um mês sem nenhuma recarga é **404**, e uma UF sem recarga num mês que existe é lista vazia.
 **Formato:** valores numéricos saem como **string decimal** (`"4122460.00"`), sem float; `delta_pct` em pontos percentuais com 2 casas. No primeiro mês da série `previous` e `delta_pct` são `null`. Erros: `400 INVALID_ARGUMENT` (parâmetro inválido), `404 NOT_FOUND` (mês sem dados), `503 WAREHOUSE_UNAVAILABLE`. `/api/health` devolve `status` (do App, sempre `healthy` se responde) e `warehouse` (estado, sem acordá-lo).
+**Chat (`POST /api/chat`, ADR-0023):** `message` não vazia e com no máximo 2.000 caracteres (senão `400 INVALID_ARGUMENT`); `conversation_id` opcional vai ao agente como `context.conversation_id`. A resposta é `text/event-stream` com os eventos `delta` (`{text}`, trecho a acrescentar), `done` (`{text}`, texto final completo que **substitui** o acumulado) e `error` (`{code, message}`, terminal; `AGENT_UNAVAILABLE`, `RATE_LIMITED`, `TIMEOUT`, `AGENT_ERROR`). Antes do primeiro byte, os erros são HTTP: `400 INVALID_ARGUMENT`, `403 PERMISSION_DENIED` (o usuário sem `CAN_USE` no `agent-atlas`), `429 RATE_LIMITED` (limite por usuário) e `503 AGENT_UNAVAILABLE`. Timeouts: 10 s para conectar, 60 s sem byte do agente e 120 s no total, com `: ping` (comentário SSE) a cada 15 s ao navegador; sem retentativa e sem cache; 10 mensagens por minuto por usuário. O backend não interpreta o texto: o número vem do agente, com o bloco `Fonte:`.
 **Cache:** em memória por `(endpoint, params)` por 10 minutos (os dados são D-1). Na subida, o backend aquece o cache da tela do último mês (meses, KPIs, regiões e UFs) em segundo plano, sem bloquear a subida, e o renova a cada 8 minutos, antes do TTL (ADR-0022). A conexão com o warehouse é reaproveitada, uma por thread.
 
 ## 4. Comportamento da tela
@@ -54,6 +57,8 @@ Arquivos de geometria:
 - Município sem dado: cinza claro com padrão hachurado e o rótulo "sem recargas" no tooltip.
 - A legenda sempre mostra os limites das classes e a unidade. As cores passam em contraste AA e funcionam em tema claro e escuro.
 
+**Painel de chat:** botão "Perguntar ao agente" abre um painel recolhível (teclado: Enter envia, Shift+Enter quebra a linha, Esc fecha). A resposta aparece aos poucos conforme os `delta`, e o `done` troca o texto pelo final. O painel exibe o texto do agente como veio, inclusive o bloco `Fonte:`, **sem calcular, somar nem reformatar número**, e não altera o mapa nem os KPIs. Estados: vazio (sugestões fixas de perguntas), enviando (o botão vira "Parar", que aborta a conexão), erro por código (`RATE_LIMITED`: "Limite de uso atingido, tente em 1 minuto"; `AGENT_UNAVAILABLE`: "O agente está parado ou indisponível"; `PERMISSION_DENIED`: "Você não tem acesso ao agente"; `TIMEOUT`) com "Tentar de novo". O histórico fica só na memória da página.
+
 **Estados:** skeleton durante o carregamento; em erro de API, um banner "Não foi possível carregar os dados (código)" com botão para tentar de novo, mantendo o mapa anterior; com o warehouse frio, a mensagem "Aquecendo o banco de dados…" depois de 3s.
 
 ## 5. Acessibilidade
@@ -67,6 +72,9 @@ Cada polígono tem `role="button"`, `aria-label` com o nome e o valor, e navega�
 - **Dado** `measure=foo`, **então** a API retorna 400.
 - **Dado** qualquer UF, **então** 100% dos municípios da referência (a mesma que alimenta `dim_municipality`) têm polígono por `municipality_ibge_code`, e o único polígono da malha do IBGE sem linha na referência (Boa Esperança do Norte, MT) é descartado (teste automatizado entre geometria e referência).
 - **Dado** a API fora do ar, **então** o banner de erro aparece e a página não quebra.
+- **Dado** GS-001 perguntado pelo painel (conferência manual na P12.14), **então** o texto vai chegando em `delta`, termina com o mesmo valor do agente (R$ 4.122.460,00) e o bloco `Fonte:`; o trace do agente tem a tag `user` com o usuário do dashboard.
+- **Dado** uma mensagem vazia ou com mais de 2.000 caracteres, **então** `400`; **dado** o agente parado ou lento demais, **então** o painel mostra o erro do §4 e o resto do dashboard segue funcionando.
+- **Dado** o chat em uso, **então** o p95 de `/api/map/municipality` (P12.8) não piora e o `atlas-web` continua sem SQL fora de `semantic`.
 
 ## 7. Fora de escopo
-Aprovação de comissão na UI (v2), filtros por distribuidor e tipo de PDV no mapa (v1.1), mapa de pontos por PDV (v2, com geo híbrido), exportar em PDF ou imagem.
+Histórico de conversas entre sessões, o chat alterar o mapa ou os filtros, qualquer ação de escrita pelo chat. Aprovação de comissão na UI (v2), filtros por distribuidor e tipo de PDV no mapa (v1.1), mapa de pontos por PDV (v2, com geo híbrido), exportar em PDF ou imagem.

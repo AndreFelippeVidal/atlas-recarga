@@ -3,7 +3,7 @@
 - **Status:** proposto
 - **Data:** 2026-11-17
 - **Decisores:** mantenedor
-- **Relacionados:** SPEC-005 §4 a §6, ADR-0007, ADR-0013, ADR-0016
+- **Relacionados:** SPEC-005 §4 a §6, ADR-0007, ADR-0013, ADR-0016, ADR-0023 (altera o item "Sem streaming de tokens")
 
 ## Contexto
 A SPEC-005 §4 pede ao Unity Gateway quatro controles que o S0.1 não chegou a validar: rate limit de 30 requisições por minuto por usuário, teto de gasto mensal, detecção de PII na saída e bloqueio de tópicos. O spike da P10.5 (CLI 1.24.0, perfil `andrevidal`, 2026-11-17) leu o `system.ai.gpt-oss-120b` e a API de model services:
@@ -52,6 +52,6 @@ A SPEC-005 §4 pede ao Unity Gateway quatro controles que o S0.1 não chegou a v
 - **Negativas, aceitas conscientemente:** sem limite por usuário final no gateway; sem teto mensal que bloqueie; a máscara de PII é por padrão (regex) e não pega todo dado pessoal.
 - **PII fora da máscara (risco aceito):** a máscara atua só na resposta ao cliente. O trace do MLflow, as trace tables `agent_*` e a inference table `agent_llm_payload` guardam o texto bruto, inclusive um CPF digitado pelo usuário. Os dados são sintéticos e o acesso a essas tabelas é do mantenedor e do service principal do App; antes de qualquer dado real, é preciso um redator no trace e no payload (follow-up).
 - **Experiment novo para as trace tables:** o MLflow recusa ligar o trace location UC a um experiment que já tem traces (`BAD_REQUEST`, visto no `dev`). Os traces do agente vão para `/Shared/atlas/agent-traces`; o antigo fica com o histórico de teste e com o dataset do golden set.
-- **Sem streaming de tokens:** para mascarar, o texto sai inteiro no `output_item.done`. Se a chat UI não renderizar sem os deltas, a conferência manual do README pega; a saída seria mascarar por buffer de frase.
+- **Sem streaming de tokens (alterado pelo ADR-0023: o agente passa a emitir deltas por um mascarador de fluxo):** para mascarar, o texto sai inteiro no `output_item.done`. Se a chat UI não renderizar sem os deltas, a conferência manual do README pega; a saída seria mascarar por buffer de frase.
 - **`max_tokens` e histórico:** o passo da task pedia avaliar limitá-los. Pela decisão do mantenedor o controle fica só no gateway (500.000 tokens/hora); o código do agente não limita `max_tokens` nem o histórico reenviado. O teto por hora é o único freio dos turnos grandes (143.841 tokens na P10.2).
 - **Plano B / gatilho para revisitar:** se o gateway ganhar guardrails ou `service_policies` na API, mover a PII para lá; se o App passar a repassar o usuário ao gateway, trocar a chave para `RATE_LIMIT_KEY_USER`.
