@@ -46,5 +46,5 @@ Escolhemos a **opção 1**. O `react-markdown` monta elementos React (não injet
 
 ## Consequências
 - **Positivas:** a resposta aparece formatada; a segurança não depende de um sanitizador; o texto do agente continua sendo exibido sem recalcular número (a renderização só muda a forma, não os valores).
-- **Negativas, aceitas conscientemente:** duas dependências novas no frontend (`pnpm audit` no CI passa a cobri-las); um marcador sem par pode aparecer por instantes no streaming.
-- **Plano B / gatilho para revisitar:** se o bundle passar do orçamento de tamanho do `atlas-web` ou surgir uma vulnerabilidade sem correção na cadeia `remark`/`rehype`, trocar pela opção 2 só para o subconjunto que as respostas usam.
+- **Negativas, aceitas conscientemente:** duas dependências novas no frontend (o CI de hoje não roda `pnpm audit`, embora o `tech-stack.md` o liste; as dependências ficam sem auditoria automática até haver uma task para isso); um marcador sem par pode aparecer por instantes no streaming.
+- **Plano B / gatilho para revisitar:** se o tamanho do bundle virar problema (ainda não há orçamento definido; hoje são ~113 KB gzip de JS) ou surgir uma vulnerabilidade sem correção na cadeia `remark`/`rehype`, trocar pela opção 2 só para o subconjunto que as respostas usam.

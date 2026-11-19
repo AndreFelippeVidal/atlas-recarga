@@ -107,7 +107,7 @@
   - O agente prepara o bundle (`user_api_scopes` do `atlas-web`) e a lista de usuários com `CAN_USE` no `agent-atlas`; **primeiro confirma no `dev` o escopo de OBO entre Apps** (ADR-0023: se falhar, reabrir o ADR) e um `scripts/check_web_chat.py`; o mantenedor faz o deploy e roda a conferência no `dev`
   - Conferir GS-001 pelo painel (R$ 4.122.460,00) e uma recusa do golden set; o trace do agente mostra o usuário; os 3 Apps sobem juntos (auto-stop de 24h)
 
-### P12.15 🤖 Chat: renderizar Markdown e modernizar o painel
+### P12.15 🤝 Chat: renderizar Markdown e modernizar o painel
 
 - **Depende de:** P12.14
 - **Pronto quando:** A resposta aparece formatada (negrito, listas, tabela, código) em vez de com `**` literais; HTML cru e links `javascript:` na resposta não chegam ao DOM; o bloco `Fonte:` aparece como citação; o build e os testes do frontend passam no CI; o mantenedor confere o visual no `dev`
