@@ -54,9 +54,9 @@ O campo `source` de toda resposta repete o contrato de citação do agente (view
 | `RATE_LIMITED` | Mais de 30 chamadas de tool por minuto do mesmo usuário; a resposta traz `retry_after_s` e nenhuma query é executada |
 
 ## 5. Conexão (documentada no README)
-- **Claude Code (caminho validado na P11.5):** `claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp --header "Authorization: Bearer $DATABRICKS_USER_TOKEN"`, com um token de curta duração do usuário (expira em cerca de 1 hora). A query roda como esse usuário (OBO), como o Spike S0.5 já tinha mostrado. O `--header` grava o token em texto puro no `~/.claude.json`, fora do repositório.
+- **Claude Code (caminho validado na P11.5):** `claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp --header "Authorization: Bearer $DATABRICKS_USER_TOKEN"`, com um token de curta duração do usuário (expira em tempo curto; estimativa de cerca de 1 hora, não medida). A query roda como esse usuário (OBO), como o Spike S0.5 já tinha mostrado. O `--header` grava o token em texto puro no `~/.claude.json`, fora do repositório.
 - **OAuth interativo nativo (`/mcp` no Claude Code): não funciona hoje.** O Databricks recusa com `access_denied: Scopes 'iam.access-control:read iam.current-user:read sql' are not assigned to the client https://claude.ai/oauth/claude-code-client-metadata`, pois o client público do Claude Code não está registrado no workspace e a Free Edition não permite criar a OAuth app connection. Revisar se a plataforma aceitar esse client.
-- **Alternativa com proxy:** `mcp-remote` com o mesmo cabeçalho `Authorization: Bearer`. O token nunca vai para o repositório.
+- **Alternativa com proxy (não testada na P11.5):** `mcp-remote` com o mesmo cabeçalho `Authorization: Bearer`. O token nunca vai para o repositório.
 - Guia, evidência e cuidados: [docs/mcp-claude-code.md](../../mcp-claude-code.md).
 
 ## 6. Observabilidade e controle (no lugar do Unity Gateway)
