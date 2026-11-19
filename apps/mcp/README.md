@@ -77,3 +77,15 @@ espere 1 minuto antes de repetir o `check_mcp_observability.py` (o limite é por
 
 O service principal do App só consulta o estado do warehouse (`CAN_USE`); as consultas de dados
 rodam com o `SELECT` do próprio usuário em `atlas.semantic`.
+
+## Conectar ao Claude Code (P11.5)
+
+Guia completo, com o motivo de o OAuth interativo não funcionar, os cuidados com o token e a
+evidência: [docs/mcp-claude-code.md](../../docs/mcp-claude-code.md). Resumo:
+
+```bash
+claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp \
+  --header "Authorization: Bearer $DATABRICKS_USER_TOKEN"   # token de curta duração, só na sessão
+```
+
+O token nunca vai para o repositório. A consulta roda como o usuário (OBO).

@@ -54,8 +54,10 @@ O campo `source` de toda resposta repete o contrato de citação do agente (view
 | `RATE_LIMITED` | Mais de 30 chamadas de tool por minuto do mesmo usuário; a resposta traz `retry_after_s` e nenhuma query é executada |
 
 ## 5. Conexão (documentada no README)
-- **Claude Code:** `claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp`, autenticado como o usuário. O Spike S0.5 confirmou que o Claude Code chamou o App FastMCP com o token de usuário no cabeçalho e que a query rodou como esse usuário (OBO). O fluxo OAuth interativo nativo do cliente **não** foi exercitado e fica para a P11.4/P11.5.
-- **Plano B (não acionado no S0.5; vale se o OAuth interativo falhar na P11.5):** proxy local `mcp-remote` com o header `Authorization: Bearer $(databricks auth token ...)`. O token nunca vai para o repositório.
+- **Claude Code (caminho validado na P11.5):** `claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp --header "Authorization: Bearer $DATABRICKS_USER_TOKEN"`, com um token de curta duração do usuário (expira em tempo curto; estimativa de cerca de 1 hora, não medida). A query roda como esse usuário (OBO), como o Spike S0.5 já tinha mostrado. O `--header` grava o token em texto puro no `~/.claude.json`, fora do repositório.
+- **OAuth interativo nativo (`/mcp` no Claude Code): não funciona hoje.** O Databricks recusa com `access_denied: Scopes 'iam.access-control:read iam.current-user:read sql' are not assigned to the client https://claude.ai/oauth/claude-code-client-metadata`, pois o client público do Claude Code não está registrado no workspace e a Free Edition não permite criar a OAuth app connection. Revisar se a plataforma aceitar esse client.
+- **Alternativa com proxy (não testada na P11.5):** `mcp-remote` com o mesmo cabeçalho `Authorization: Bearer`. O token nunca vai para o repositório.
+- Guia, evidência e cuidados: [docs/mcp-claude-code.md](../../mcp-claude-code.md).
 
 ## 6. Observabilidade e controle (no lugar do Unity Gateway)
 
@@ -83,7 +85,7 @@ Os logs JSON no stdout do App continuam (`tool`, `user`, `duration_ms`, `rows`, 
 - **Dado** o golden set, **quando** reformulado via `query_metric`, **então** os números são iguais aos do SQL de referência (reaproveita a SPEC-008).
 - **Dado** 31 chamadas de `query_metric` do mesmo usuário em 60s, **então** a 31ª recebe `RATE_LIMITED` com o seu `request_id`, e nenhuma linha de `system.query.history` contém esse `request_id` (no teste de unidade: o cliente SQL mockado não é chamado).
 - **Dado** qualquer chamada de tool, **então** existe um trace em `/Shared/atlas/mcp` com os atributos do §6 e **sem outputs** (teste: o span não tem `outputs` nem valores das linhas).
-- **Dado** o modo on-behalf-of-user (confirmado no S0.5 com token de usuário no cabeçalho; o OAuth interativo nativo é testado na P11.5), **então** a query da tool aparece em `system.query.history` com `executed_by` igual ao usuário do cliente MCP. **No plano B**, o critério passa a ser: o `user` do trace é o do cliente e `executed_by` é o service principal.
+- **Dado** o modo on-behalf-of-user (confirmado no S0.5 com token de usuário no cabeçalho; o OAuth interativo nativo foi tentado na P11.5 e não funciona, ver §5), **então** a query da tool aparece em `system.query.history` com `executed_by` igual ao usuário do cliente MCP. **No plano B**, o critério passa a ser: o `user` do trace é o do cliente e `executed_by` é o service principal.
 - **Dado** a página "Uso do MCP", **então** ela mostra chamadas, erros por código e p95 por tool para o último dia com tráfego.
 
 ## 8. Fora de escopo

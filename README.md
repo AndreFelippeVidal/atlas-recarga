@@ -17,6 +17,16 @@ Plataforma de dados e IA no **Databricks Free Edition** para a rede de recarga p
 ## Arquitetura
 Componentes, onde ficam os dados, a fronteira do humano (comissão) e a da IA (só leitura): [docs/architecture.md](docs/architecture.md).
 
+## Perguntar ao Atlas pelo Claude (MCP)
+O App `atlas-mcp` expõe as metric views como tools MCP somente leitura. No Claude Code:
+```bash
+claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp \
+  --header "Authorization: Bearer $DATABRICKS_USER_TOKEN"   # token de curta duração do seu usuário
+```
+Depois: *"Qual a receita bruta de outubro de 2026?"* → R$ 4.122.460,00, com a fonte `mv_recharges`.
+O login pelo navegador (OAuth) não funciona na Free Edition; o motivo, os cuidados com o token, a
+auditoria e a captura de tela estão em [docs/mcp-claude-code.md](docs/mcp-claude-code.md).
+
 ## Como rodar
 _A plataforma em si vem a partir da Fase 4; este README será completado na P13.3._
 
