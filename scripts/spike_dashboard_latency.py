@@ -14,8 +14,8 @@ Modos:
   `warehouse-frio` e repita logo depois, com o `--label warehouse-quente`.
 - `aggregate`: cria `<catalog>.semantic.spike_map_agg` por `MEASURE()` (agregado derivado da
   metric view, princípio 1) e mede a leitura dele contra a consulta direta à metric view.
-- `reuse`: UFs direto na metric view com conexão nova a cada consulta (como o `sql_client`
-  de hoje) contra uma conexão aberta uma vez.
+- `reuse`: UFs direto na metric view pelo `sql_client` (conexão reaproveitada, P12.11) contra
+  uma conexão nova a cada consulta (o comportamento antigo); a P12.11 pede p50 < 500 ms.
 - `drop`: remove a tabela do spike.
 """
 
@@ -37,6 +37,7 @@ from typing import Any
 
 GEO_DIR = Path(__file__).resolve().parents[1] / "apps" / "web" / "public" / "geo"
 AGG_TABLE = "spike_map_agg"
+REUSE_P50_MS = 500
 MEASURES = ("gross_revenue", "recharge_count", "avg_ticket", "active_pos")
 CATALOG_RE = re.compile(r"[a-z][a-z0-9_]*")
 
@@ -219,7 +220,7 @@ def run_aggregate(args: argparse.Namespace, drop: bool) -> int:
 
 
 def run_reuse(args: argparse.Namespace) -> int:
-    """Conexão aberta uma vez contra conexão nova a cada consulta (como o `sql_client` de hoje)."""
+    """`sql_client` (conexão reaproveitada) contra uma conexão nova a cada consulta (antes)."""
     from atlas_web.sql_client import make_executor
     from databricks import sql as dbsql
     from databricks.sdk.core import Config
@@ -233,9 +234,6 @@ def run_reuse(args: argparse.Namespace) -> int:
         f"SELECT `uf`, MEASURE(`gross_revenue`) AS `value` FROM {catalog}.semantic.mv_recharges "
         "WHERE `recharge_month` = :month GROUP BY ALL"
     )
-    new_each = make_executor()
-    fresh = [timed(lambda: new_each(query, {"month": first}))[0] for _ in range(args.repeat)]
-
     host = os.environ["DATABRICKS_HOST"].removeprefix("https://").rstrip("/")
     cfg = Config()
     open_s, conn = timed(
@@ -251,12 +249,31 @@ def run_reuse(args: argparse.Namespace) -> int:
             reused.append(
                 timed(lambda: (cursor.execute(query, {"month": first}), cursor.fetchall()))[0]
             )
+
+    def new_each() -> Any:
+        c = dbsql.connect(
+            server_hostname=host,
+            http_path=f"/sql/1.0/warehouses/{os.environ['DATABRICKS_WAREHOUSE_ID']}",
+            credentials_provider=lambda: cfg.authenticate,
+        )
+        with c, c.cursor() as cur:
+            cur.execute(query, {"month": first})
+            return cur.fetchall()
+
+    fresh = [timed(new_each)[0] for _ in range(args.repeat)]
+    executor = make_executor()  # a 1ª chamada abre a conexão; as seguintes a reaproveitam
+    executor(query, {"month": first})
+    client = [timed(lambda: executor(query, {"month": first}))[0] for _ in range(args.repeat)]
+    p50 = percentile([s * 1000 for s in client], 50)
     print(f"abrir a conexão uma vez: {open_s * 1000:.0f} ms\n")
     print("| consulta de UFs | n | mín ms | p50 ms | p95 ms | máx ms |")
     print("|---|---|---|---|---|---|")
-    print(format_row("conexão nova a cada consulta (hoje)", fresh))
-    print(format_row("conexão reaproveitada", reused))
-    return 0
+    print(format_row("conexão nova a cada consulta (antes)", fresh))
+    print(format_row("conexão aberta uma vez (referência)", reused))
+    print(format_row("sql_client.make_executor (P12.11)", client))
+    ok = p50 < REUSE_P50_MS
+    print(f"\np50 do sql_client < {REUSE_P50_MS} ms: {'sim' if ok else 'NÃO'} ({p50:.0f} ms)")
+    return 0 if ok else 1
 
 
 def _positive_int(value: str) -> int:

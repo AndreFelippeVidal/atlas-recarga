@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable, Mapping
+import threading
+from collections.abc import AsyncIterator, Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
+from functools import partial
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
@@ -18,6 +22,8 @@ log = logging.getLogger(__name__)
 UNKNOWN = "UNKNOWN"
 UNREACHABLE = "UNREACHABLE"
 RETRY_TIMEOUT_S = 10
+WARM_WORKERS = 4
+REFRESH_INTERVAL_S = 480  # antes do TTL de 10 min do cache (SPEC-007 §3)
 
 
 def warehouse_state(warehouse_id: str | None, fetch: Callable[[str], Any] | None = None) -> str:
@@ -38,20 +44,101 @@ def warehouse_state(warehouse_id: str | None, fetch: Callable[[str], Any] | None
         return UNREACHABLE
 
 
+Task = tuple[tuple[Any, ...], Callable[[], Any]]
+
+
+def warm_tasks(catalog: str, run: Executor, month: str) -> list[Task]:
+    """Consultas da tela do mês, com as mesmas chaves de cache dos endpoints."""
+    tasks: list[Task] = [(("kpis", month), lambda: kpis_mod.kpis(catalog, run, month))]
+    for measure in map_data.MAP_MEASURES:
+        tasks.append(
+            (
+                ("map", "region", month, measure),
+                partial(map_data.map_region, catalog, run, month, measure),
+            )
+        )
+        tasks.append(
+            (
+                ("map", "uf", month, measure, None),
+                partial(map_data.map_uf, catalog, run, month, measure, None),
+            )
+        )
+    return tasks
+
+
+def warm_cache(
+    store: TTLCache, catalog: str, run: Executor, release: Callable[[], None] | None = None
+) -> None:
+    """Aquece (ou renova) o cache da tela do último mês, em paralelo. Nunca levanta.
+
+    Cada consulta que falha é registrada e o valor antigo do cache fica.
+    """
+
+    def one(key: tuple[Any, ...], compute: Callable[[], Any]) -> None:
+        try:
+            store.refresh(key, compute)
+        except Exception:
+            log.warning("aquecimento falhou para %s", key, exc_info=True)
+        finally:
+            if release is not None:  # a thread do pool morre no fim do ciclo: não vaza conexão
+                release()
+
+    try:
+        months = store.refresh(("months",), lambda: kpis_mod.list_months(catalog, run))
+    except Exception:
+        log.warning("aquecimento falhou: meses", exc_info=True)
+        return
+    finally:
+        if release is not None:
+            release()
+    if not months:
+        return
+    with ThreadPoolExecutor(max_workers=WARM_WORKERS) as pool:
+        for key, compute in warm_tasks(catalog, run, months[0]):
+            pool.submit(one, key, compute)
+
+
 def create_app(
     executor: Executor | None = None,
     cache: TTLCache | None = None,
     warehouse_fetch: Callable[[str], Any] | None = None,
+    warm: bool = True,
+    refresh_interval_s: float = REFRESH_INTERVAL_S,
 ) -> FastAPI:
-    app = FastAPI(title="atlas-web", docs_url=None, redoc_url=None)
     store = cache or TTLCache()
     catalog = os.environ.get("ATLAS_CATALOG", "atlas")
     holder: list[Executor] = [executor] if executor else []
+    holder_lock = threading.Lock()
 
     def run(sql: str, params: Mapping[str, Any]) -> tuple[list[str], list[list[Any]]]:
         if not holder:  # o executor só nasce na 1ª consulta (precisa do ambiente do App)
-            holder.append(make_executor())
+            with holder_lock:
+                if not holder:
+                    holder.append(make_executor())
         return holder[0](sql, params)
+
+    def release() -> None:
+        close = getattr(holder[0], "close_thread", None) if holder else None
+        if close is not None:
+            close()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        stop = threading.Event()
+
+        def loop() -> None:  # thread daemon: aquece na subida e renova antes do TTL
+            while not stop.is_set():
+                warm_cache(store, catalog, run, release)
+                stop.wait(refresh_interval_s)
+
+        if warm:
+            threading.Thread(target=loop, name="cache-warmer", daemon=True).start()
+        try:
+            yield
+        finally:
+            stop.set()
+
+    app = FastAPI(title="atlas-web", docs_url=None, redoc_url=None, lifespan=lifespan)
 
     def unavailable() -> HTTPException:
         return HTTPException(503, {"code": "WAREHOUSE_UNAVAILABLE", "message": "consulta falhou"})

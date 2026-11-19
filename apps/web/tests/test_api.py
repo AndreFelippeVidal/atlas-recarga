@@ -338,3 +338,72 @@ def test_null_municipality_names_do_not_break_the_ordering() -> None:
     ]
     keys = ("municipality_ibge_code", "municipality_name")
     assert [i["municipality_ibge_code"] for i in _sorted(items, keys)] == ["1", "2"]
+
+
+def test_cache_refresh_overwrites_and_keeps_old_value_on_failure() -> None:
+    cache = TTLCache()
+    cache.get_or_set(("k",), lambda: 1)
+    assert cache.refresh(("k",), lambda: 2) == 2
+    assert cache.get_or_set(("k",), lambda: 99) == 2
+
+    def boom() -> int:
+        raise RuntimeError("x")
+
+    with pytest.raises(RuntimeError):
+        cache.refresh(("k",), boom)
+    assert cache.get_or_set(("k",), lambda: 99) == 2
+
+
+def test_warm_cache_fills_the_latest_month_screen_then_requests_hit_the_cache() -> None:
+    from atlas_web.app import warm_cache
+
+    wh = MapWarehouse()
+    cache = TTLCache()
+    warm_cache(cache, "atlas_test", wh)
+    calls = len(wh.calls)
+    assert calls > 1
+    c = TestClient(create_app(executor=wh, cache=cache, warm=False))
+    month = M.strftime("%Y-%m")
+    assert c.get("/api/months").is_success
+    for measure in ("gross_revenue", "mom_change"):
+        assert c.get("/api/map/region", params={"month": month, "measure": measure}).is_success
+        assert c.get("/api/map/uf", params={"month": month, "measure": measure}).is_success
+    assert len(wh.calls) == calls  # tudo veio do cache aquecido
+
+
+def test_warm_cache_never_raises_when_the_warehouse_fails() -> None:
+    from atlas_web.app import warm_cache
+
+    def down(sql: str, params: Mapping[str, Any]) -> tuple[list[str], list[list[Any]]]:
+        raise RuntimeError("warehouse fora")
+
+    warm_cache(TTLCache(), "atlas_test", down)
+
+
+def test_lifespan_warms_in_background_and_refreshes_periodically() -> None:
+    import threading
+
+    wh = FakeWarehouse(ROWS)
+    cache = TTLCache()
+    done = threading.Event()
+    refreshes: list[int] = []
+    original = cache.refresh
+
+    def spy(key: tuple[Any, ...], compute: Any) -> Any:
+        if key == ("months",):
+            refreshes.append(1)
+            if len(refreshes) >= 2:
+                done.set()
+        return original(key, compute)
+
+    cache.refresh = spy  # type: ignore[method-assign]
+    with TestClient(create_app(executor=wh, cache=cache, refresh_interval_s=0.01)):
+        assert done.wait(5)
+
+
+def test_warm_cache_releases_each_worker_connection() -> None:
+    from atlas_web.app import warm_cache
+
+    released: list[int] = []
+    warm_cache(TTLCache(), "atlas_test", MapWarehouse(), lambda: released.append(1))
+    assert len(released) >= 2  # meses + uma por tarefa do pool
