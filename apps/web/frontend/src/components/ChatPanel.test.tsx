@@ -57,10 +57,9 @@ it("acrescenta os delta e troca pelo done, com a Fonte como veio", async () => {
   const final = "A receita foi de R$ 4.122.460,00.\nFonte: semantic.mv_recharges · gross_revenue";
   stream.push(": ping\n\n" + sse("done", { text: final }));
   stream.end();
-  const answer = await screen.findByText(
-    (_, el) => el?.className === "chat-answer" && el.textContent === final,
-  );
-  expect(answer).toBeInTheDocument();
+  const source = await screen.findByLabelText("Fonte da resposta");
+  expect(source).toHaveTextContent("Fonte: semantic.mv_recharges · gross_revenue");
+  expect(screen.getByText("A receita foi de R$ 4.122.460,00.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Enviar" })).toBeDisabled(); // campo vazio
   expect(sent(0).message).toBe("receita de outubro?");
   expect(sent(0).conversation_id).toBeTruthy();

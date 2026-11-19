@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { chatErrorMessage, streamChat } from "../chat";
 import { ApiError } from "../api";
+import AnswerMarkdown from "./AnswerMarkdown";
 
-// Painel de chat (SPEC-007 §4). Exibe o texto do agente como veio, inclusive o bloco `Fonte:`:
-// o frontend não calcula, soma nem reformata número, e não mexe no mapa nem nos KPIs.
+// Painel de chat (SPEC-007 §4). Renderiza o Markdown do agente (ADR-0024) e destaca o bloco
+// `Fonte:`: o frontend não calcula, soma nem reformata número, e não mexe no mapa nem nos KPIs.
 
 export const SUGGESTIONS = [
   "Qual a receita bruta do último mês?",
@@ -22,6 +23,24 @@ interface Turn {
 
 function newConversationId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `c-${Date.now()}-${Math.floor(performance.now())}`;
+}
+
+function ChatIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.5-4.6A8 8 0 1 1 21 12Z" />
+    </svg>
+  );
 }
 
 export default function ChatPanel() {
@@ -92,6 +111,7 @@ export default function ChatPanel() {
   if (!open) {
     return (
       <button ref={openerRef} type="button" className="chat-open" onClick={() => setOpen(true)}>
+        <ChatIcon />
         Perguntar ao agente
       </button>
     );
@@ -106,16 +126,23 @@ export default function ChatPanel() {
       }}
     >
       <header className="chat-head">
-        <h2>Perguntar ao agente</h2>
-        <button type="button" onClick={close} aria-label="Fechar o chat">
-          Fechar
+        <span className="chat-avatar" aria-hidden="true">
+          <ChatIcon />
+        </span>
+        <div className="chat-title">
+          <h2>Perguntar ao agente</h2>
+          <p>Respostas só das métricas oficiais</p>
+        </div>
+        <button type="button" className="chat-close" onClick={close} aria-label="Fechar o chat">
+          <span aria-hidden="true">×</span>
         </button>
       </header>
 
       <div className="chat-log" ref={logRef} role="log" aria-live="polite">
         {turns.length === 0 && (
           <div className="chat-empty">
-            <p>Pergunte sobre receita, recargas e comissão. Algumas ideias:</p>
+            <p className="chat-empty-title">Pergunte sobre receita, recargas e comissão</p>
+            <p className="chat-empty-sub">Algumas ideias para começar:</p>
             <ul>
               {SUGGESTIONS.map((s) => (
                 <li key={s}>
@@ -131,9 +158,20 @@ export default function ChatPanel() {
           <div key={t.id} className="chat-turn">
             <p className="chat-question">{t.question}</p>
             {t.status === "streaming" && t.answer === "" && (
-              <p className="chat-wait">Consultando o agente…</p>
+              <p className="chat-wait" role="status">
+                <span className="chat-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                Consultando o agente
+              </p>
             )}
-            {t.answer !== "" && <p className="chat-answer">{t.answer}</p>}
+            {t.answer !== "" && (
+              <div className={`chat-answer${t.status === "streaming" ? " streaming" : ""}`}>
+                <AnswerMarkdown text={t.answer} />
+              </div>
+            )}
             {t.status === "stopped" && <p className="chat-note">Resposta interrompida.</p>}
             {t.status === "error" && (
               <div className="chat-error" role="alert">
