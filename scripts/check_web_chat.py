@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from typing import Any
 
@@ -64,6 +65,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--web-url", required=True)
     parser.add_argument("--agent-url", default=None)
     args = parser.parse_args(argv)
+    for url in (args.web_url, args.agent_url):  # a credencial só vai a Apps
+        if url and not re.fullmatch(r"https://[\w.-]+\.databricksapps\.com/?", url):
+            parser.error(f"URL fora de https://*.databricksapps.com: {url}")
 
     from databricks.sdk import WorkspaceClient
 
@@ -78,13 +82,17 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if "4.122.460,00" not in text:
                 problems.append("GS-001: valor diferente de R$ 4.122.460,00")
+            if text.startswith("ERROR"):
+                problems.append(f"GS-001: evento de erro: {text[:80]}")
             if "Fonte:" not in text:
                 problems.append("GS-001: sem `Fonte:`")
 
         status, text = ask(client, args.web_url, headers, GS026)
         print(f"GS-026 (recusa): HTTP {status}\n{text}\n")
-        if status != 200:
-            problems.append(f"GS-026: HTTP {status}")
+        if status != 200 or text.startswith("ERROR"):
+            problems.append(f"GS-026: HTTP {status} {text[:80]}")
+        elif re.search(r"\d{3}", text):
+            problems.append("GS-026: a recusa trouxe número")
 
         r = client.post(
             f"{args.web_url.rstrip('/')}/api/chat", json={"message": "  "}, headers=headers
