@@ -104,3 +104,9 @@ Medem a latência do `atlas-web` (por endpoint, com cache e warehouse frios e qu
 agregado derivado de `mv_recharges` e a leitura de uma synced table do Lakebase. Quem roda é o
 mantenedor, no `dev`; o roteiro e as tabelas de resultado estão em
 [docs/spikes/P12.10-dashboard-latency.md](../docs/spikes/P12.10-dashboard-latency.md).
+
+## `measure_web_p95.py` (P12.8)
+
+Mede o p95 dos municípios de uma UF no App `atlas-web` implantado (SPEC-007 §6): uma chamada fria por
+UF e medida, logo depois do deploy ou do `apps start`. Quem roda é o mantenedor, no `dev`; o roteiro
+está em [apps/web/README.md](../apps/web/README.md). Sai com 0 se o p95 < 3 s.

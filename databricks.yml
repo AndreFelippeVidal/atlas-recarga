@@ -304,6 +304,26 @@ resources:
             experiment_id: ${resources.experiments.atlas_mcp_traces.id}
             permission: CAN_EDIT
 
+    # App do dashboard (SPEC-007, P12.8). Lê só `semantic` com o service principal do App, por `MEASURE()`;
+    # o `SELECT` em `semantic` é concedido por principal (ADR-0016): `scripts/setup_workspace.py --reader
+    # <client id do App>`. O App serve o build do React em apps/web/static e as malhas em apps/web/public/geo.
+    atlas_web:
+      name: atlas-web
+      description: "Dashboard com mapa do Brasil do Atlas Recarga (FastAPI + React)"
+      source_code_path: ./apps/web
+      config:
+        command: ["uv", "run", "atlas-web"]
+        env:
+          - name: DATABRICKS_WAREHOUSE_ID
+            value_from: "sql-warehouse"
+          - name: ATLAS_CATALOG
+            value: ${var.catalog}
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+
   pipelines:
     atlas_medallion:
       name: atlas_medallion

@@ -10,7 +10,7 @@ Uma tela executiva de impacto: KPIs do mês e um **mapa coroplético do Brasil p
 | Camada | Escolha |
 |---|---|
 | Frontend | React 18 + TypeScript + Vite; mapa em **SVG com `d3-geo`** (projeção `geoMercator` com `fitSize`), sem tiles nem chave de API externa |
-| Backend | FastAPI no mesmo Databricks App, servindo o build estático e `/api/*` |
+| Backend | FastAPI no mesmo Databricks App, servindo o build estático e `/api/*`. O build do Vite fica **versionado** em `apps/web/static` (o App não tem Node; o CI confere que está atualizado) e as malhas saem de `apps/web/public/geo/` em `/geo` |
 | Dados | `databricks-sql-connector` → SQL warehouse → `atlas.semantic.mv_recharges` |
 | Geometria | Malhas do IBGE (API de malhas v3), baixadas **no build** por `scripts/fetch_geo.py`, simplificadas (mapshaper, ~1–5% dos vértices) e versionadas em `apps/web/public/geo/` |
 | Auth | Autenticação nativa do Databricks App; o backend consulta com o service principal (`SELECT` em `semantic`) |
@@ -63,7 +63,7 @@ Cada polígono tem `role="button"`, `aria-label` com o nome e o valor, e navega�
 - **Dado** o cenário `regional_drop` (−14% de recargas nos 13 municípios do Baixo Amazonas no penúltimo mês, SPEC-001 §5), **quando** seleciono o penúltimo mês e `mom_change` e clico no PA, **então** o tooltip e o ranking mostram o Δ% desses municípios (queda em torno de −14%, mais o ruído do dado). A classe de cor segue a escala do §4 (limite no percentil 90) e **não** é critério: uma queda de −14% cai em "perto de 0%" quando outros municípios variam ±70% ou mais.
 - **Dado** um mês, **então** a soma de `/api/map/region` e a de `/api/map/uf` para `gross_revenue` são iguais ao KPI `gross_revenue` e ao valor do AI/BI Dashboard.
 - **Dado** um clique numa região, **então** só as UFs dela ficam visíveis e centralizadas; **dado** um clique numa UF, **então** o mapa mostra direto os municípios dela.
-- **Dado** um clique numa UF, **então** a renderização dos municípios termina em p95 < 3s com cache frio de API e geometria em cache do navegador.
+- **Dado** um clique numa UF, **então** a renderização dos municípios termina em p95 < 3s com cache frio de API e geometria em cache do navegador. A medição (`scripts/measure_web_p95.py`) é a da **API** (`/api/map/municipality` por UF e medida, cache frio), contra o App implantado; o JSON da geometria e a renderização no navegador ficam fora dela.
 - **Dado** `measure=foo`, **então** a API retorna 400.
 - **Dado** qualquer UF, **então** 100% dos municípios da referência (a mesma que alimenta `dim_municipality`) têm polígono por `municipality_ibge_code`, e o único polígono da malha do IBGE sem linha na referência (Boa Esperança do Norte, MT) é descartado (teste automatizado entre geometria e referência).
 - **Dado** a API fora do ar, **então** o banner de erro aparece e a página não quebra.
