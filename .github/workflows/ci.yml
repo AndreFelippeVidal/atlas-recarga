@@ -55,6 +55,7 @@ jobs:
             web:
               - 'apps/web/frontend/**'
               - 'apps/web/public/**'
+              - 'apps/web/static/**'
               - '.github/workflows/ci.yml'
 
   lint:
@@ -179,6 +180,15 @@ jobs:
       - run: pnpm format:check
       - run: pnpm test
       - run: pnpm build
+      # P12.8: o App não tem Node; o build vai versionado em apps/web/static e precisa estar atualizado.
+      - name: Build commitado está atualizado
+        working-directory: .
+        run: |
+          if [ -n "$(git status --porcelain -- apps/web/static)" ]; then
+            git status --short -- apps/web/static
+            echo "Rode 'pnpm build' em apps/web/frontend e commite apps/web/static"
+            exit 1
+          fi
 
   ci-ok:
     needs: [changes, lint, types, test, secrets, docs, bundle-validate, agent-eval, web-frontend]

@@ -407,3 +407,53 @@ def test_warm_cache_releases_each_worker_connection() -> None:
     released: list[int] = []
     warm_cache(TTLCache(), "atlas_test", MapWarehouse(), lambda: released.append(1))
     assert len(released) >= 2  # meses + uma por tarefa do pool
+
+
+def _frontend(tmp_path: Any) -> tuple[Any, Any]:
+    static = tmp_path / "static"
+    (static / "assets").mkdir(parents=True)
+    (static / "index.html").write_text("<div id='root'></div>")
+    (static / "assets" / "app.js").write_text("console.log(1)")
+    geo = tmp_path / "geo"
+    (geo / "mun").mkdir(parents=True)
+    (geo / "br-uf.json").write_text("{}")
+    (geo / "mun" / "PA.json").write_text('{"x":1}')
+    return static, geo
+
+
+def test_serves_the_react_build_geo_and_keeps_api_routes(tmp_path: Any) -> None:
+    static, geo = _frontend(tmp_path)
+    c = TestClient(
+        create_app(executor=FakeWarehouse(ROWS), cache=TTLCache(), static_dir=static, geo_dir=geo)
+    )
+    root = c.get("/")
+    assert root.status_code == 200 and "root" in root.text
+    assert c.get("/assets/app.js").status_code == 200
+    assert c.get("/geo/br-uf.json").status_code == 200
+    assert c.get("/geo/mun/PA.json").json() == {"x": 1}
+    assert c.get("/api/health").json()["status"] == "healthy"
+    assert c.get("/api/months").json() == {"months": ["2026-10", "2026-09"]}
+
+
+def test_api_only_when_there_is_no_build(tmp_path: Any) -> None:
+    c = TestClient(
+        create_app(
+            executor=FakeWarehouse(ROWS),
+            cache=TTLCache(),
+            static_dir=tmp_path / "nada",
+            geo_dir=tmp_path / "nada",
+        )
+    )
+    assert c.get("/").status_code == 404
+    assert c.get("/api/health").status_code == 200
+
+
+def test_committed_build_exists_and_references_only_committed_assets() -> None:
+    from pathlib import Path
+
+    static = Path(__file__).resolve().parents[1] / "static"
+    html = (static / "index.html").read_text()
+    refs = re.findall(r'(?:src|href)="(/assets/[^"]+)"', html)
+    assert refs, "index.html sem /assets/..."
+    for ref in refs:
+        assert (static / ref.lstrip("/")).is_file(), ref

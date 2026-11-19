@@ -9,9 +9,12 @@ from collections.abc import AsyncIterator, Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from atlas_web import kpis as kpis_mod
 from atlas_web import map_data
@@ -104,6 +107,8 @@ def create_app(
     warehouse_fetch: Callable[[str], Any] | None = None,
     warm: bool = True,
     refresh_interval_s: float = REFRESH_INTERVAL_S,
+    static_dir: Path | None = None,
+    geo_dir: Path | None = None,
 ) -> FastAPI:
     store = cache or TTLCache()
     catalog = os.environ.get("ATLAS_CATALOG", "atlas")
@@ -138,7 +143,9 @@ def create_app(
         finally:
             stop.set()
 
-    app = FastAPI(title="atlas-web", docs_url=None, redoc_url=None, lifespan=lifespan)
+    app = FastAPI(
+        title="atlas-web", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
+    )
 
     def unavailable() -> HTTPException:
         return HTTPException(503, {"code": "WAREHOUSE_UNAVAILABLE", "message": "consulta falhou"})
@@ -237,4 +244,23 @@ def create_app(
         )
         return result
 
+    mount_frontend(app, static_dir, geo_dir)
     return app
+
+
+def mount_frontend(app: FastAPI, static_dir: Path | None, geo_dir: Path | None) -> None:
+    """Serve o build do React e as malhas do mapa (SPEC-007 §2). Vem depois de `/api/*`."""
+    if geo_dir is not None and geo_dir.is_dir():
+        app.mount("/geo", StaticFiles(directory=geo_dir), name="geo")
+    if static_dir is None:
+        return
+    if not (static_dir / "index.html").is_file():
+        log.warning("build do React ausente em %s: o App serve só a API", static_dir)
+        return
+    if (static_dir / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+    index = static_dir / "index.html"
+
+    @app.get("/", include_in_schema=False)
+    def root() -> FileResponse:
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})

@@ -20,7 +20,7 @@ uv run python scripts/check_web_map.py    # idem; confere soma das regiões e UF
 
 ## Frontend (P12.4)
 
-`frontend/` é o Vite + React 18 + TypeScript (pnpm, Node 22). Em desenvolvimento, `vite` faz proxy de `/api` para `localhost:8000` (o FastAPI) e serve `public/geo/` pelo `publicDir`. O FastAPI ainda não serve o build estático (P12.8).
+`frontend/` é o Vite + React 18 + TypeScript (pnpm, Node 22). Em desenvolvimento, `vite` faz proxy de `/api` para `localhost:8000` (o FastAPI) e serve `public/geo/` pelo `publicDir`. O build vai para `apps/web/static` (versionado; o CI confere que está atualizado) e o FastAPI o serve junto de `public/geo/` (P12.8).
 
 ```bash
 cd apps/web/frontend
@@ -33,3 +33,25 @@ Os valores chegam como string decimal e o frontend só formata; nenhuma métrica
 ## Mapa por região (P12.5)
 
 `frontend/src/components/RegionMap.tsx` desenha as 27 UFs em SVG com `d3-geo` (`geoMercator` + `fitSize`) a partir de `public/geo/br-uf.json`, pintando cada UF com o valor da **sua região** (`/api/map/region`). As fronteiras das regiões ficam em destaque. A escala é de quantis em 5 classes (`scale.ts`), azul sequencial (valor maior = mais escuro, nos dois temas, para mostrar concentração), e a legenda mostra a faixa de cada classe e a unidade. O ranking e o tooltip repetem o valor, então a cor nunca é a única informação. Região sem valor no mês aparece hachurada e como "sem recargas". Seletor de medida: `gross_revenue`, `recharge_count`, `avg_ticket`, `active_pos` (o `mom_change` e a escala divergente são da P12.7; o drill-down, da P12.6).
+
+## App `atlas-web` (P12.8)
+
+O recurso `atlas_web` do `databricks.yml` publica o App: `uv run atlas-web` (`atlas_web/main.py`) serve `/api/*`, o build do React (`static/`) e as malhas (`/geo`, de `public/geo/`). O service principal do App só tem `CAN_USE` no warehouse e `SELECT` em `semantic`.
+
+Ao mudar o frontend: `cd apps/web/frontend && pnpm build` e commite `apps/web/static`.
+
+Deploy e medição (pelo mantenedor, no `dev`):
+
+```bash
+databricks bundle deploy -t dev --profile andrevidal
+databricks apps get atlas-web --profile andrevidal            # URL e o service_principal_client_id
+# 1º deploy: conceda `semantic` ao service principal do App (ADR-0016)
+uv run python scripts/setup_workspace.py --target dev --profile andrevidal --reader <service_principal_client_id>
+databricks apps start atlas-web --profile andrevidal           # se estiver parado
+# logo depois do start (cache de API frio para municípios):
+uv run python scripts/measure_web_p95.py --profile andrevidal --url https://<url do App>
+```
+
+O script faz uma chamada fria de `/api/map/municipality` por UF e medida (135 amostras, com `mom_change`) e sai com 0 se o p95 < 3 s (2 se o cache estava quente: reinicie o App e repita). Se passar de 3 s, o ADR-0022 manda reabrir o Lakebase.
+
+O build do Vite precisa sair igual no CI: se o job `web-frontend` reclamar de `apps/web/static`, rode `pnpm install --frozen-lockfile && pnpm build` com Node 22 e pnpm 10.33 e commite.
