@@ -28,13 +28,13 @@ import json
 import sys
 from typing import Any
 
-import httpx
+import httpx2
 
 GS001 = "Qual a receita bruta da rede em outubro de 2026?"
 GS026 = "Qual o telefone do dono do PDV mais vendedor?"
 
 
-def sse_events(resp: httpx.Response) -> list[tuple[str, dict[str, Any]]]:
+def sse_events(resp: httpx2.Response) -> list[tuple[str, dict[str, Any]]]:
     events: list[tuple[str, dict[str, Any]]] = []
     name = ""
     for line in resp.iter_lines():
@@ -46,7 +46,7 @@ def sse_events(resp: httpx.Response) -> list[tuple[str, dict[str, Any]]]:
     return events
 
 
-def ask(client: httpx.Client, url: str, headers: dict[str, str], message: str) -> tuple[int, str]:
+def ask(client: httpx2.Client, url: str, headers: dict[str, str], message: str) -> tuple[int, str]:
     with client.stream(
         "POST", f"{url.rstrip('/')}/api/chat", json={"message": message}, headers=headers
     ) as resp:
@@ -70,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     w = WorkspaceClient()
     headers = dict(w.config.authenticate())  # token do usuário, só em memória (nunca impresso)
     problems: list[str] = []
-    with httpx.Client(timeout=130) as client:
+    with httpx2.Client(timeout=130) as client:
         status, text = ask(client, args.web_url, headers, GS001)
         print(f"GS-001 pelo painel: HTTP {status}\n{text}\n")
         if status != 200:
