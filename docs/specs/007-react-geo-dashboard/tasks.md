@@ -94,14 +94,15 @@
 - **Depende de:** P12.12
 - **Pronto quando:** Testes unitários e build verdes; o painel só exibe a resposta e a citação
 - **Passos:**
-  - Backend: `POST /api/chat` conforme o contrato do ADR da P12.12; repassa a pergunta ao `atlas-agent`, devolve a resposta e a fonte, e mapeia falhas para o contrato de erros da SPEC-007 §3 (sem inventar resposta)
-  - Frontend: painel de chat recolhível no dashboard, com estados de carregando, erro e vazio e acessibilidade por teclado; mostra a citação `Fonte:` e nunca calcula métrica
-  - Testes: contrato (erro do agente, timeout, mensagem vazia, limite de tamanho) com o agente simulado; nada de SQL novo no `atlas-web`
+  - Agente (SPEC-005 §5, ADR-0023): mascarador de fluxo para os deltas de texto (cauda de 40 caracteres), com testes de CPF, telefone e e-mail cortados entre deltas; o `done` traz o texto completo mascarado
+  - Backend: `POST /api/chat` em SSE conforme o ADR-0023 (`delta`, `done`, `error`), repassando o token do usuário e o `conversation_id`; limite de 10 mensagens por minuto por usuário; falhas viram o contrato da SPEC-007 §3 (sem inventar resposta)
+  - Frontend: painel de chat recolhível (SPEC-007 §4) que acrescenta os `delta`, troca pelo `done` e tem botão "Parar"; estados de vazio, enviando e erro, e teclado; mostra a citação `Fonte:` e nunca calcula métrica
+  - Testes: contrato (erro do agente, timeout por idle e total, mensagem vazia, limite de tamanho, 403, limite por usuário, fluxo cortado no meio) com o agente simulado; nada de SQL novo no `atlas-web`
 
 ### P12.14 🤝 Deploy, permissão e conferência do chat
 
 - **Depende de:** P12.13
 - **Pronto quando:** Uma pergunta do golden set pelo painel devolve o mesmo valor do agente; p95 do dashboard não piora
 - **Passos:**
-  - O agente prepara o bundle (permissão do SP do `atlas-web` no `atlas-agent`) e um `scripts/check_web_chat.py`; o mantenedor faz o deploy e roda a conferência no `dev`
+  - O agente prepara o bundle (`user_api_scopes` do `atlas-web`) e a lista de usuários com `CAN_USE` no `agent-atlas`; **primeiro confirma no `dev` o escopo de OBO entre Apps** (ADR-0023: se falhar, reabrir o ADR) e um `scripts/check_web_chat.py`; o mantenedor faz o deploy e roda a conferência no `dev`
   - Conferir GS-001 pelo painel (R$ 4.122.460,00) e uma recusa do golden set; o trace do agente mostra o usuário; os 3 Apps sobem juntos (auto-stop de 24h)

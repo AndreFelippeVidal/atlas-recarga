@@ -1,6 +1,6 @@
 # SPEC-005 — Agente de negócio (`atlas-agent`)
 
-> PRD: F6 · ADRs: [0006](../../adr/0006-agent-framework-genie.md), [0007](../../adr/0007-unity-gateway-llm-governance.md), [0009](../../adr/0009-three-apps-allocation.md) · Status: rascunho
+> PRD: F6 · ADRs: [0006](../../adr/0006-agent-framework-genie.md), [0007](../../adr/0007-unity-gateway-llm-governance.md), [0009](../../adr/0009-three-apps-allocation.md), [0023](../../adr/0023-dashboard-agent-chat-streaming.md) · Status: rascunho
 
 ## 1. Objetivo
 Responder a perguntas de negócio da Diretoria Comercial em PT-BR com **números rastreáveis até a metric view**, **sem nenhuma capacidade de escrita**, com todo o tráfego de LLM passando pelo **Unity Gateway** e cada conversa registrada em **MLflow traces**.
@@ -66,6 +66,8 @@ Guardrails e limites ([ADR-0021](../../adr/0021-agent-gateway-limits-and-pii-fal
 - **Freio de gasto:** 500.000 tokens por hora no serviço (`RATE_LIMIT_KEY_SERVICE`), dimensionado pelo pior turno da P10.2 (143.841 tokens). O aviso mensal é um orçamento de conta com alerta por e-mail, que notifica e não bloqueia.
 - **PII na saída:** filtro determinístico no App (CPF, telefone, e-mail) que mascara o trecho e marca o trace com `pii_masked = true`. Tópicos fora do escopo: a recusa do prompt (regra 3), medida pelo golden set.
 - **Inference table** do LLM em `atlas.observability.agent_llm_payload`.
+- **Streaming de texto (ADR-0023, P12.13):** o `atlas-web` consome o stream do agente, então os deltas de texto deixam de ser descartados e passam por um **mascarador de fluxo**: guarda uma cauda de 40 caracteres, aplica `mask_pii` ao acumulado e só libera o que está fora da cauda (um CPF ou telefone cortado entre deltas é mascarado inteiro). O item `response.output_item.done` traz o texto completo mascarado e é a fonte da verdade; o golden set avalia esse item. `pii_masked = true` segue no trace.
+- **Chamado por outro App:** o `atlas-web` chama o `/invocations` com o token do usuário (OBO); o `user` do trace sai desse token como hoje (§5). Os 30 req/min do gateway são compartilhados com a chat UI.
 
 ## 5. Observabilidade
 - `mlflow.langchain.autolog()` com tracing ligado; experiment `/Shared/atlas/agent-traces`. Trace tables no UC em `atlas.observability.agent_*`, ligadas a esse experiment por `scripts/setup_agent_trace_tables.py`. O MLflow só liga um trace location UC a um experiment **sem traces**, por isso é um experiment novo; o `/Shared/atlas/agent` (traces da P10.2 a P10.4 e o dataset do golden set) continua como está.
