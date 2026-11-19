@@ -390,6 +390,7 @@ dependencies = [
     { name = "databricks-sdk" },
     { name = "databricks-sql-connector" },
     { name = "fastapi" },
+    { name = "httpx2" },
     { name = "uvicorn" },
 ]
 
@@ -398,6 +399,7 @@ requires-dist = [
     { name = "databricks-sdk", specifier = ">=0.60.0" },
     { name = "databricks-sql-connector", specifier = ">=4.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "httpx2", specifier = ">=2.16.0" },
     { name = "uvicorn", specifier = ">=0.30.0" },
 ]
 
