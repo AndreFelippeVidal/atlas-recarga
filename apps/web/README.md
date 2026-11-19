@@ -10,6 +10,8 @@ Databricks App `atlas-web` (FastAPI + React). Governado pela [SPEC-007](../../do
 
 O mapa (P12.3): `GET /api/map/region`, `/api/map/uf` (`region` opcional) e `/api/map/municipality` (`uf` obrigatório), todos com `month` e `measure` (`gross_revenue`, `recharge_count`, `avg_ticket`, `active_pos`, `mom_change`). Cada nível vem de `MEASURE()` agrupado pela dimensão do nível. O `mom_change` (Δ% de `gross_revenue`) é calculado no backend e vale `null` sem base no mês anterior. Medida, região ou UF fora da lista fechada dão `400`; mês sem dados, `404`.
 
+Conexão e cache (P12.11, ADR-0022): o `sql_client` mantém **uma conexão por thread**, aberta na 1ª consulta e reaproveitada; se uma conexão reaproveitada falha, fecha, reabre e repete uma vez. Na subida, uma thread daemon aquece o cache da tela do último mês (meses, KPIs, regiões e UFs, em paralelo, sem bloquear a subida) e o renova a cada 8 minutos, antes do TTL de 10. Município por UF continua sob demanda.
+
 ```bash
 uv run pytest apps/web
 uv run python scripts/check_web_kpis.py   # no dev, pelo mantenedor (ver o docstring)

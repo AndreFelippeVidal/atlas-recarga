@@ -25,5 +25,11 @@ class TTLCache:
         self._items[key] = (self._clock(), value)
         return value
 
+    def refresh(self, key: tuple[Any, ...], compute: Callable[[], Any]) -> Any:
+        """Recalcula e grava sem olhar o TTL. Se `compute` falhar, o valor antigo fica."""
+        value = compute()
+        self._items[key] = (self._clock(), value)
+        return value
+
     def clear(self) -> None:
         self._items.clear()

@@ -32,7 +32,7 @@ Arquivos de geometria:
 
 `measure ∈ {gross_revenue, recharge_count, avg_ticket, active_pos, mom_change}`. `mom_change` = Δ% de `gross_revenue` contra o mês anterior, calculado no backend a partir de uma consulta com os dois meses; vale `null` quando o mês anterior não tem base (ausente ou zero). O valor de cada nível vem de `MEASURE()` agrupado pela dimensão do nível (`region`, `uf`, `municipality_ibge_code`): o frontend **nunca** soma UFs para obter a região, porque `avg_ticket` e `active_pos` não são aditivos. Qualquer outro valor retorna **400**, assim como `region` fora de `N`, `NE`, `CO`, `SE`, `S` e `uf` ausente ou fora das 27 siglas. As listas trazem só as linhas com valor no mês (regiões, UFs ou municípios sem recarga ficam de fora; o frontend os trata como "sem recargas"); um mês sem nenhuma recarga é **404**, e uma UF sem recarga num mês que existe é lista vazia.
 **Formato:** valores numéricos saem como **string decimal** (`"4122460.00"`), sem float; `delta_pct` em pontos percentuais com 2 casas. No primeiro mês da série `previous` e `delta_pct` são `null`. Erros: `400 INVALID_ARGUMENT` (parâmetro inválido), `404 NOT_FOUND` (mês sem dados), `503 WAREHOUSE_UNAVAILABLE`. `/api/health` devolve `status` (do App, sempre `healthy` se responde) e `warehouse` (estado, sem acordá-lo).
-**Cache:** em memória por `(endpoint, params)` por 10 minutos (os dados são D-1).
+**Cache:** em memória por `(endpoint, params)` por 10 minutos (os dados são D-1). Na subida, o backend aquece o cache da tela do último mês (meses, KPIs, regiões e UFs) em segundo plano, sem bloquear a subida, e o renova a cada 8 minutos, antes do TTL (ADR-0022). A conexão com o warehouse é reaproveitada, uma por thread.
 
 ## 4. Comportamento da tela
 
