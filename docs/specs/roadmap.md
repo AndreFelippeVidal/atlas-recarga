@@ -27,7 +27,7 @@
 | 9 | Avaliação do agente: golden set antes do agente | [008-agent-evaluation](008-agent-evaluation/spec.md) | 3 |
 | 10 | Agente de negócio | [005-business-agent](005-business-agent/spec.md) | 8 |
 | 11 | MCP server | [006-mcp-server](006-mcp-server/spec.md) | 4 (a P11.5 fica no fim da Fase 12) |
-| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 11 + P11.5 |
+| 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 14 + P11.5 |
 | 13 | Demo e release v1.0 | — | 5 |
 
 ## Fase 0 — Fundação do repositório → [009-repo-foundation](009-repo-foundation/spec.md)
@@ -178,14 +178,17 @@ _KPIs + mapa coroplético UF → município, p95 < 3s._
 - [x] **P12.11** 🤖 `sql_client` do `atlas-web` com conexão reaproveitada (uma por thread, reconexão em erro) e aquecimento do cache na subida — _pronto quando:_ Testes unitários cobrem reconexão e threads; `scripts/spike_dashboard_latency.py reuse` mostra p50 < 500 ms; os `check_web_*` seguem ok no `dev` (#90) — conexão por thread com uma reconexão; aquecimento do último mês em thread daemon, renovado a cada 8 min, com as conexões das threads do aquecimento fechadas. Conferido no `dev` pelo mantenedor: `spike_dashboard_latency.py reuse` deu p50 de 345 ms no `sql_client` (p95 1.134 ms) contra 1.255 ms com conexão nova a cada consulta; `check_web_kpis.py` e `check_web_map.py` ok (`gross_revenue` de 2026-10 = 4.122.460,00). **Não conferido:** o p95 dentro do App (P12.8); a repetição vale para qualquer erro de uma conexão reaproveitada, não só os de conexão · depende de P12.10
 - [ ] **P12.8** 🤝 Deploy do App `atlas-web` (o FastAPI serve o build estático e `public/geo/`) + medição de p95 — _pronto quando:_ p95 < 3s registrado · depende de P12.11
 - [ ] **P12.9** 🤝 Revalidar o production monitoring do MLflow (Beta) da P10.8 — _pronto quando:_ O comando de contagem de assessments é rodado no `dev` e o resultado (mudou ou não) fica registrado na SPEC-008 §6 e no ADR-0013 · depende de P12.8
+- [ ] **P12.12** 🤖 ADR e spec do chat do agente dentro do dashboard (o `atlas-web` chama o `atlas-agent`) — _pronto quando:_ ADR novo com pelo menos 2 alternativas descartadas (agente dentro do `atlas-web`, link para a chat UI do agente) sobre autenticação (OBO ou service principal), permissões do SP do `atlas-web` e o contrato da chamada; SPEC-007 (§2, §3, §4, §6) e, se preciso, a SPEC-005 atualizadas em commit `docs(specs)` anterior ao código; `tech-stack.md` e ADR-0009 só mudam se a decisão pedir · depende de P12.8, P10.8
+- [ ] **P12.13** 🤖 Painel de chat no `atlas-web`: rota `/api/chat` que repassa ao `atlas-agent` + componente React — _pronto quando:_ Testes unitários cobrem o contrato do ADR (erro do agente, timeout, mensagem vazia, limite de tamanho); o frontend só exibe a resposta e a citação `Fonte:` e não calcula métrica; build no CI; o `atlas-web` não lê nada fora de `semantic` · depende de P12.12
+- [ ] **P12.14** 🤝 Deploy, permissão do SP do `atlas-web` no `atlas-agent` e conferência — _pronto quando:_ Uma pergunta do golden set feita pelo painel devolve o mesmo valor do agente (ex.: GS-001 = R$ 4.122.460,00) com `Fonte:`; o p95 do dashboard (P12.8) não piora; o trace do agente identifica o usuário · depende de P12.13
 - [ ] **P11.5** 🤝 Conectar ao Claude Code/Desktop e documentar no README (movida para o fim da Fase 12, antes da demo; o agente prepara a integração com você) — _pronto quando:_ Você pergunta no Claude e recebe a resposta com `source` · depende de P11.4, P12.8
 
 ## Fase 13 — Demo e release v1.0
 
 _Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medidas e publicadas._
 
-- [ ] **P13.0** 🤝 Migrar schemas, Volume e grants do UC de `setup_workspace.py` para o `databricks.yml` (ADR-0017) — _pronto quando:_ `bundle validate` mostra os schemas com nome fixo em `dev` e `demo`; um `bundle deploy` num catálogo vazio cria schemas, Volume e grants; o script fica só com catálogo e grupos; a P7.3 (`check_readers_permissions.py`) continua passando · depende de P10.8, P11.5, P12.8
-- [ ] **P13.1** 🤖 `make apps-start` + runbook de demo (auto-stop de 24h) — _pronto quando:_ Os 3 Apps sobem com um comando e os healthchecks passam · depende de P10.8, P11.5, P12.8, P13.0
+- [ ] **P13.0** 🤝 Migrar schemas, Volume e grants do UC de `setup_workspace.py` para o `databricks.yml` (ADR-0017) — _pronto quando:_ `bundle validate` mostra os schemas com nome fixo em `dev` e `demo`; um `bundle deploy` num catálogo vazio cria schemas, Volume e grants; o script fica só com catálogo e grupos; a P7.3 (`check_readers_permissions.py`) continua passando · depende de P10.8, P11.5, P12.8, P12.14
+- [ ] **P13.1** 🤖 `make apps-start` + runbook de demo (auto-stop de 24h) — _pronto quando:_ Os 3 Apps sobem com um comando e os healthchecks passam · depende de P10.8, P11.5, P12.8, P12.14, P13.0
 - [ ] **P13.2** 🤖 Teste de consistência entre os 5 consumidores — _pronto quando:_ Mesmo `gross_revenue` no AI/BI, Genie, agente, MCP e React · depende de P13.1
 - [ ] **P13.3** 🤖 README final (repo-readme-generator) com as métricas medidas do PRD §4 — _pronto quando:_ Uma pessoa nova roda a demo sem perguntar nada · depende de P13.2
 - [ ] **P13.4** 👤 Tag `v1.0.0` + release notes — _pronto quando:_ Release publicado · depende de P13.3
@@ -204,5 +207,4 @@ _Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medida
 | v2 | DQ por camada + Lakehouse Monitoring; expectations de volume bloqueantes |
 | v2 | UI de aprovação de comissão (novo ADR sobre o slot de App) |
 | v2 | Dashboard React com abas (Hierarquia, Indicadores, Território) em vez de tela única |
-| v2 | "Pergunte ao Genie" embutido no `atlas-web`: pede ADR novo sobre a alocação de Apps (ADR-0009) |
 | v3 | Row-level security por região; alertas proativos de queda regional |

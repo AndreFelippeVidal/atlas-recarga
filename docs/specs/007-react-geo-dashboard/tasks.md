@@ -79,3 +79,29 @@
   - Se continuar 0 assessments: registrar a nova data na SPEC-008 §6 e no ADR-0013 (o Beta segue sem efeito) e parar
   - Se houver assessments: registrar a latência trace→assessment e conferir que o job as reaproveita sem duplicar (deduplicação por nome); só então propor, em PR separado e com confirmação do mantenedor, mudar o texto da SPEC-008 §6 e do ADR-0013
 
+### P12.12 🤖 ADR e spec do chat do agente dentro do dashboard
+
+- **Depende de:** P12.8, P10.8
+- **Pronto quando:** ADR aceito e specs atualizadas em commit `docs(specs)` anterior ao código
+- **Passos:**
+  - Decisão já tomada pelo mantenedor: o `atlas-web` **chama** o `atlas-agent` (3 Apps mantidos, ADR-0009). Alternativas descartadas a registrar: agente embutido no processo do `atlas-web` (soma permissões e reabre a opção 4 do ADR-0009) e link ou iframe para a chat UI do agente (fora do board)
+  - Decidir e registrar: autenticação da chamada (token do usuário em OBO ou service principal do web), a permissão mínima do SP do `atlas-web` no `atlas-agent`, o contrato da rota (corpo, erros, timeout, tamanho máximo, streaming ou não) e o que o trace do agente grava sobre o usuário
+  - Conferir os princípios: nenhuma métrica calculada no frontend nem no `atlas-web`; o web continua lendo só `semantic`; o agente segue somente leitura e com a citação `Fonte:`
+  - Atualizar SPEC-007 (§2 arquitetura, §3 API, §4 comportamento do painel, §6 critérios) e, se o contrato do agente mudar, a SPEC-005. Se o ADR-0009 ou o `tech-stack.md` precisarem mudar, o motivo vai no ADR
+
+### P12.13 🤖 Painel de chat no `atlas-web`
+
+- **Depende de:** P12.12
+- **Pronto quando:** Testes unitários e build verdes; o painel só exibe a resposta e a citação
+- **Passos:**
+  - Backend: `POST /api/chat` conforme o contrato do ADR da P12.12; repassa a pergunta ao `atlas-agent`, devolve a resposta e a fonte, e mapeia falhas para o contrato de erros da SPEC-007 §3 (sem inventar resposta)
+  - Frontend: painel de chat recolhível no dashboard, com estados de carregando, erro e vazio e acessibilidade por teclado; mostra a citação `Fonte:` e nunca calcula métrica
+  - Testes: contrato (erro do agente, timeout, mensagem vazia, limite de tamanho) com o agente simulado; nada de SQL novo no `atlas-web`
+
+### P12.14 🤝 Deploy, permissão e conferência do chat
+
+- **Depende de:** P12.13
+- **Pronto quando:** Uma pergunta do golden set pelo painel devolve o mesmo valor do agente; p95 do dashboard não piora
+- **Passos:**
+  - O agente prepara o bundle (permissão do SP do `atlas-web` no `atlas-agent`) e um `scripts/check_web_chat.py`; o mantenedor faz o deploy e roda a conferência no `dev`
+  - Conferir GS-001 pelo painel (R$ 4.122.460,00) e uma recusa do golden set; o trace do agente mostra o usuário; os 3 Apps sobem juntos (auto-stop de 24h)
