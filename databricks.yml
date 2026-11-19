@@ -27,6 +27,8 @@ variables:
     default: "false"
   warehouse_id:
     description: SQL warehouse que executa as queries do dashboard (P7.4). Definido por target.
+  agent_url:
+    description: URL do App agent-atlas, para o chat do atlas-web (ADR-0023). Literal porque `${resources.apps.agent_atlas.url}` chega vazio ao config do outro App no deploy; a URL é fixa por nome de App e workspace.
 
 resources:
   dashboards:
@@ -311,6 +313,8 @@ resources:
       name: atlas-web
       description: "Dashboard com mapa do Brasil do Atlas Recarga (FastAPI + React)"
       source_code_path: ./apps/web
+      user_api_scopes:
+        - apps
       config:
         command: ["uv", "run", "atlas-web"]
         env:
@@ -318,10 +322,10 @@ resources:
             value_from: "sql-warehouse"
           - name: ATLAS_CATALOG
             value: ${var.catalog}
-          # Chat (ADR-0023): o /api/chat repassa ao agent-atlas com o token do usuário. O escopo OBO
-          # (user_api_scopes) e o CAN_USE dos usuários no agente ficam na P12.14.
+          # Chat (ADR-0023): o /api/chat repassa ao agent-atlas com o token do usuário (OBO, escopo
+          # `apps` = acesso App a App). O CAN_USE do usuário no agente é do workspace, não do SP do web.
           - name: ATLAS_AGENT_URL
-            value: ${resources.apps.agent_atlas.url}
+            value: ${var.agent_url}
       resources:
         - name: sql-warehouse
           sql_warehouse:
@@ -555,6 +559,7 @@ targets:
     variables:
       catalog: atlas_dev
       warehouse_id: af0a1dbe08dd5514
+      agent_url: https://agent-atlas-7474657271994643.aws.databricksapps.com
 
   demo:
     mode: production
@@ -563,3 +568,5 @@ targets:
     variables:
       catalog: atlas
       warehouse_id: af0a1dbe08dd5514
+      # O demo roda no mesmo workspace do dev (mesmo warehouse); troque aqui se ele ganhar o próprio.
+      agent_url: https://agent-atlas-7474657271994643.aws.databricksapps.com

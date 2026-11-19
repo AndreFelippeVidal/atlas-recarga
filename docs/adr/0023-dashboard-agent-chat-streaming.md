@@ -1,6 +1,6 @@
 # ADR-0023 — O `atlas-web` chama o `atlas-agent` por streaming, como o usuário (OBO)
 
-- **Status:** proposto
+- **Status:** aceito
 - **Data:** 2026-11-19
 - **Decisores:** mantenedor
 - **Relacionados:** SPEC-005, SPEC-007, ADR-0008, ADR-0009, ADR-0016, ADR-0021
@@ -31,7 +31,7 @@ Restrições: o `atlas-web` só lê `semantic` e não calcula métrica (princíp
 ## Decisão
 **Opção 1.**
 
-**Autenticação.** O `atlas-web` declara `user_api_scopes` e repassa o token do usuário (`x-forwarded-access-token`) no cabeçalho `Authorization: Bearer` da chamada ao `agent-atlas`. O agente enxerga o usuário real (a tag `user` do trace já sai de `current_user.me()` com esse token, SPEC-005 §5). O escopo exato que o Databricks exige para um App chamar outro App em nome do usuário **não está verificado**: a P12.14 o confirma no `dev` e, se o OBO não funcionar, reabre este ADR (gatilho abaixo).
+**Autenticação.** O `atlas-web` declara `user_api_scopes` e repassa o token do usuário (`x-forwarded-access-token`) no cabeçalho `Authorization: Bearer` da chamada ao `agent-atlas`. O agente enxerga o usuário real (a tag `user` do trace já sai de `current_user.me()` com esse token, SPEC-005 §5). O escopo que o Databricks exige para um App chamar outro App em nome do usuário é **`apps`** (`user_api_scopes: [apps]`), confirmado no `dev` na P12.14: o GS-001 feito pelo painel devolveu R$ 4.122.460,00 com `Fonte:` e o trace do agente trouxe a tag `user` com o e-mail do usuário. Não foi exercitado um segundo usuário (nem o 403 sem `CAN_USE`).
 
 **Permissões.** O SP do `atlas-web` continua só com `SELECT` em `semantic` e `CAN_USE` no warehouse. Ele **não** ganha `CAN_RUN` no Genie nem `EXECUTE` em nada. O usuário precisa de `CAN_USE` no `agent-atlas` (permissão do App, concedida pelo mantenedor no workspace); sem ela a rota devolve `403 PERMISSION_DENIED`.
 
@@ -46,6 +46,8 @@ Restrições: o `atlas-web` só lê `semantic` e não calcula métrica (princíp
 **Streaming sem furar o filtro de PII.** O agente passa a emitir os deltas de texto, mas por um **mascarador de fluxo** (algoritmo na SPEC-005 §4): só libera texto até uma fronteira de espaço que deixe pelo menos 40 caracteres retidos no fim, de modo que um CPF, telefone ou e-mail cortado entre deltas é mascarado inteiro (e-mail e CPF não têm espaço; telefone com DDD e rótulo de CPF cabem nos 40). O item `response.output_item.done` traz o texto completo mascarado, que é a fonte da verdade (o evento `done` da rota). O trace continua marcando `pii_masked = true`. Isso altera a SPEC-005 §4 e o ADR-0021 (nota de alteração nele); a mudança entra na P12.13 junto com a rota, e o golden set (SPEC-008) roda sobre o item final e não muda.
 
 **Citação.** O bloco `Fonte:` faz parte do texto do agente; o painel o exibe sem tratar, e o frontend não calcula nem reformata métrica.
+
+> **Nota da P12.14 (2026-11-19):** o `ATLAS_AGENT_URL` do `atlas-web` vem da variável de bundle `agent_url` (URL literal do `agent-atlas`), pois `${resources.apps.agent_atlas.url}` chega vazio ao config de outro App no deploy (o chat devolvia `503 AGENT_UNAVAILABLE`). `bundle run` não gera deployment se nada mudou: depois de mexer só no código, use `databricks apps deploy atlas-web --source-code-path <caminho do bundle>`. P95 do dashboard medido depois: 484 ms (P12.8: 1.457 ms).
 
 ## Prós e contras das opções
 ### 1. Repasse com OBO, SSE
