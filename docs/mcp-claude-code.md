@@ -35,7 +35,7 @@ Pré-requisitos: o App `atlas-mcp` está `RUNNING` (ele para sozinho após 24 h;
 databricks apps get atlas-mcp --profile <profile> -o json | jq -r .url
 
 # 2. Token de curta duração do seu usuário, só na sua sessão de shell
-export DATABRICKS_USER_TOKEN=<token OAuth do seu usuário, gerado pela CLI do Databricks>
+export DATABRICKS_USER_TOKEN=$(databricks auth token --profile <profile> | jq -r .access_token)
 
 # 3. Registrar o servidor no Claude Code
 claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp \
@@ -57,16 +57,17 @@ Registrar o client exigiria uma OAuth app connection no console de conta, que a 
 
 ### Cuidados
 
-- **O token expira** (cerca de 1 hora). Quando as tools passarem a falhar com erro de autenticação, gere outro token e repita os passos 2 e 3 (`claude mcp remove atlas` antes).
+- **O token expira** (estimativa: cerca de 1 hora; a duração não foi medida). Quando as tools passarem a falhar com erro de autenticação, gere outro token e repita os passos 2 e 3 (`claude mcp remove atlas` antes).
 - **`--header` grava o token em texto puro** no `~/.claude.json`, que fica na sua máquina e fora do repositório. Nunca cole o token em arquivo versionado, issue ou PR. Em máquina compartilhada, remova o servidor ao terminar: `claude mcp remove atlas`.
-- **Alternativa com proxy:** `claude mcp add atlas -- npx -y mcp-remote <url>/mcp --header "Authorization: Bearer ${DATABRICKS_USER_TOKEN}"` (o `mcp-remote` é o plano B original da SPEC-006 §5). O resultado é o mesmo.
+- **Alternativa com proxy (não testada na P11.5):** `claude mcp add atlas -- npx -y mcp-remote <url>/mcp --header "Authorization: Bearer ${DATABRICKS_USER_TOKEN}"` (o `mcp-remote` é o plano B original da SPEC-006 §5). Só vale se o `--header` nativo deixar de servir.
+- **Claude Desktop:** fora desta entrega. Só o Claude Code foi conectado e conferido.
 
 ## Segurança e auditoria
 
 | Garantia | Como se verifica |
 |---|---|
 | Só leitura | O servidor não tem tool de escrita; `query_metric` aceita só nomes da lista fechada (`catalog.json`, gerado de `semantic/*.yaml`) e vincula todo valor como parâmetro |
-| Roda como você | Modo on-behalf-of-user: `system.query.history.executed_by` é o seu usuário, e quem não tem `SELECT` em `atlas.semantic` recebe `PERMISSION_DENIED` |
+| Roda como você | Modo on-behalf-of-user: `system.query.history.executed_by` é o seu usuário (conferido no S0.5 e na P11.4; **não** na sessão da P11.5). Quem não tem `SELECT` em `atlas.semantic` deve receber erro de permissão, o que também não foi conferido com um segundo usuário |
 | Rastreável | Cada chamada gera um trace em `/Shared/atlas/mcp` (só atributos, sem valores) e o SQL leva o comentário `/* atlas-mcp request_id=… */`, o mesmo `request_id` do trace |
 | Limite de uso | 30 chamadas por minuto por usuário; a 31ª recebe `RATE_LIMITED` sem rodar query |
 
