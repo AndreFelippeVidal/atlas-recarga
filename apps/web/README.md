@@ -43,7 +43,8 @@ Ao mudar o frontend: `cd apps/web/frontend && pnpm build` e commite `apps/web/st
 Deploy e medição (pelo mantenedor, no `dev`):
 
 ```bash
-databricks bundle deploy -t dev --profile andrevidal
+databricks bundle deploy -t dev --profile andrevidal   # só cria o App; o código sobe no `bundle run`
+databricks bundle run atlas_web -t dev --profile andrevidal
 databricks apps get atlas-web --profile andrevidal            # URL e o service_principal_client_id
 # 1º deploy: conceda `semantic` ao service principal do App (ADR-0016)
 uv run python scripts/setup_workspace.py --target dev --profile andrevidal --reader <service_principal_client_id>
