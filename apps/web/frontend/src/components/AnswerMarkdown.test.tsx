@@ -58,3 +58,30 @@ it("splitSource usa a última Fonte: e aceita resposta sem ela", () => {
     source: "Fonte: x\nb Fonte: y",
   });
 });
+
+it("negrito sem par (streaming) não quebra nem vaza elemento", () => {
+  const { container } = render(<AnswerMarkdown text="A receita foi de **R$ 4.122" />);
+  expect(container.querySelector("strong")).toBeNull();
+  expect(container.textContent).toContain("R$ 4.122");
+});
+
+it("resposta sem Fonte: não mostra a citação", () => {
+  render(<AnswerMarkdown text="Não tenho esse dado." />);
+  expect(screen.queryByLabelText("Fonte da resposta")).toBeNull();
+  expect(screen.getByText("Não tenho esse dado.")).toBeInTheDocument();
+});
+
+it("Fonte: com Markdown dentro e a variante **Fonte:**", () => {
+  const { container, unmount } = render(
+    <AnswerMarkdown text={"ok\n\nFonte: `semantic.mv_recharges` · **gross_revenue**"} />,
+  );
+  const aside = screen.getByLabelText("Fonte da resposta");
+  expect(aside.querySelector("code")?.textContent).toBe("semantic.mv_recharges");
+  expect(container.textContent).not.toContain("`");
+  unmount();
+
+  render(<AnswerMarkdown text={"ok\n\n**Fonte:** semantic.mv_recharges"} />);
+  expect(screen.getByLabelText("Fonte da resposta")).toHaveTextContent(
+    "Fonte: semantic.mv_recharges",
+  );
+});

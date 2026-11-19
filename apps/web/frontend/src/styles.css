@@ -715,7 +715,19 @@ button {
   font-size: 0.82rem;
   overflow-wrap: anywhere;
 }
+.md-source {
+  white-space: pre-line;
+}
 .md-source strong {
   margin-right: 4px;
   color: var(--text);
+}
+.chat-open:focus-visible {
+  outline-color: var(--text);
+  outline-offset: 3px;
+}
+.chat-close:focus-visible,
+.md a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

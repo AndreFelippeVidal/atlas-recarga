@@ -51,6 +51,7 @@ it("acrescenta os delta e troca pelo done, com a Fonte como veio", async () => {
   expect(screen.getByRole("button", { name: "Parar" })).toBeInTheDocument();
   stream.push(sse("delta", { text: "A receita foi de R$ 4.122" }));
   await screen.findByText("A receita foi de R$ 4.122");
+  expect(document.querySelector(".chat-answer.streaming")).not.toBeNull();
   stream.push(sse("delta", { text: ".460,00." }));
   await screen.findByText("A receita foi de R$ 4.122.460,00.");
 

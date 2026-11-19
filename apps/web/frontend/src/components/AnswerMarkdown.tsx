@@ -56,33 +56,38 @@ const components: ComponentProps<typeof Markdown>["components"] = {
 
 /** Separa o bloco final `Fonte:` do corpo, só para mostrá-lo como citação. O texto não muda. */
 export function splitSource(text: string): { body: string; source: string } {
-  const matches = [...text.matchAll(/(^|\n)[ \t]*Fonte:/g)];
+  const matches = [...text.matchAll(/(^|\n)[ \t]*(?:\*\*)?Fonte:/g)];
   const last = matches.at(-1);
   if (last?.index === undefined) return { body: text, source: "" };
   const start = last.index + last[1].length;
   return { body: text.slice(0, start).trimEnd(), source: text.slice(start).trim() };
 }
 
+function Rich({ children, inline }: { children: string; inline?: boolean }) {
+  return (
+    <Markdown
+      remarkPlugins={[remarkGfm]}
+      skipHtml
+      allowedElements={ALLOWED}
+      unwrapDisallowed
+      urlTransform={safeUrl}
+      components={inline ? { ...components, p: ({ children: c }) => <>{c}</> } : components}
+    >
+      {children}
+    </Markdown>
+  );
+}
+
 export default function AnswerMarkdown({ text }: { text: string }) {
   const { body, source } = splitSource(text);
+  // O rótulo "Fonte:" é sempre mostrado em negrito; o resto da citação também aceita Markdown.
+  const rest = source.replace(/^(?:\*\*)?Fonte:(?:\*\*)?/, "");
   return (
     <div className="md">
-      {body !== "" && (
-        <Markdown
-          remarkPlugins={[remarkGfm]}
-          skipHtml
-          allowedElements={ALLOWED}
-          unwrapDisallowed
-          urlTransform={safeUrl}
-          components={components}
-        >
-          {body}
-        </Markdown>
-      )}
+      {body !== "" && <Rich>{body}</Rich>}
       {source !== "" && (
         <aside className="md-source" aria-label="Fonte da resposta">
-          <strong>Fonte:</strong>
-          {source.replace(/^Fonte:/, "")}
+          <strong>Fonte:</strong> <Rich inline>{rest.trim()}</Rich>
         </aside>
       )}
     </div>
