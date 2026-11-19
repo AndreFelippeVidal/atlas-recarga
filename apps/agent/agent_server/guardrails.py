@@ -7,6 +7,7 @@ inference table), então a máscara vive aqui. Sem imports pesados: testado no C
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 
 MASK = "[dado pessoal omitido]"
@@ -39,6 +40,86 @@ def mask_pii(text: str) -> tuple[str, bool]:
     return masked, masked != text
 
 
+HOLD_BACK = 40  # mais que qualquer padrão com espaço (telefone com DDD, rótulo de CPF)
+
+
+class StreamMasker:
+    """Mascara um texto que chega em deltas (ADR-0023, SPEC-005 §4).
+
+    Acumula o texto bruto e só libera até uma fronteira de espaço que deixe pelo menos `HOLD_BACK`
+    caracteres retidos no fim. Um corte só vale se nenhum padrão de PII o atravessa (o mascarado do
+    prefixo é prefixo do mascarado do todo), então o que já saiu nunca fica incompleto.
+    """
+
+    def __init__(self) -> None:
+        self.raw = ""
+        self.emitted = ""
+        self._cut = 0
+        self.masked_any = False
+
+    def _emit(self, masked: str) -> str:
+        new = masked[len(self.emitted) :]
+        self.emitted = masked
+        return new
+
+    def feed(self, delta: str) -> str:
+        """Devolve o trecho mascarado novo que já pode sair (pode ser vazio)."""
+        self.raw += delta
+        limit = len(self.raw) - HOLD_BACK
+        if limit <= self._cut:
+            return ""
+        full, _ = mask_pii(self.raw)
+        for cut in range(limit, self._cut, -1):
+            if not self.raw[cut - 1].isspace():
+                continue
+            prefix, hit = mask_pii(self.raw[:cut])
+            if full.startswith(prefix):
+                self._cut = cut
+                self.masked_any = self.masked_any or hit
+                return self._emit(prefix)
+        return ""
+
+    def finish(self) -> str:
+        """Libera o resto, mascarado."""
+        full, hit = mask_pii(self.raw)
+        self.masked_any = self.masked_any or hit
+        self._cut = len(self.raw)
+        return self._emit(full)
+
+
+class StreamGuard:
+    """Fiação do `StreamMasker` no stream de eventos do agente (ADR-0023), sem imports pesados.
+
+    `process(event)` devolve os eventos a emitir no lugar de `event`. `make_delta(text, item_id)`
+    cria um evento de delta. Os deltas passam pelo mascarador; antes de cada
+    `output_item.done` o que ficou retido é liberado, e o item traz o texto todo mascarado.
+    """
+
+    def __init__(self, make_delta: Callable[[str, str], Any]) -> None:
+        self._make_delta = make_delta
+        self._maskers: dict[str, StreamMasker] = {}
+        self.pii_masked = False
+
+    def process(self, event: Any) -> list[Any]:
+        if event.type == "response.output_text.delta":
+            masker = self._maskers.setdefault(event.item_id, StreamMasker())
+            text = masker.feed(event.delta)
+            return [self._make_delta(text, event.item_id)] if text else []
+        keep, masked = guard_event(event)  # PII na saída (ADR-0021)
+        out: list[Any] = []
+        if keep and event.type == "response.output_item.done":
+            for item_id, masker in self._maskers.items():
+                if rest := masker.finish():
+                    out.append(self._make_delta(rest, item_id))
+            masked = masked or any(m.masked_any for m in self._maskers.values())
+            self._maskers.clear()
+        if masked:
+            self.pii_masked = True
+        if keep:
+            out.append(event)
+        return out
+
+
 def is_rate_limited(error: BaseException) -> bool:
     """O gateway respondeu 429 (`RateLimitError`, `status_code` ou o texto do erro)."""
     for exc in (error, error.__cause__, error.__context__):
@@ -57,8 +138,9 @@ def is_rate_limited(error: BaseException) -> bool:
 def guard_event(event: Any) -> tuple[bool, bool]:
     """Aplica a máscara de PII a um evento de saída do stream (duck-typed: `.type` e `.item`).
 
-    Devolve `(manter, mascarou)`. Os deltas de texto são descartados: eles saem antes da máscara e o
-    texto completo chega no `output_item.done` da mensagem, que é o que se mascara.
+    Devolve `(manter, mascarou)`. Os deltas de texto passam por fora, pelo `StreamMasker`; aqui eles
+    são descartados e o texto completo chega no `output_item.done` da mensagem, que é o que se
+    mascara (fonte da verdade).
     """
     if event.type == "response.output_text.delta":
         return False, False

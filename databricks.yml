@@ -318,6 +318,10 @@ resources:
             value_from: "sql-warehouse"
           - name: ATLAS_CATALOG
             value: ${var.catalog}
+          # Chat (ADR-0023): o /api/chat repassa ao agent-atlas com o token do usuário. O escopo OBO
+          # (user_api_scopes) e o CAN_USE dos usuários no agente ficam na P12.14.
+          - name: ATLAS_AGENT_URL
+            value: ${resources.apps.agent_atlas.url}
       resources:
         - name: sql-warehouse
           sql_warehouse:

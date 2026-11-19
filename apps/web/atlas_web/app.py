@@ -12,12 +12,13 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+import httpx2
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from atlas_web import chat, map_data
 from atlas_web import kpis as kpis_mod
-from atlas_web import map_data
 from atlas_web.cache import TTLCache
 from atlas_web.sql_client import Executor, make_executor
 
@@ -109,6 +110,8 @@ def create_app(
     refresh_interval_s: float = REFRESH_INTERVAL_S,
     static_dir: Path | None = None,
     geo_dir: Path | None = None,
+    agent_transport: httpx2.AsyncBaseTransport | None = None,
+    chat_settings: chat.ChatSettings | None = None,
 ) -> FastAPI:
     store = cache or TTLCache()
     catalog = os.environ.get("ATLAS_CATALOG", "atlas")
@@ -243,6 +246,57 @@ def create_app(
             lambda: map_data.map_municipality(catalog, run, month, measure, uf or ""),
         )
         return result
+
+    settings = chat_settings or chat.ChatSettings()
+    limiter = chat.RateLimiter(settings.rate_limit, settings.rate_window_s)
+
+    @app.post("/api/chat")
+    async def chat_route(request: Request) -> StreamingResponse:
+        """Repassa a pergunta ao `agent-atlas` como o usuário e devolve SSE (ADR-0023)."""
+        try:
+            payload = await request.json()
+        except ValueError:
+            payload = None
+        message, conversation_id = chat.parse_body(payload)
+        token = request.headers.get(chat.TOKEN_HEADER)
+        if not token:  # sem o token do usuário não há OBO: o SP nunca fala pelo usuário
+            raise chat.error_http(403, "PERMISSION_DENIED", "sem identidade do usuário")
+        if not limiter.allow(chat.user_key(request, token)):
+            raise HTTPException(
+                429,
+                {"code": "RATE_LIMITED", "message": "limite de mensagens por minuto atingido"},
+                headers={"Retry-After": str(int(settings.rate_window_s))},
+            )
+        agent_url = os.environ.get("ATLAS_AGENT_URL")
+        if not agent_url:
+            raise chat.error_http(503, "AGENT_UNAVAILABLE", "o agente não está configurado")
+        client = httpx2.AsyncClient(
+            transport=agent_transport,
+            timeout=httpx2.Timeout(
+                settings.total_timeout_s,
+                connect=settings.connect_timeout_s,
+                read=settings.idle_timeout_s,
+            ),
+        )
+        try:
+            response = await chat.open_agent_stream(
+                client, agent_url, token, message, conversation_id
+            )
+        except chat.AgentRateLimited:
+            await client.aclose()
+            return chat.immediate_error("RATE_LIMITED", "limite de uso do agente atingido")
+        except HTTPException:
+            await client.aclose()
+            raise
+
+        async def body() -> Any:
+            try:
+                async for event in chat.stream_events(response, settings):
+                    yield event
+            finally:
+                await client.aclose()
+
+        return StreamingResponse(body(), media_type="text/event-stream", headers=chat.SSE_HEADERS)
 
     mount_frontend(app, static_dir, geo_dir)
     return app

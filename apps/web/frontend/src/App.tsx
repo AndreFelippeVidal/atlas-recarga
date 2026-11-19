@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ChatPanel from "./components/ChatPanel";
 import ErrorBanner from "./components/ErrorBanner";
 import KpiCard from "./components/KpiCard";
 import MapPanel from "./components/MapPanel";
@@ -71,6 +72,8 @@ export default function App() {
       <main className="content">
         <MapPanel month={month} measure={measure} monthLoading={months.loading} />
       </main>
+
+      <ChatPanel />
     </div>
   );
 }
