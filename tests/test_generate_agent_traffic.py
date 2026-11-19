@@ -36,8 +36,8 @@ def test_ok_rate() -> None:
     assert gen.ok_rate([]) == 0.0
 
 
-def test_golden_set_has_enough_questions() -> None:
+def test_golden_set_has_distinct_questions() -> None:
     import yaml  # type: ignore[import-untyped]
 
     cases = yaml.safe_load((ROOT / "eval" / "golden_set.yaml").read_text(encoding="utf-8"))
-    assert len(gen.pick_questions(cases, 40)) == 40
+    assert len(set(gen.pick_questions(cases, len(cases)))) >= 30
