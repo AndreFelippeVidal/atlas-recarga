@@ -146,8 +146,12 @@ def entity_mismatches(local: dict[str, Any], remote_text: str | None) -> list[st
         return []
     try:
         remote_files: dict[str, Any] = json.loads(remote_text)["files"]
-    except (ValueError, KeyError, TypeError):
-        return []  # manifest remoto ilegível: o upload trata como ausente
+    except (ValueError, KeyError, TypeError) as exc:
+        raise LoadError(
+            "o manifest da landing existe mas está ilegível: não dá para conferir os PDVs; "
+            "corrija ou apague o manifest remoto",
+            EXIT_INVALID,
+        ) from exc
     return [
         name
         for name in ENTITY_FILES
@@ -180,6 +184,10 @@ def describe(plan: Plan, args: argparse.Namespace) -> list[str]:
 
 def reset_out(out: Path) -> None:
     """Apaga uma saída anterior do `generate` (reproduzível); recusa uma pasta que não é uma."""
+    resolved = out.resolve()
+    protected = (ROOT / "data" / "generated").resolve()
+    if resolved in (protected, ROOT) or resolved in ROOT.parents:
+        raise LoadError(f"{out} é protegido: use uma pasta dedicada (--out)", EXIT_INVALID)
     if not out.exists() or not any(out.iterdir()):
         return
     if not (out / MANIFEST_NAME).is_file():
@@ -270,9 +278,15 @@ def main(
                 from atlas_cli.upload import DatabricksVolume
 
                 factory = DatabricksVolume
-            text: str | None = factory(args.profile).read_text(
-                VOLUMES[args.target].rstrip("/") + "/" + MANIFEST_NAME
-            )
+            try:
+                text: str | None = factory(args.profile).read_text(
+                    VOLUMES[args.target].rstrip("/") + "/" + MANIFEST_NAME
+                )
+            except Exception as exc:
+                raise LoadError(
+                    f"não consegui ler o manifest da landing: {type(exc).__name__}: {exc}",
+                    EXIT_UPLOAD,
+                ) from exc
             return text
 
         execute(args, plan, run, read_remote)

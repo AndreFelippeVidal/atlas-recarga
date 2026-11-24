@@ -111,7 +111,9 @@ def test_entity_mismatches() -> None:
     assert ld.entity_mismatches(local, None) == []
     assert ld.entity_mismatches(local, same) == []
     assert ld.entity_mismatches(local, other) == ["pos/pos.parquet"]
-    assert ld.entity_mismatches(local, "{não é json") == []
+    with pytest.raises(ld.LoadError) as error:
+        ld.entity_mismatches(local, "{não é json")
+    assert error.value.code == ld.EXIT_INVALID
     assert ld.entity_mismatches(local, json.dumps({"files": {}})) == []
 
 
@@ -208,3 +210,23 @@ def test_days_before_the_base_window_come_from_incremental_days(tmp_path: Path) 
     assert recorder.names() == ["generate", "generate", "generate", "validate", "upload"]
     days = sorted(p.name for p in (tmp_path / "out" / "recharges").glob("dt=*"))
     assert days == ["dt=2026-08-01", "dt=2026-08-02"]
+
+
+@pytest.mark.parametrize("path", [ld.ROOT, ld.ROOT.parent, ld.ROOT / "data" / "generated"])
+def test_reset_out_protects_the_repo_and_the_default_cli_output(path: Path) -> None:
+    with pytest.raises(ld.LoadError) as error:
+        ld.reset_out(path)
+    assert error.value.code == ld.EXIT_INVALID
+
+
+def test_landing_read_failure_maps_to_the_upload_exit_code(tmp_path: Path) -> None:
+    class Broken:
+        def read_text(self, path: str) -> str | None:
+            raise PermissionError("sem acesso")
+
+    code = ld.main(
+        ["--from", "2026-10-29", "--to", "2026-10-30", *_args(tmp_path)],
+        run=Recorder(),
+        volume_factory=lambda p: Broken(),
+    )
+    assert code == ld.EXIT_UPLOAD

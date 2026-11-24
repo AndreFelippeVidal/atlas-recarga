@@ -151,4 +151,7 @@ uv run python scripts/load_data.py --from 2026-08-01 --to 2026-10-31 --profile <
 
 `--target demo` usa o Volume `atlas`; `--no-run` não dispara o pipeline. O `generate` completo gera
 ~2 milhões de linhas antes da poda e leva alguns minutos. Cenários de vários dias só aparecem se o
-dia deles cair dentro do intervalo.
+dia deles cair dentro do intervalo. Cada dia fora da janela base roda um `--incremental-day`, então
+um intervalo longo depois dela (até 366 dias) é lento. O manifest no Volume descreve só o último envio:
+`check_bronze_counts.py` e `check_silver_recharges.py` comparam com ele, então só valem para a landing
+limpa ou para um único intervalo.
