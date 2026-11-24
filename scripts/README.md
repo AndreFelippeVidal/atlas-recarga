@@ -121,3 +121,18 @@ Religa os 3 Apps (`agent-atlas`, `atlas-mcp`, `atlas-web`) depois do auto-stop d
 healthchecks. Use pelo `make apps-start PROFILE=<perfil>`; o roteiro e os sintomas estão no
 [README da raiz](../README.md#runbook-de-demo-religar-os-3-apps). O `PROFILE` é obrigatório (não há
 perfil padrão). Não faz deploy. Sai com 0 se os 3 Apps estão de pé.
+
+## `check_consistency.py` (P13.2)
+
+Confere que os 5 consumidores (AI/BI, Genie, agente, MCP e React) mostram o mesmo `gross_revenue` de
+um mês, ao centavo, contra uma referência independente (SQL direto em `gold.fct_recharges`). O card
+do AI/BI é lido de `semantic/dashboards/atlas_visao_comercial.lvdash.json`; o script falha se ele
+deixar de usar `MEASURE(gross_revenue)` sobre a `mv_recharges`. Quem roda é o mantenedor, no `dev`,
+com os 3 Apps `RUNNING` (`make apps-start`):
+
+```bash
+uv run python scripts/check_consistency.py --profile <perfil> --warehouse-id <id> --catalog atlas_dev
+```
+
+Genie e agente são modelos: se só um falhar, rode de novo e leia a resposta impressa. Não confere o
+desenho do card no navegador. Sai com 0 se os 5 batem.
