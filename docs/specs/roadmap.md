@@ -29,6 +29,7 @@
 | 11 | MCP server | [006-mcp-server](006-mcp-server/spec.md) | 4 (a P11.5 fica no fim da Fase 12) |
 | 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 15 + P11.5 |
 | 13 | Demo e release v1.0 | — | 5 |
+| 14 | Carga de dados por intervalo | [012-data-range-loader](012-data-range-loader/spec.md) | 1 (a P13.3 depende dela) |
 
 ## Fase 0 — Fundação do repositório → [009-repo-foundation](009-repo-foundation/spec.md)
 
@@ -191,8 +192,14 @@ _Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medida
 - [x] **P13.0** 🤝 Migrar schemas, Volume e grants do UC de `setup_workspace.py` para o `databricks.yml` (ADR-0017) — _pronto quando:_ `bundle validate` mostra os schemas com nome fixo em `dev` e `demo`; um `bundle deploy` num catálogo vazio cria schemas, Volume e grants; o script fica só com catálogo e grupos; a P7.3 (`check_readers_permissions.py`) continua passando (#99) — o teste do ADR-0017 mostrou que o `mode: development` prefixa os schemas; o `dev` passou a usar `presets` e os 8 schemas, o Volume e os grants em `semantic` (variável `semantic_grants`) estão no bundle; `bundle validate` ok em `dev` e `demo`; o script ficou com catálogo, grupos, membros e `USE CATALOG`. Conferido no `dev` pelo agente a pedido do mantenedor: bind dos 8 schemas e do Volume, `bundle deploy -t dev` ok (depois de renomear 2 experiments antigos que colidiam), `check_agent_functions`, `check_mv_recharges`, `check_genie_space` e `check_web_chat` ok; deploy dos mesmos recursos num catálogo vazio (sonda descartada) ok. **Não conferido:** a P7.3 (`check_readers_permissions.py`: o perfil `atlas-readers-check` não autentica; os grants efetivos do principal de teste foram conferidos no UC) e o `atlas-mcp` (parado) · depende de P10.8, P11.5, P12.8, P12.14, P12.15
 - [x] **P13.1** 🤖 `make apps-start` + runbook de demo (auto-stop de 24h) — _pronto quando:_ Os 3 Apps sobem com um comando e os healthchecks passam (#100) — `make apps-start PROFILE=<perfil>` roda `scripts/apps_start.py`: inicia os Apps parados, espera app `RUNNING` e compute `ACTIVE` e confere `/api/health` (web), a tool `health` (MCP) e `/health` ou `/` (agente); runbook no README; testes unitários. Conferido no `dev` pelo agente a pedido do mantenedor: com os 3 Apps parados (`UNAVAILABLE`/`STOPPED`), `make apps-start` os religou em 2 min 48 s e os 3 healthchecks passaram; o agente responde 200 em `/health` e em `/`; uma 2ª execução só confere (já `RUNNING`). **Não conferido:** o auto-stop real de 24 h (os Apps foram parados à mão), um perfil sem acesso e o `demo` · depende de P10.8, P11.5, P12.8, P12.14, P13.0
 - [x] **P13.2** 🤖 Teste de consistência entre os 5 consumidores — _pronto quando:_ Mesmo `gross_revenue` no AI/BI, Genie, agente, MCP e React (#101) — `scripts/check_consistency.py` compara o `gross_revenue` de um mês nos 5 consumidores com o SQL direto no gold; o card do AI/BI vem do `.lvdash.json` versionado; testes unitários sem workspace. Conferido no `dev` pelo mantenedor com `scripts/check_consistency.py` (2026-10): AI/BI, Genie, agente, MCP e React = 4.122.460,00, igual ao SQL direto no gold; o Genie usou só `semantic.mv_recharges`. **Não conferido:** o desenho do card no navegador e as outras métricas do golden set (a meta de 100% do PRD §4; o script cobre só `gross_revenue` de um mês); agente e Genie rodaram 1 vez · depende de P13.1
-- [ ] **P13.3** 🤖 README final (repo-readme-generator) com as métricas medidas do PRD §4 — _pronto quando:_ Uma pessoa nova roda a demo sem perguntar nada · depende de P13.2
+- [ ] **P13.3** 🤖 README final (repo-readme-generator) com as métricas medidas do PRD §4 — _pronto quando:_ Uma pessoa nova roda a demo sem perguntar nada; o README começa pela carga de dados (`scripts/load_data.py`) e traz, na ordem real, setup do workspace, deploy, jobs, Apps e checks · depende de P13.2, P14.1
 - [ ] **P13.4** 👤 Tag `v1.0.0` + release notes — _pronto quando:_ Release publicado · depende de P13.3
+
+## Fase 14 — Carga de dados por intervalo → [012-data-range-loader](012-data-range-loader/spec.md)
+
+_Um comando gera os dados de um intervalo de datas, envia para a landing e roda o pipeline; é o primeiro passo do README (P13.3)._
+
+- [ ] **P14.1** 🤖 `atlas_cli.prune` + `scripts/load_data.py` (gera, poda, valida, envia e roda o `atlas_daily`) — _pronto quando:_ Critérios 1 a 5 da SPEC-012 §6, com testes sem workspace; o mantenedor confere o critério 6 no `dev` · depende de P13.2
 
 ## Depois do MVP
 
