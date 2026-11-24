@@ -33,7 +33,7 @@ def finished_before_deadline(end_ms: int, deadline: time = DEADLINE) -> bool:
 
 
 def matching_job_ids(jobs: object) -> list[int]:
-    """Ids dos jobs `atlas_daily`; em `dev` o bundle prefixa o nome (`[dev fulano] atlas_daily`)."""
+    """Ids dos jobs `atlas_daily`; antes da P13.0 o `dev` prefixava o nome (`[dev fulano] ...`)."""
     ids: list[int] = []
     for job in jobs if isinstance(jobs, list) else []:
         name = str(job.get("settings", {}).get("name", "")) if isinstance(job, dict) else ""

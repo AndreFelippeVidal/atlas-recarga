@@ -22,7 +22,7 @@ bundle:
 # Leitores por principal (ADR-0016) ficam num arquivo local, fora do git (e-mails, application ids).
 # Exemplo em databricks.example-local.yml. Sem o arquivo, só o grupo `atlas_readers` recebe grants.
 include:
-  - databricks.local*.yml
+  - databricks.loca[l].yml
 
 variables:
   catalog:
@@ -368,8 +368,8 @@ resources:
             permission: CAN_EDIT
 
     # App do dashboard (SPEC-007, P12.8). Lê só `semantic` com o service principal do App, por `MEASURE()`;
-    # o `SELECT` em `semantic` é concedido por principal (ADR-0016): `scripts/setup_workspace.py --reader
-    # <client id do App>`. O App serve o build do React em apps/web/static e as malhas em apps/web/public/geo.
+    # o `SELECT` em `semantic` vem da variável `semantic_grants` (ADR-0016, ADR-0017); `USE CATALOG` por
+    # `scripts/setup_workspace.py --reader <client id do App>`. O App serve o build do React em apps/web/static e as malhas em apps/web/public/geo.
     atlas_web:
       name: atlas-web
       description: "Dashboard com mapa do Brasil do Atlas Recarga (FastAPI + React)"

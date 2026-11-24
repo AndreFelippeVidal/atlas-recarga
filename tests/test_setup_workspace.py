@@ -46,6 +46,8 @@ def test_bundle_declares_the_eight_schemas_the_volume_and_the_grants() -> None:
         )
         assert re.search(pattern, schemas, re.MULTILINE), schema
     assert "grants: ${var.semantic_grants}" in schemas
+    # only `semantic` carries grants: readers get nothing on the other layers (SPEC-004 §7)
+    assert schemas.count("grants:") == 1
     assert "      name: landing\n" in resources
     # no `mode: development` in dev: it would prefix the schemas (ADR-0017)
     assert "mode: development" not in re.sub(r"#.*", "", text)
