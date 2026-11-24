@@ -38,3 +38,5 @@ A P7.3 aplicou `GRANT` em `atlas_readers` (USE CATALOG, USE SCHEMA, SELECT em `s
 - **Positivas:** a leitura restrita a `semantic` passa a ser verificável de ponta a ponta.
 - **Negativas, aceitas conscientemente:** lista de principals a manter no script; a segregação de funções da comissão (ADR-0010) precisa do mesmo tratamento na SPEC-003.
 - **Plano B / gatilho para revisitar:** se a Free Edition passar a permitir grupos de conta, voltar à opção 2 e remover `--reader`.
+
+> **Atualização (P13.0, ADR-0017):** o `EXECUTE`, o `USE SCHEMA` e o `SELECT` em `semantic` por principal agora vêm da variável `semantic_grants` do `databricks.yml`; o `setup_workspace.py --reader` só concede `USE CATALOG`.

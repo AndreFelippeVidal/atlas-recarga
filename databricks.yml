@@ -1,5 +1,5 @@
 # Declarative Automation Bundle do Atlas Recarga (SPEC-002 §2, tech-stack "Deploy").
-# P5.1: esqueleto. P5.2: catálogo, schemas e Volume (scripts/setup_workspace.py).
+# P5.1: esqueleto. P5.2: catálogo e grupos (scripts/setup_workspace.py). P13.0: schemas, Volume e grants aqui.
 # P7.4: dashboard `atlas_visao_comercial` (AI/BI sobre atlas.semantic.mv_recharges).
 # P7.5: Genie Space `atlas_recarga`. P8.11: fontes mv_recharges e mv_commission (página Comissão no dashboard).
 # P8.2: job `atlas_commission_deploy` (tabelas de commission.*; não executa o review).
@@ -19,6 +19,11 @@
 bundle:
   name: atlas-recarga
 
+# Leitores por principal (ADR-0016) ficam num arquivo local, fora do git (e-mails, application ids).
+# Exemplo em databricks.example-local.yml. Sem o arquivo, só o grupo `atlas_readers` recebe grants.
+include:
+  - databricks.loca[l].yml
+
 variables:
   catalog:
     description: Catálogo do Unity Catalog onde o bundle cria os objetos.
@@ -27,10 +32,66 @@ variables:
     default: "false"
   warehouse_id:
     description: SQL warehouse que executa as queries do dashboard (P7.4). Definido por target.
+  semantic_grants:
+    description: Grants em `semantic` (ADR-0016). O grupo `atlas_readers` é só um rótulo no UC; acrescente cada leitor como principal (e-mail, service principal) em databricks.local.yml (variável complexa não aceita --var nem BUNDLE_VAR_).
+    type: complex
+    default:
+      - principal: atlas_readers
+        privileges: [USE_SCHEMA, SELECT, EXECUTE]
+      # Os Apps que leem `semantic` como service principal (ADR-0016). Os grants do bundle valem
+      # para o schema inteiro: o que não está na lista é revogado no deploy.
+      - principal: ${resources.apps.agent_atlas.service_principal_client_id}
+        privileges: [USE_SCHEMA, SELECT, EXECUTE]
+      - principal: ${resources.apps.atlas_web.service_principal_client_id}
+        privileges: [USE_SCHEMA, SELECT]
   agent_url:
     description: URL do App agent-atlas, para o chat do atlas-web (ADR-0023). Literal porque `${resources.apps.agent_atlas.url}` chega vazio ao config do outro App no deploy; a URL é fixa por nome de App e workspace.
 
 resources:
+  # P13.0 (ADR-0017): schemas, Volume e grants do UC. O catálogo e os grupos ficam em scripts/setup_workspace.py.
+  schemas:
+    raw:
+      catalog_name: ${var.catalog}
+      name: raw
+      comment: "Landing dos arquivos sintéticos (SPEC-001)"
+    bronze:
+      catalog_name: ${var.catalog}
+      name: bronze
+      comment: "Cópia fiel da landing (SPEC-002)"
+    silver:
+      catalog_name: ${var.catalog}
+      name: silver
+      comment: "Dados limpos, tipados e deduplicados (SPEC-002)"
+    gold:
+      catalog_name: ${var.catalog}
+      name: gold
+      comment: "Modelo dimensional consumido pelas metric views (SPEC-002)"
+    semantic:
+      catalog_name: ${var.catalog}
+      name: semantic
+      comment: "Metric views e funções do agente: única porta de leitura (SPEC-004)"
+      # A metric view é a única porta de leitura (SPEC-004 §7); por principal, não por grupo (ADR-0016).
+      grants: ${var.semantic_grants}
+    commission:
+      catalog_name: ${var.catalog}
+      name: commission
+      comment: "Fechamento de comissão; etapa irreversível (SPEC-003)"
+    eval:
+      catalog_name: ${var.catalog}
+      name: eval
+      comment: "Golden set e resultados de avaliação (SPEC-008)"
+    observability:
+      catalog_name: ${var.catalog}
+      name: observability
+      comment: "Frescor, traces e uso dos consumidores"
+
+  volumes:
+    landing:
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.raw.name}
+      name: landing
+      comment: "Landing dos arquivos sintéticos (SPEC-001); fonte imutável do pipeline"
+
   dashboards:
     atlas_visao_comercial:
       display_name: "Atlas — Visão Comercial"
@@ -307,8 +368,8 @@ resources:
             permission: CAN_EDIT
 
     # App do dashboard (SPEC-007, P12.8). Lê só `semantic` com o service principal do App, por `MEASURE()`;
-    # o `SELECT` em `semantic` é concedido por principal (ADR-0016): `scripts/setup_workspace.py --reader
-    # <client id do App>`. O App serve o build do React em apps/web/static e as malhas em apps/web/public/geo.
+    # o `SELECT` em `semantic` vem da variável `semantic_grants` (ADR-0016, ADR-0017); `USE CATALOG` por
+    # `scripts/setup_workspace.py --reader <client id do App>`. O App serve o build do React em apps/web/static e as malhas em apps/web/public/geo.
     atlas_web:
       name: atlas-web
       description: "Dashboard com mapa do Brasil do Atlas Recarga (FastAPI + React)"
@@ -555,7 +616,10 @@ resources:
 targets:
   dev:
     default: true
-    mode: development
+    # Sem `mode: development`: ele prefixa os schemas (dev_<usuário>_gold) e quebra os nomes fixos (ADR-0017).
+    presets:
+      pipelines_development: true
+      trigger_pause_status: PAUSED
     variables:
       catalog: atlas_dev
       warehouse_id: af0a1dbe08dd5514

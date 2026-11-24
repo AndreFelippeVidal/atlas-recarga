@@ -1,0 +1,14 @@
+# Copie para databricks.local.yml (ignorado pelo git) e ajuste. Substitui a lista inteira, então
+# repita o grupo e os Apps. Cada leitor por principal: e-mail, nome de service principal ou application id (ADR-0016).
+targets:
+  dev:
+    variables:
+      semantic_grants:
+        - principal: atlas_readers
+          privileges: [USE_SCHEMA, SELECT, EXECUTE]
+        - principal: ${resources.apps.agent_atlas.service_principal_client_id}
+          privileges: [USE_SCHEMA, SELECT, EXECUTE]
+        - principal: ${resources.apps.atlas_web.service_principal_client_id}
+          privileges: [USE_SCHEMA, SELECT]
+        - principal: leitor@example.com
+          privileges: [USE_SCHEMA, SELECT, EXECUTE]

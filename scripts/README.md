@@ -4,18 +4,22 @@ Utilitários de build (referência IBGE, malhas geográficas). Não rodam em run
 
 ## `setup_workspace.py` (P5.2)
 
-Cria, de forma idempotente, o catálogo, os schemas (ADR-0003), o Volume `raw.landing` e os
-grupos `atlas_readers`, `atlas_commission_analysts` e `atlas_commission_directors`. Quem roda
-é o mantenedor; use `--dry-run` primeiro:
+Bootstrap idempotente do que o bundle não declara (ADR-0017): o catálogo, os grupos `atlas_readers`,
+`atlas_commission_analysts` e `atlas_commission_directors`, os membros e `USE CATALOG`. Os schemas
+(ADR-0003), o Volume `raw.landing` e os grants em `semantic` vêm do `databricks.yml`: rode este
+script **antes** do primeiro `bundle deploy`. Quem roda é o mantenedor; use `--dry-run` primeiro:
 
 ```bash
 uv run python scripts/setup_workspace.py --target dev --profile <perfil> --dry-run
 uv run python scripts/setup_workspace.py --target dev --profile <perfil>
 ```
 
-`dev` usa o catálogo `atlas_dev` e `demo` usa `atlas`, como no `databricks.yml`. Desde a P7.3 ele também
-aplica os grants de leitura (ADR-0016: o grupo de workspace não vale no UC, então use `--reader <principal>`, repetível): `USE CATALOG` e `USE SCHEMA` + `SELECT` só em `semantic`. Os
-grants de `commission` ficam para a SPEC-003.
+`dev` usa o catálogo `atlas_dev` e `demo` usa `atlas`, como no `databricks.yml`. O grupo de workspace
+não vale no UC (ADR-0016), então `--reader <principal>` (repetível) dá `USE CATALOG` a cada leitor.
+`USE SCHEMA`, `SELECT` e `EXECUTE` em `semantic` são a variável `semantic_grants` do bundle: o padrão
+cobre `atlas_readers` e os service principals dos Apps; leitores por principal vão em
+`databricks.local.yml` (modelo em `databricks.example-local.yml`). Os grants do bundle são
+autoritativos no schema `semantic`: quem não está na lista perde o acesso no deploy.
 
 ## `check_readers_permissions.py` (P7.3)
 

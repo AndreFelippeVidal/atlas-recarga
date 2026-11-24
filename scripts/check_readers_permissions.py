@@ -5,7 +5,8 @@ catálogo (um service principal, como o do agente) e que recebeu os grants por p
 (ADR-0016), depois de aplicá-los:
 
     uv run python scripts/setup_workspace.py --target dev --profile andrevidal \\
-        --reader <application-id-do-leitor>
+        --reader <application-id-do-leitor>   # USE CATALOG
+    # e o leitor em `semantic_grants` (databricks.local.yml) + databricks bundle deploy -t dev
     uv run python scripts/check_readers_permissions.py --target dev \\
         --profile <perfil-do-leitor> --warehouse-id <id>
 
