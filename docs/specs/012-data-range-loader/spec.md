@@ -15,7 +15,7 @@ uv run python scripts/load_data.py --from 2026-08-01 --to 2026-10-31 --profile <
 |---|---|---|
 | `--from`, `--to` | — (obrigatórias) | `YYYY-MM-DD`, inclusivas; `from` ≤ `to`; no máximo 366 dias |
 | `--profile` | — (obrigatória) | Perfil da CLI do Databricks. O script não escolhe um sozinho |
-| `--target` | `dev` | `dev` ou `demo`; define o destino do Volume e o job (`bundle run -t`) |
+| `--target` | `dev` | `dev` ou `demo`; define o Volume (`dev`: `/Volumes/atlas_dev/raw/landing/`; `demo`: `/Volumes/atlas/raw/landing/`, igual ao catálogo do `databricks.yml`) e o job (`bundle run -t`) |
 | `--seed` | `42` | A mesma seed das cargas anteriores |
 | `--rows` | `2_000_000` | Total da janela base (SPEC-001); os dias do intervalo são a fração proporcional |
 | `--base-end-month` | `2026-11` | Janela base: o último mês gerado é este − 1 |
@@ -30,7 +30,7 @@ uv run python scripts/load_data.py --from 2026-08-01 --to 2026-10-31 --profile <
 3. **Dias fora da janela.** Para cada dia do intervalo fora da janela base, roda `atlas-cli generate --incremental-day <dia>` (SPEC-001 §2).
 4. **Poda.** Remove as partições `recharges/dt=` fora de `[from, to]` e atualiza o manifest (SPEC-001 §2, "Poda"). O que sobra são só os dias pedidos.
 5. **Validação.** Roda `atlas-cli validate`; qualquer `FALHA` interrompe antes do upload.
-6. **Upload.** Roda `atlas-cli upload` (idempotente; nunca apaga). Antes, compara o sha256 local do `pos/pos.parquet` e do `distributors/distributors.parquet` com o do manifest remoto: se diferirem, **aborta** (a janela ou a seed não são as da carga anterior), exceto no primeiro envio (sem manifest remoto).
+6. **Upload.** Roda `atlas-cli upload --dest <Volume do target>` (idempotente; nunca apaga). Antes, compara o sha256 local do `pos/pos.parquet` e do `distributors/distributors.parquet` com o do manifest remoto: se diferirem, **aborta** (a janela ou a seed não são as da carga anterior), exceto no primeiro envio (sem manifest remoto).
 7. **Processamento.** Roda `databricks bundle run atlas_daily -t <target> --profile <perfil>` e espera o término. Imprime o estado final do run. `--no-run` pula este passo.
 
 O script é idempotente: repetir com o mesmo intervalo, seed e flags reenvia 0 arquivos e roda o pipeline de novo sem mudar o gold.
