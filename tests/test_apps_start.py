@@ -181,3 +181,55 @@ def test_make_apps_start_passes_the_profile_to_the_script() -> None:
     )
     assert "scripts/apps_start.py --profile" in result.stdout
     assert "meu-perfil" in result.stdout
+
+
+def test_combined_state_needs_app_running_and_compute_active() -> None:
+    assert a.combined_state("RUNNING", "ACTIVE") == "RUNNING"
+    assert a.combined_state("RUNNING", None) == "RUNNING"
+    assert a.combined_state("RUNNING", "STOPPED") == "RUNNING/STOPPED"
+    assert a.combined_state("UNAVAILABLE", "STOPPED") == "UNAVAILABLE/STOPPED"
+    assert a.combined_state(None, None) == "None/None"
+
+
+def test_wait_survives_a_transient_error_in_get_state() -> None:
+    fake = FakeClock()
+    answers: list[str | Exception] = [ConnectionError("rede"), "RUNNING"]
+
+    def get_state(_name: str) -> str | None:
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    states = a.wait_until_running(
+        ["atlas-web"], get_state, timeout_s=100, interval_s=1, sleep=fake.sleep, clock=fake.clock
+    )
+    assert states == {"atlas-web": "RUNNING"}
+
+
+def test_build_check_mcp_sends_the_bearer_token_and_never_prints_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, str] = {}
+
+    async def fake_call(url: str, token: str) -> dict[str, Any]:
+        seen.update(url=url, token=token)
+        return {"status": "healthy", "warehouse": "STOPPED", "version": "0.1.0"}
+
+    monkeypatch.setattr(a, "_call_mcp_health", fake_call)
+    check = a.build_check(
+        "mcp", "https://mcp", lambda _b, _p: None, lambda: {"Authorization": "Bearer segredo"}
+    )
+    assert check() == []
+    assert seen == {"url": "https://mcp/mcp", "token": "segredo"}
+
+    def boom(_url: str, _token: str) -> dict[str, Any]:
+        raise ConnectionError("recusou")
+
+    async def failing(url: str, token: str) -> dict[str, Any]:
+        return boom(url, token)
+
+    monkeypatch.setattr(a, "_call_mcp_health", failing)
+    problems = a._probe("atlas-mcp", check)
+    assert problems == ["atlas-mcp: ConnectionError: recusou"]
+    assert "segredo" not in " ".join(problems)

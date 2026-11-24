@@ -59,6 +59,16 @@ APPS: tuple[AppSpec, ...] = (
 AGENT_PATHS = ("/health", "/")
 
 
+def combined_state(app_state: str | None, compute_state: str | None) -> str | None:
+    """`RUNNING` só se o App roda **e** o compute está `ACTIVE`; senão, os dois estados juntos.
+
+    O auto-stop para o compute, e o `app_status.state` sozinho pode não refletir isso.
+    """
+    if app_state == "RUNNING" and compute_state in (None, "ACTIVE"):
+        return "RUNNING"
+    return f"{app_state}/{compute_state}"
+
+
 def wait_until_running(
     names: Sequence[str],
     get_state: Callable[[str], str | None],
@@ -77,7 +87,10 @@ def wait_until_running(
     while True:
         for name in names:
             if states[name] != "RUNNING":
-                states[name] = get_state(name)
+                try:
+                    states[name] = get_state(name)
+                except Exception as exc:  # erro transitório de rede: tenta de novo no próximo ciclo
+                    states[name] = f"erro ({type(exc).__name__})"
         if all(state == "RUNNING" for state in states.values()) or clock() >= deadline:
             return states
         sleep(interval_s)
@@ -183,7 +196,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     def state_of(name: str) -> str | None:
         app = w.apps.get(name)
-        return app.app_status.state.value if app.app_status and app.app_status.state else None
+        app_state = app.app_status.state.value if app.app_status and app.app_status.state else None
+        compute = (
+            app.compute_status.state.value
+            if app.compute_status and app.compute_status.state
+            else None
+        )
+        return combined_state(app_state, compute)
 
     failures: dict[str, list[str]] = {}
 
