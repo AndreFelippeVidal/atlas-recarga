@@ -45,8 +45,8 @@ LangGraph, chat UI). Vêm **sem alteração** do template (excluídos do ruff): 
 ## Conferência da P10.3 (mantenedor)
 
 Pré-requisito: `EXECUTE` + `SELECT` em
-`semantic` para o service principal do App (`scripts/setup_workspace.py --reader <client_id>`,
-ADR-0016).
+`semantic` para o service principal do App (`semantic_grants` no bundle, ADR-0017; `USE CATALOG` por
+`scripts/setup_workspace.py --reader <client_id>`, ADR-0016).
 
 1. Deploy e `bundle run` como acima.
 2. No App, pergunte o GS-001: "Qual foi a receita de recarga da rede em outubro de 2026?"

@@ -25,20 +25,30 @@ def _load() -> ModuleType:
 
 
 setup = _load()
+ADR_0003_SCHEMAS = (
+    "raw", "bronze", "silver", "gold", "semantic", "commission", "eval", "observability"
+)  # fmt: skip
 
 
-def test_statements_are_idempotent() -> None:
-    statements = setup.build_statements("atlas_dev")
-    assert statements[0] == "CREATE CATALOG IF NOT EXISTS atlas_dev"
-    assert all("IF NOT EXISTS" in s for s in statements)
+def test_bootstrap_is_only_the_catalog() -> None:
+    # schemas, Volume and grants on semantic moved to databricks.yml (ADR-0017)
+    assert setup.build_statements("atlas_dev") == ["CREATE CATALOG IF NOT EXISTS atlas_dev"]
+    assert not hasattr(setup, "SCHEMAS")
 
 
-def test_creates_every_adr_0003_schema_and_the_landing_volume() -> None:
-    statements = setup.build_statements("atlas")
-    for schema in ("raw", "bronze", "silver", "gold", "semantic", "commission", "eval",
-                   "observability"):  # fmt: skip
-        assert f"CREATE SCHEMA IF NOT EXISTS atlas.{schema}" in statements
-    assert any(s.startswith("CREATE VOLUME IF NOT EXISTS atlas.raw.landing") for s in statements)
+def test_bundle_declares_the_eight_schemas_the_volume_and_the_grants() -> None:
+    text = (ROOT / "databricks.yml").read_text(encoding="utf-8")
+    resources = text.split("\nresources:\n", 1)[1]
+    schemas = resources.split("  schemas:\n", 1)[1].split("\n  volumes:", 1)[0]
+    for schema in ADR_0003_SCHEMAS:
+        pattern = (
+            rf"^    {schema}:\n      catalog_name: \$\{{var\.catalog\}}\n      name: {schema}\n"
+        )
+        assert re.search(pattern, schemas, re.MULTILINE), schema
+    assert "grants: ${var.semantic_grants}" in schemas
+    assert "      name: landing\n" in resources
+    # no `mode: development` in dev: it would prefix the schemas (ADR-0017)
+    assert "mode: development" not in re.sub(r"#.*", "", text)
 
 
 @pytest.mark.parametrize("bad", ["", "Atlas", "atlas; DROP CATALOG x", "a-b", "1atlas", "a b"])
@@ -68,6 +78,7 @@ def test_dry_run_changes_nothing(capsys: pytest.CaptureFixture[str]) -> None:
     out = capsys.readouterr().out
     assert "CREATE CATALOG IF NOT EXISTS atlas_dev;" in out
     assert "atlas_readers" in out
+    assert "SCHEMA" not in out
 
 
 def test_ensure_groups_creates_only_missing_and_tolerates_already_exists(
@@ -152,7 +163,7 @@ def test_pick_warehouse(monkeypatch: pytest.MonkeyPatch) -> None:
         setup._pick_warehouse("p", None)
 
 
-def test_main_runs_every_statement_then_groups(
+def test_main_runs_the_bootstrap_then_groups(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     ran: list[str] = []
@@ -163,15 +174,10 @@ def test_main_runs_every_statement_then_groups(
     assert "groups created: atlas_readers" in capsys.readouterr().out
 
 
-def test_readers_get_select_and_execute_only_on_semantic() -> None:
-    grants = setup.build_grant_statements("atlas_dev")
-    assert grants == [
-        "GRANT USE CATALOG ON CATALOG atlas_dev TO `atlas_readers`",
-        "GRANT USE SCHEMA, SELECT ON SCHEMA atlas_dev.semantic TO `atlas_readers`",
-        "GRANT EXECUTE ON SCHEMA atlas_dev.semantic TO `atlas_readers`",
+def test_readers_only_get_use_catalog_here() -> None:
+    assert setup.build_grant_statements("atlas_dev") == [
+        "GRANT USE CATALOG ON CATALOG atlas_dev TO `atlas_readers`"
     ]
-    for layer in ("raw", "bronze", "silver", "gold", "commission", "eval", "observability"):
-        assert not any(f"atlas_dev.{layer}" in g for g in grants)
 
 
 def test_grants_reject_unsafe_catalog_names() -> None:
@@ -179,18 +185,17 @@ def test_grants_reject_unsafe_catalog_names() -> None:
         setup.build_grant_statements("atlas; DROP CATALOG x")
 
 
-def test_dry_run_lists_the_grants(capsys: pytest.CaptureFixture[str]) -> None:
+def test_dry_run_lists_use_catalog(capsys: pytest.CaptureFixture[str]) -> None:
     assert setup.main(["--target", "dev", "--profile", "x", "--dry-run"]) == 0
-    assert "GRANT USE SCHEMA, SELECT ON SCHEMA atlas_dev.semantic" in capsys.readouterr().out
+    assert "GRANT USE CATALOG ON CATALOG atlas_dev" in capsys.readouterr().out
 
 
 def test_each_reader_principal_gets_the_grants_directly() -> None:
     grants = setup.build_grant_statements("atlas_dev", ["5846127f-3d8e-4597-8b69-6e5c58359b0e"])
-    assert len(grants) == 6
-    assert grants[3] == (
+    assert len(grants) == 2
+    assert grants[1] == (
         "GRANT USE CATALOG ON CATALOG atlas_dev TO `5846127f-3d8e-4597-8b69-6e5c58359b0e`"
     )
-    assert not any("gold" in g or "commission" in g for g in grants)
 
 
 @pytest.mark.parametrize("bad", ["", "a`; DROP CATALOG x --", "x y", "-lead", "a`b"])

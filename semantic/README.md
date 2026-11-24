@@ -24,5 +24,5 @@ O job `atlas_semantic_deploy` tem uma segunda task, `apply_agent_functions`
 `fn_compare_months` em `<catalog>.semantic` depois das metric views (SPEC-005 §3). O DDL é gerado
 do `mv_recharges.yaml`: medidas, dimensões e descrições têm uma definição só. Medida ou nível fora
 da lista falha com `INVALID_MEASURE` ou `INVALID_LEVEL`. Os leitores recebem `EXECUTE` em
-`semantic` (`setup_workspace.py`); conferência no `dev` com `scripts/check_agent_functions.py`. O `EXECUTE` só vale depois de rodar
-`scripts/setup_workspace.py` de novo (com `--reader` por principal, ADR-0016).
+`semantic` (variável `semantic_grants` do bundle, ADR-0017); conferência no `dev` com `scripts/check_agent_functions.py`.
+O `EXECUTE` de um leitor por principal vem de `databricks.local.yml` (ADR-0016) e vale depois do `bundle deploy`.

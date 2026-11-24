@@ -43,3 +43,4 @@ apps/agent/uv.lock
 
 # apps/mcp: o lock do App é gerado no deploy; o do workspace raiz já cobre o dev.
 apps/mcp/uv.lock
+databricks.local.yml

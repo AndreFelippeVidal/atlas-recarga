@@ -1,4 +1,8 @@
-"""Idempotent workspace setup: catalog, schemas, Volume and groups (SPEC-002 §2, task P5.2).
+"""Idempotent workspace bootstrap: catalog, groups and `USE CATALOG` (SPEC-002 §2, P5.2, P13.0).
+
+Since P13.0 (ADR-0017) the schemas, the `raw.landing` Volume and the grants on `semantic` live in
+`databricks.yml`. What stays here is what a bundle cannot declare: the catalog, the workspace
+groups, their members and `USE CATALOG`. Run this first, then `databricks bundle deploy`.
 
 Run by the **maintainer** against the workspace (the agent only prepares it). Every
 statement is `IF NOT EXISTS`, and groups are created only when missing, so it is safe to
@@ -8,9 +12,8 @@ run again. It uses the Databricks CLI (no extra dependency) and never touches se
     uv run python scripts/setup_workspace.py --target dev --profile andrevidal
 
 Targets mirror `databricks.yml`: `dev` -> catalog `atlas_dev`, `demo` -> catalog `atlas`.
-Schemas follow ADR-0003. Grants (P7.3, SPEC-004 §7): `atlas_readers` gets `USE CATALOG` and
-`USE SCHEMA` + `SELECT` on `semantic` only, nothing on gold/silver/bronze/commission. The
-`commission` grants come with SPEC-003. Grants need the group to exist, so they run after it.
+`USE CATALOG` goes to `atlas_readers` and to each `--reader` principal (ADR-0016); the grants on
+`semantic` come from the bundle (`semantic_grants`). It needs the group, so it runs after it.
 Membership (P8.6): `--analyst` / `--director` (repeatable, user e-mails) add people to
 `atlas_commission_analysts` / `atlas_commission_directors`, which `atlas_commission_review`
 reads to decide who may approve (SPEC-003 §4). Idempotent; nobody is added without the flag.
@@ -28,18 +31,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 CATALOGS = {"dev": "atlas_dev", "demo": "atlas"}  # keep in sync with databricks.yml
-SCHEMAS = (
-    "raw",
-    "bronze",
-    "silver",
-    "gold",
-    "semantic",
-    "commission",
-    "eval",
-    "observability",
-)
-VOLUME_SCHEMA = "raw"
-VOLUME_NAME = "landing"
 GROUPS = ("atlas_readers", "atlas_commission_analysts", "atlas_commission_directors")
 READERS_GROUP = "atlas_readers"
 ANALYSTS_GROUP = "atlas_commission_analysts"
@@ -50,26 +41,20 @@ _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def build_statements(catalog: str) -> list[str]:
-    """Return the setup SQL. Only closed lists and a validated identifier go in (no free SQL)."""
+    """Return the bootstrap SQL. Only a validated identifier goes in (no free SQL)."""
     if not _IDENTIFIER.fullmatch(catalog):
         raise ValueError(f"invalid catalog name: {catalog!r}")
-    statements = [f"CREATE CATALOG IF NOT EXISTS {catalog}"]
-    statements += [f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}" for schema in SCHEMAS]
-    statements.append(
-        f"CREATE VOLUME IF NOT EXISTS {catalog}.{VOLUME_SCHEMA}.{VOLUME_NAME} "
-        "COMMENT 'Landing dos arquivos sintéticos (SPEC-001); fonte imutável do pipeline'"
-    )
-    return statements
+    return [f"CREATE CATALOG IF NOT EXISTS {catalog}"]
 
 
 _PRINCIPAL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]*$")  # user e-mail, SP name or application id
 
 
 def build_grant_statements(catalog: str, readers: Sequence[str] = ()) -> list[str]:
-    """Grants of the readers: the metric views are the only read door (SPEC-004 §7).
+    """`USE CATALOG` of the readers; the grants on `semantic` are in the bundle (ADR-0017).
 
     `atlas_readers` is a workspace group, which Unity Catalog does not evaluate (ADR-0016), so
-    each reader principal also gets the grants directly. Names are validated, never free SQL.
+    each reader principal also gets it directly. Names are validated, never free SQL.
     """
     if not _IDENTIFIER.fullmatch(catalog):
         raise ValueError(f"invalid catalog name: {catalog!r}")
@@ -77,12 +62,7 @@ def build_grant_statements(catalog: str, readers: Sequence[str] = ()) -> list[st
     for principal in (READERS_GROUP, *readers):
         if principal != READERS_GROUP and not _PRINCIPAL.fullmatch(principal):
             raise ValueError(f"invalid principal: {principal!r}")
-        statements += [
-            f"GRANT USE CATALOG ON CATALOG {catalog} TO `{principal}`",
-            f"GRANT USE SCHEMA, SELECT ON SCHEMA {catalog}.semantic TO `{principal}`",
-            # as fn_* do agente (SPEC-005 §3): EXECUTE, nada além de semantic
-            f"GRANT EXECUTE ON SCHEMA {catalog}.semantic TO `{principal}`",
-        ]
+        statements.append(f"GRANT USE CATALOG ON CATALOG {catalog} TO `{principal}`")
     return statements
 
 
@@ -193,7 +173,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--reader",
         action="append",
         default=[],
-        help="principal (user e-mail, SP name or application id) that reads `semantic`; repeatable",
+        help="principal (user e-mail, SP name or application id) that gets USE CATALOG; repeatable",
     )
     parser.add_argument(
         "--analyst",
