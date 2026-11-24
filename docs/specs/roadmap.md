@@ -199,7 +199,7 @@ _Qualquer pessoa roda a demo a partir do README; as métricas do PRD são medida
 
 _Um comando gera os dados de um intervalo de datas, envia para a landing e roda o pipeline; é o primeiro passo do README (P13.3)._
 
-- [ ] **P14.1** 🤖 `atlas_cli.prune` + `scripts/load_data.py` (gera, poda, valida, envia e roda o `atlas_daily`) — _pronto quando:_ Critérios 1 a 5 da SPEC-012 §6, com testes sem workspace; o mantenedor confere o critério 6 no `dev` · depende de P13.2
+- [x] **P14.1** 🤖 `atlas_cli.prune` + `scripts/load_data.py` (gera, poda, valida, envia e roda o `atlas_daily`) — _pronto quando:_ Critérios 1 a 5 da SPEC-012 §6, com testes sem workspace; o mantenedor confere o critério 6 no `dev` (#102) — `prune_recharges` no `atlas_cli` (o `validate` pula o invariante 5 quando há `pruned`) e `scripts/load_data.py` com `--from`/`--to`, `--dry-run` e `--no-run`; testes de ponta a ponta com o `atlas-cli` real e o upload e o `bundle run` simulados. **Não conferido:** o critério 6 (a execução no `dev`, o upload e o `atlas_daily` de verdade, e as contagens com `check_bronze_counts.py` e `check_silver_recharges.py`) · depende de P13.2
 
 ## Depois do MVP
 
