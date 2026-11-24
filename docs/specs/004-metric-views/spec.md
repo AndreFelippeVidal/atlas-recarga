@@ -59,7 +59,7 @@ Regras desta view:
 - **Todos os lotes `locked` entram**, inclusive os de ajuste `ADJ` (linhas de diferença, possivelmente negativas; original + ajustes = valor final pago) e os de `demo_mode = true`. `batch_id` é a forma de separá-los.
 
 ## 5. Comparações temporais e janelas (v1.1, Fase 15)
-No MVP a variação mês contra mês **não** era medida: o consumidor consultava dois períodos e calculava (o `atlas-web` calcula o `mom_change` no backend). Calcular métrica no código de um consumidor contraria o princípio 1, então a v1.1 move essas contas para a metric view, com **medidas com janela** ordenadas por `recharge_month`:
+No MVP a variação mês contra mês **não** era medida: o consumidor consultava dois períodos e calculava (o `atlas-web` calcula o `mom_change` no backend). Calcular métrica no código de um consumidor contraria o princípio 1, então a v1.1 move **a conta de `gross_revenue`** para a metric view, com **medidas com janela** ordenadas por `recharge_month`:
 
 | nome | definição | formato | sinônimos |
 |---|---|---|---|
@@ -73,6 +73,8 @@ Regras:
 - **Os filtros de PDV valem antes da janela.** `pos_type` e `distributor_name` no `WHERE` recortam a base; a janela é calculada sobre o recorte.
 - **Mês aberto fica parcial.** As janelas herdam a regra do "último mês fechado" (SPEC-005): o mês corrente, se houver, aparece com o que já foi carregado.
 - **Unidade na API.** O `mom_change` do `atlas-web` continua em pontos percentuais com 2 casas; a conversão da fração (× 100, em Decimal) é só formatação, não métrica.
+- **Exceção declarada.** O Δ% de `recharge_count`, `avg_ticket` e `active_pos` (cards do `atlas-web`) e o `compare_months` do MCP continuam calculados no consumidor, como no MVP; o ADR-0025 registra a exceção e o roadmap a lista em "Depois do MVP".
+- **A decisão do ADR-0025 define o que as P15.5 e P15.6 fazem.** Ramo A (janelas na `mv_recharges`): as tasks seguem como escritas. Ramo B (view separada `mv_recharges_trend`, `version: 0.1`): a view repete as dimensões `recharge_month`, `region`, `uf`, `municipality_ibge_code`, `municipality_name`, `pos_type` e `distributor_name`, entra em `semantic_grants`, no Genie e na lista fechada do MCP, e a SPEC-004 §6 e §7 e a SPEC-006 são corrigidas antes do código. Ramo C (manter no backend): P15.5, P15.6 e P15.7 fecham como "documentar a exceção" e a P15.8 usa o `mom_change` do backend.
 - Cada medida tem `comment` com a definição literal, porque o agente lê.
 
 ## 6. Consumidores
