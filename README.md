@@ -27,6 +27,21 @@ Depois: *"Qual a receita bruta de outubro de 2026?"* → R$ 4.122.460,00, com a 
 O login pelo navegador (OAuth) não funciona na Free Edition; o motivo, os cuidados com o token, a
 auditoria e a captura de tela estão em [docs/mcp-claude-code.md](docs/mcp-claude-code.md).
 
+## Runbook de demo: religar os 3 Apps
+A Free Edition **para cada App 24 h** depois de iniciado ou redeployado ([ADR-0009](docs/adr/0009-three-apps-allocation.md)). Antes de uma demo, religue os três (`agent-atlas`, `atlas-mcp`, `atlas-web`) com um comando:
+```bash
+databricks auth profiles                  # veja os perfis; escolha o do workspace da demo
+make apps-start PROFILE=<perfil>          # o mesmo que: uv run python scripts/apps_start.py --profile <perfil>
+```
+O comando inicia os Apps parados, espera os três ficarem `RUNNING` e confere o healthcheck de cada um (`/api/health` no web, a tool `health` no MCP, `/health` ou `/` no agente). Sai com 0 só se os três estão de pé; a espera padrão é de 10 minutos por etapa (`--timeout`).
+
+| Sintoma | O que fazer |
+|---|---|
+| `não iniciou` ou App nunca implantado | `databricks bundle deploy -t dev --profile <perfil>` e rode o comando de novo |
+| MCP com `warehouse: STOPPED` | Normal: o `health` só lê o estado e não acorda o warehouse; a 1ª consulta leva alguns segundos |
+| Primeira tela do dashboard lenta | O cache aquece na subida (cerca de 6 s); espere o aviso "Aquecendo o banco de dados…" sumir |
+| `PERMISSION_DENIED` ou 403 | Seu usuário precisa de `CAN_USE` no App (`databricks apps update-permissions`) |
+
 ## Como rodar
 _A plataforma em si vem a partir da Fase 4; este README será completado na P13.3._
 

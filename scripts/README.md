@@ -114,3 +114,10 @@ mantenedor, no `dev`; o roteiro e as tabelas de resultado estão em
 Mede o p95 dos municípios de uma UF no App `atlas-web` implantado (SPEC-007 §6): uma chamada fria por
 UF e medida, logo depois do deploy ou do `apps start`. Quem roda é o mantenedor, no `dev`; o roteiro
 está em [apps/web/README.md](../apps/web/README.md). Sai com 0 se o p95 < 3 s.
+
+## `apps_start.py` (P13.1)
+
+Religa os 3 Apps (`agent-atlas`, `atlas-mcp`, `atlas-web`) depois do auto-stop de 24 h e espera os
+healthchecks. Use pelo `make apps-start PROFILE=<perfil>`; o roteiro e os sintomas estão no
+[README da raiz](../README.md#runbook-de-demo-religar-os-3-apps). O `PROFILE` é obrigatório (não há
+perfil padrão). Não faz deploy. Sai com 0 se os 3 Apps estão de pé.
