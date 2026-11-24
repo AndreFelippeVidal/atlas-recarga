@@ -224,7 +224,7 @@ def _sql_value(profile: str, warehouse_id: str, statement: str) -> Decimal | Non
 
 
 def _read_genie(profile: str, month: str) -> Reading:
-    from check_genie_space import extract_sql, find_space_id
+    from check_genie_space import FORBIDDEN_SCHEMAS, extract_sql, find_space_id
 
     space_id = find_space_id(_cli(profile, "genie", "list-spaces"), SPACE_TITLE)
     if space_id is None:
@@ -246,8 +246,11 @@ def _read_genie(profile: str, month: str) -> Reading:
     )
     value = genie_value(result)
     reading = Reading("Genie", values=[value] if value is not None else [], detail=sql)
+    leaks = [sc for sc in FORBIDDEN_SCHEMAS if re.search(rf"\b{sc}\.", sql.lower())]
     if "mv_recharges" not in sql.lower():
         reading.error = "o SQL do Genie não consulta mv_recharges"
+    elif leaks:
+        reading.error = f"o SQL do Genie leu {leaks}; só atlas.semantic é permitido"
     return reading
 
 
@@ -264,7 +267,9 @@ def _read_agent(url: str, headers: dict[str, str], month: str) -> Reading:
     if response.status_code != 200:
         return Reading("agente", error=f"HTTP {response.status_code}")
     text = message_text(response.json())
-    return Reading("agente", values=extract_brl(text), detail=text)
+    values = extract_brl(text)
+    note = f"\n(aviso: {len(values)} valores em R$; só o primeiro conta)" if len(values) > 1 else ""
+    return Reading("agente", values=values[:1], detail=text + note)
 
 
 async def _call_mcp(url: str, token: str, month: str) -> Any:
@@ -280,11 +285,18 @@ async def _call_mcp(url: str, token: str, month: str) -> Any:
         return (await client.call_tool("query_metric", arguments)).data
 
 
+def mcp_reading(data: dict[str, Any]) -> Reading:
+    """O `gross_revenue` da primeira linha, achado pelo nome da coluna (não pela posição)."""
+    columns, rows = data.get("columns", []), data.get("rows", [])
+    if "gross_revenue" not in columns or not rows:
+        return Reading("MCP", error=f"resposta sem a coluna gross_revenue: {columns} {rows}")
+    value = to_decimal(rows[0][columns.index("gross_revenue")])
+    return Reading("MCP", values=[value] if value is not None else [], detail=str(rows))
+
+
 def _read_mcp(url: str, token: str, month: str) -> Reading:
     data = asyncio.run(_call_mcp(f"{url}/mcp", token, month))
-    rows = data.get("rows", [])
-    value = to_decimal(rows[0][-1]) if rows else None
-    return Reading("MCP", values=[value] if value is not None else [], detail=str(rows))
+    return mcp_reading(data)
 
 
 def _read_web(url: str, headers: dict[str, str], month: str) -> Reading:

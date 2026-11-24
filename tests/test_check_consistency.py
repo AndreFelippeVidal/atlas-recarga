@@ -57,10 +57,19 @@ def test_referencia_ausente_falha() -> None:
     assert c.evaluate(None, [_reading("React", "1")])[0].startswith("FALHA referência")
 
 
-def test_agente_com_varios_valores_basta_conter_o_esperado() -> None:
+def test_agente_so_o_primeiro_valor_conta() -> None:
     text = "A receita bruta de outubro foi **R$ 4.122.460,00**, contra R$ 3.900.000,50 em setembro."
-    reading = c.Reading("agente", values=c.extract_brl(text))
-    assert c.evaluate(EXPECTED, [reading])[0].startswith("ok")
+    assert c.extract_brl(text)[:1] == [EXPECTED]
+    wrong_first = "Foram R$ 3.900.000,50 em setembro e R$ 4.122.460,00 em outubro."
+    reading = c.Reading("agente", values=c.extract_brl(wrong_first)[:1])
+    assert c.evaluate(EXPECTED, [reading])[0].startswith("FALHA agente")
+
+
+def test_mcp_reading_acha_a_coluna_pelo_nome() -> None:
+    data = {"columns": ["uf", "gross_revenue"], "rows": [["SP", "4122460.00"]]}
+    assert c.mcp_reading(data).values == [EXPECTED]
+    assert c.mcp_reading({"columns": ["x"], "rows": [["1"]]}).error
+    assert c.mcp_reading({}).error
 
 
 @pytest.mark.parametrize(
