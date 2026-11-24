@@ -100,7 +100,8 @@ databricks bundle run atlas_agent_monitoring -t dev --profile $PROFILE
 ```bash
 uv run python scripts/check_consistency.py --profile $PROFILE --warehouse-id $WAREHOUSE_ID --catalog atlas_dev   # mesmo gross_revenue nos 5 consumidores
 uv run python scripts/check_mv_recharges.py --target dev --profile $PROFILE --warehouse-id $WAREHOUSE_ID         # as 7 medidas respondem
-uv run python scripts/check_web_kpis.py                                                                          # KPIs do dashboard = gold (veja o cabeçalho do script)
+DATABRICKS_CONFIG_PROFILE=$PROFILE ATLAS_CATALOG=atlas_dev DATABRICKS_HOST=<url do workspace> \
+  DATABRICKS_WAREHOUSE_ID=$WAREHOUSE_ID uv run python scripts/check_web_kpis.py                                 # KPIs do dashboard = gold
 ```
 
 Cada pasta tem checagens próprias em `scripts/check_*.py` (resumo em [scripts/README.md](scripts/README.md)).
@@ -139,7 +140,7 @@ Diagrama C4 completo, onde ficam os dados, as fronteiras do humano e da IA e a t
 | Camada | Ferramenta | Por quê |
 |---|---|---|
 | Plataforma | Databricks Free Edition (serverless), Unity Catalog | Governança e linhagem de bronze até a metric view, sem custo |
-| Deploy | Declarative Automation Bundles + CLI | Catálogo, pipeline, jobs e Apps reproduzíveis por `bundle deploy` |
+| Deploy | Databricks Asset Bundles + CLI | Catálogo, pipeline, jobs e Apps reproduzíveis por `bundle deploy` |
 | Dados sintéticos | Python 3.12, Typer, NumPy, PyArrow | Seed determinística: mesmos bytes, mesmo dataset |
 | Pipeline | Lakeflow Spark Declarative Pipelines + Auto Loader | Medalhão com expectations e linhagem |
 | Semântica | UC metric views (YAML) | Definição única de cada métrica, com `MEASURE()` |
@@ -158,13 +159,13 @@ Medidas no `dev` pelo mantenedor; cada linha aponta para a task que a mediu no [
 
 | Métrica | Meta | Medido | Task |
 |---|---|---|---|
-| Acurácia do agente no golden set | ≥ 90% | 93,5 / 90,3 / 90,3% em 3 rodadas (média 91,4%); só scorers de código, sem LLM judges | P10.6 |
+| Acurácia do agente no golden set | ≥ 90% | 93,5 / 90,3 / 90,3% em 3 rodadas (média 91,4%); só scorers de código, sem LLM judges; a regra do período ausente (`no_period`) falhou em 2 de 3 rodadas | P10.6 |
 | Recusa fora do escopo | 100% | Sem falha de recusa no golden set | P10.6 |
 | Divergência da comissão × reconciliação | R$ 0,00 | R$ 0,00 em 4.798 linhas (`COM-2026-10-v1`) | P8.4 |
 | Gold D-1 | até 08:00 | `atlas_daily` em ~3 min (run manual); o disparo das 06:00 não foi observado | P6.7 |
 | Dashboard React | p95 < 3 s | p95 1.457 ms a frio; 484 ms após stop e start | P12.8, P12.14 |
-| Consistência entre consumidores | 100% | `gross_revenue` de 2026-10 igual (R$ 4.122.460,00) em AI/BI, Genie, agente, MCP e React; MCP × golden set: 20 casos de métrica iguais ao SQL de referência | P13.2, P11.4 |
-| Lotes `locked` com 2 aprovações | 100% | Lotes travados, mas **um único ator** no workspace: a 2ª etapa usou `demo_override` (`demo_mode = true`) | P8.9 |
+| Consistência entre consumidores | 100% | `gross_revenue` de 2026-10 igual (R$ 4.122.460,00) em AI/BI, Genie, agente, MCP e React; MCP × golden set: 20 casos de métrica iguais ao SQL de referência. **Não conferidos:** as demais métricas nos 5 consumidores e os 5 casos de comparação | P13.2, P11.4 |
+| Lotes `locked` com 2 aprovações | 100% | Lotes travados, mas **um único ator** no workspace: a 2ª aprovação usou `demo_override` (`demo_mode = true`) no `COM-2026-10-v1` e no ajuste `COM-2026-08-ADJ-1`; dois atores distintos nunca foram exercidos | P8.9, P8.10 |
 | Agente p95 < 15 s, fechamento < 1 h, pergunta < 1 min | — | **Não medidos** | — |
 
 ## 7. O que aprendi
