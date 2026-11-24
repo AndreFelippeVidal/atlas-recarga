@@ -7,7 +7,9 @@
 ![Databricks](https://img.shields.io/badge/Databricks-Free%20Edition-FF3621)
 ![Dados](https://img.shields.io/badge/dados-100%25%20sint%C3%A9ticos-lightgrey)
 
-**Demo ao vivo:** _ainda não publicada_ (os Apps da Free Edition param a cada 24 h; veja o [runbook](#runbook-de-demo-religar-os-3-apps)) · **Captura da demo:** _placeholder_ · [Arquitetura](docs/architecture.md) · [PRD](docs/prd.md) · [Roadmap](docs/specs/roadmap.md)
+**Demo ao vivo:** _ainda não publicada_ (os Apps da Free Edition param a cada 24 h; veja o [runbook](#runbook-de-demo-religar-os-3-apps)) · [Arquitetura](docs/architecture.md) · [PRD](docs/prd.md) · [Roadmap](docs/specs/roadmap.md)
+
+![Dashboard do Atlas: KPIs de outubro de 2026 e mapa do Rio de Janeiro por variação contra o mês anterior](docs/assets/dashboard-demo.png)
 
 Construído por **Spec-Driven Development**: cada pedaço nasceu de uma [spec](docs/specs/README.md) e de [ADRs](docs/adr/README.md) com as alternativas descartadas.
 
@@ -170,8 +172,6 @@ Medidas no `dev` pelo mantenedor; cada linha aponta para a task que a mediu no [
 
 ## 7. O que aprendi
 
-> _Rascunho a confirmar pelo autor: reflete o que o repositório registra, mas cabe a quem construiu dizer o que aprendeu._
-
 - **O gargalo estava na conexão, não no banco.** O dashboard demorava ~3,4 s por consulta porque abria uma conexão nova a cada uma; reaproveitá-la levou o p50 a 343 ms. O Lakebase foi testado e descartado ([ADR-0022](docs/adr/0022-dashboard-read-path-connection-reuse.md)).
 - **A Free Edition não tem tudo que o desenho previa.** O gateway não oferece guardrail de PII nem teto mensal que bloqueie, então a PII é mascarada no App ([ADR-0021](docs/adr/0021-agent-gateway-limits-and-pii-fallback.md)). O production monitoring do MLflow (Beta) não anexou nenhuma avaliação aos traces, e o plano B (job com scorers de código) é o que vale ([ADR-0013](docs/adr/0013-mlflow-genai-evaluation-monitoring.md)).
 - **Determinismo tem dependências escondidas.** Os PDVs dependem da janela do gerador; mudar a janela deixaria as recargas já carregadas órfãs. Por isso o `load_data.py` fixa a janela base e recusa subir PDVs diferentes dos já enviados.
@@ -185,6 +185,9 @@ claude mcp add --transport http atlas https://<atlas-mcp-app-host>/mcp \
   --header "Authorization: Bearer $DATABRICKS_USER_TOKEN"   # token de curta duração do seu usuário
 ```
 Depois: *"Qual a receita bruta de outubro de 2026?"* → R$ 4.122.460,00, com a fonte `mv_recharges`.
+
+![Claude Code respondendo a receita bruta de outubro de 2026 pelo atlas-mcp](docs/assets/mcp-claude-code-p11-5.png)
+
 O login pelo navegador (OAuth) não funciona na Free Edition; o motivo, os cuidados com o token, a
 auditoria e a captura de tela estão em [docs/mcp-claude-code.md](docs/mcp-claude-code.md).
 
