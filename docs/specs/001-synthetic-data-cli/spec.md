@@ -33,6 +33,8 @@ Pacote Python `atlas_cli` (Typer), instalável com `uv`, e executável `atlas-cl
 
 **`--incremental-day`:** gera só `recharges/dt=<dia>/part-0000`, sobre os PDVs já gerados em `--out` (lê `pos/pos`; sem `_manifest.json` ou `pos`, sai com `2`). Exige a mesma `--seed` e o mesmo `--format` do lote. `--months`, `--end-month`, `--pos` e `--distributors` são ignorados (com aviso) e o dia pode estar fora do histórico. O volume do dia é `--rows` repartido pela sazonalidade da janela do manifest. Dos `--scenarios`, só `null_pos` e `unknown_pos` (proporcionais ao volume) se aplicam; `regional_drop`, `duplicates` e `late_arrival` dependem de vários dias, e `fractioning` e `negative_amount` sorteiam um dia da janela, então ficam de fora. Se `dt=<dia>` já existe, a partição inteira é substituída (mesmos bytes para os mesmos parâmetros). O `_manifest.json` é atualizado (arquivos, contagens e a chave `incremental`); o `validate` então pula os invariantes 2 (se houve cenários no dia) e 5.
 
+**Poda (`atlas_cli.prune`, SPEC-012):** função do pacote, sem flag nova no `generate`. `prune_recharges(out, first, last)` remove as partições `recharges/dt=<dia>/` fora de `[first, last]`, tira os arquivos delas do manifest, recalcula `counts.recharges` e `counts.partitions` e grava a chave `pruned` (`{"from", "to"}`). `pos`, `distributors` e `municipalities` não mudam. O `validate` pula o invariante 5 quando há `pruned` (o total deixa de seguir `--rows`). Sem `_manifest.json`, ou com `first` > `last`, é erro de pré-condição (`2`).
+
 ### `validate` — flags e comportamento
 
 | Flag | Tipo | Padrão | Regra |

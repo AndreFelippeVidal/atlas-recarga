@@ -190,6 +190,11 @@ def _inv4_ufs(manifest: dict[str, Any], pos: pa.Table, municipalities: Municipal
 
 def _inv5_total(manifest: dict[str, Any], recharges: pa.Table) -> Check:
     name = "invariante 5: total de recargas dentro de ±1% de --rows"
+    if manifest.get("pruned"):
+        window = manifest["pruned"]
+        return _skip(
+            name, f"podado para {window['from']} a {window['to']}; o total não segue --rows"
+        )
     if manifest.get("incremental"):
         days = ", ".join(sorted(manifest["incremental"]))
         return _skip(name, f"há partição incremental ({days}); o total deixa de seguir --rows")

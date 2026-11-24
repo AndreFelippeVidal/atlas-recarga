@@ -28,5 +28,6 @@ Se quem implementa (pessoa ou agente de código) precisa adivinhar, a spec está
 | [009](009-repo-foundation/spec.md) | Fundação do repositório | 0 | — | 0014 | aprovado |
 | [010](010-agent-harness/spec.md) | Harness do agente de código | 1 | — | 0012, 0014 | aprovado |
 | [011](011-architecture/spec.md) | Arquitetura explicada | 2 | — | todos | a escrever (P2.1) |
+| [012](012-data-range-loader/spec.md) | Carga de dados por intervalo | 14 | F1, F2 | 0001, 0003 | rascunho |
 
 Convenções globais (nomes, dinheiro, tempo, geo, segredos): [tech-stack.md § Convenções globais](tech-stack.md#convenções-globais).

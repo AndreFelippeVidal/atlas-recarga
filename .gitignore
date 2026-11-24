@@ -32,6 +32,7 @@ apps/web/dist/
 
 # Generated data (SPEC-001) — reproducible from the CLI, never versioned
 data/generated/
+data/generated-range/
 
 # Claude Code local state
 .claude/settings.local.json

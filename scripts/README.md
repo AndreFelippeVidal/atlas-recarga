@@ -136,3 +136,22 @@ uv run python scripts/check_consistency.py --profile <perfil> --warehouse-id <id
 
 Genie e agente são modelos: se só um falhar, rode de novo e leia a resposta impressa. Não confere o
 desenho do card no navegador. Sai com 0 se os 5 batem.
+
+## `load_data.py` (P14.1)
+
+Passo 1 da demo: gera os dados de um intervalo de datas, envia para a landing e roda o `atlas_daily`
+(SPEC-012). A janela base do `generate` é fixa (padrão: 12 meses até 2026-10) porque os PDVs dependem
+dela; o script aborta se o `pos` ou os `distributors` forem diferentes dos já carregados. Dias fora
+da janela base vêm de `--incremental-day`. Quem roda é o mantenedor, com o bundle já implantado:
+
+```bash
+uv run python scripts/load_data.py --from 2026-08-01 --to 2026-10-31 --profile <perfil> --dry-run
+uv run python scripts/load_data.py --from 2026-08-01 --to 2026-10-31 --profile <perfil>
+```
+
+`--target demo` usa o Volume `atlas`; `--no-run` não dispara o pipeline. O `generate` completo gera
+~2 milhões de linhas antes da poda e leva alguns minutos. Cenários de vários dias só aparecem se o
+dia deles cair dentro do intervalo. Cada dia fora da janela base roda um `--incremental-day`, então
+um intervalo longo depois dela (até 366 dias) é lento. O manifest no Volume descreve só o último envio:
+`check_bronze_counts.py` e `check_silver_recharges.py` comparam com ele, então só valem para a landing
+limpa ou para um único intervalo.
