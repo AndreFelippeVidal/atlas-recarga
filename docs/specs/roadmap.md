@@ -30,6 +30,7 @@
 | 12 | Dashboard React com mapa | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) | 15 + P11.5 |
 | 13 | Demo e release v1.0 | — | 5 |
 | 14 | Carga de dados por intervalo | [012-data-range-loader](012-data-range-loader/spec.md) | 1 (a P13.3 depende dela) |
+| 15 | Dashboard analítico (v1.1) | [007-react-geo-dashboard](007-react-geo-dashboard/spec.md) e [004-metric-views](004-metric-views/spec.md) | 9 |
 
 ## Fase 0 — Fundação do repositório → [009-repo-foundation](009-repo-foundation/spec.md)
 
@@ -201,14 +202,27 @@ _Um comando gera os dados de um intervalo de datas, envia para a landing e roda 
 
 - [x] **P14.1** 🤖 `atlas_cli.prune` + `scripts/load_data.py` (gera, poda, valida, envia e roda o `atlas_daily`) — _pronto quando:_ Critérios 1 a 5 da SPEC-012 §6, com testes sem workspace; o mantenedor confere o critério 6 no `dev` (#102) — `prune_recharges` no `atlas_cli` (o `validate` pula o invariante 5 quando há `pruned`) e `scripts/load_data.py` com `--from`/`--to`, `--dry-run` e `--no-run`; testes de ponta a ponta com o `atlas-cli` real e o upload e o `bundle run` simulados. **Não conferido:** o critério 6 (a execução no `dev`, o upload e o `atlas_daily` de verdade, e as contagens com `check_bronze_counts.py` e `check_silver_recharges.py`) · depende de P13.2
 
+## Fase 15 — Dashboard analítico (v1.1) → [007-react-geo-dashboard](007-react-geo-dashboard/spec.md)
+
+_Filtros de tipo de PDV e distribuidor, medidas com janela na camada semântica ([004-metric-views](004-metric-views/spec.md) §5) e leitura determinística do mapa. Depois do v1.0.0._
+
+- [x] **P15.1** 🤖 Specs da v1.1: janelas (SPEC-004 §5), filtros e leitura do mapa (SPEC-007), Fase 15 no roadmap — _pronto quando:_ SPEC-004 e SPEC-007 atualizadas em commit `docs(specs)` e as tasks P15.2 a P15.9 no roadmap e nos `tasks.md` (#106) · depende de P13.4
+- [ ] **P15.2** 🤝 Spike: medidas com janela na `mv_recharges` (Free Edition) — _pronto quando:_ `docs/spikes/P15.2-window-measures.md` responde os 7 itens, incluindo a consulta agrupada por UF, região e município, e o ADR-0025 fica `aceito` com 2 alternativas descartadas · depende de P15.1
+- [ ] **P15.3** 🤖 Backend: filtros `pos_type` e `distributor` + `/api/filters` — _pronto quando:_ Critérios de filtro da SPEC-007 §6 em teste unitário; soma das UFs e das regiões iguais ao KPI filtrado · depende de P15.1
+- [ ] **P15.4** 🤖 Frontend: seletores de tipo de PDV e de distribuidor — _pronto quando:_ Os filtros recolorem mapa, KPIs e ranking mantendo nível e zoom; estado vazio; build no CI · depende de P15.3
+- [ ] **P15.5** 🤖 `mv_recharges.yaml` com `gross_revenue_t3m`, `gross_revenue_ytd` e `revenue_mom_change` — _pronto quando:_ Critérios novos da SPEC-004 §8 passam no `dev` via `scripts/check_mv_windows.py` · depende de P15.2
+- [ ] **P15.6** 🤖 Janelas nos consumidores: catálogo do MCP, UC functions e golden set (GS-032 a GS-034) — _pronto quando:_ `query_metric` e as `fn_*` aceitam as 3 medidas pela regra do spike; `reference_sql` dos casos novos executa; acurácia do gate ≥ 90% · depende de P15.5
+- [ ] **P15.7** 🤖 `atlas-web` lê o `mom_change` de `revenue_mom_change` — _pronto quando:_ Valores iguais, com 2 casas, aos de antes nos 3 níveis; a divisão sai do backend só depois da comparação · depende de P15.5, P15.3
+- [ ] **P15.8** 🤖 Painel "Leitura do mapa": `/api/reading` + componente — _pronto quando:_ Critério da leitura da SPEC-007 §6 contra o SQL direto no gold; 400 para `level=municipality` · depende de P15.4, P15.7
+- [ ] **P15.9** 🤝 Deploy no `dev` e conferência da v1.1 — _pronto quando:_ Critérios novos conferidos no `dev`; `check_consistency.py` ok com e sem filtro; p95 abaixo de 3 s com e sem filtro · depende de P15.6, P15.8
+
 ## Depois do MVP
 
 | Versão | Item |
 |---|---|
 | v1.1 | Geo híbrido: CEP → código IBGE em tabela de referência cacheada (ADR-0004) |
-| v1.1 | Medidas com janela nas metric views; filtros de distribuidor e tipo de PDV no mapa |
-| v1.1 | Painel "Leitura do mapa" / "Onde crescer" no dashboard React, sem IA: texto determinístico calculado no backend (maior UF do mês, maior queda contra o mês anterior) |
-| v1.1 | Filtros de recorte e escopo no dashboard React (hoje só mês e medida) |
+| v1.1 | Medidas de variação mês a mês para `recharge_count`, `avg_ticket` e `active_pos` na metric view, e o `compare_months` do MCP lendo a variação dela (hoje calculados no consumidor; exceção do ADR-0025) |
+| v1.1 | Filtros de região, UF e faixa de meses no dashboard React (tipo de PDV e distribuidor entram na Fase 15) |
 | v1.1 | Alerta de frescor do monitoramento do agente: o alerta de qualidade não dispara se o job `atlas_agent_monitoring` parar (a view fica vazia) |
 | v2 | Forecast e metas regionais com backtesting |
 | v2 | Personas do agente (Helena, Analista, Regional) com golden set por persona |
