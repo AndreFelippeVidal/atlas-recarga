@@ -116,3 +116,60 @@
   - Separar o bloco final `Fonte:` do corpo só para apresentá-lo como citação (o texto não muda); testes de `**negrito**`, lista, tabela, HTML cru, `javascript:`, imagem e `Fonte:`
   - Redesenho do painel só no CSS e nos componentes do chat: balões, indicador de digitação, botão flutuante, estados vazio, erro e interrompido, foco e contraste AA nos dois temas; sem tocar mapa, KPIs nem tokens de cor existentes
   - Rebuild em `apps/web/static` (o CI confere); o mantenedor faz o deploy do `atlas-web` no `dev` e confere o visual
+
+## Fase 15 — Dashboard analítico (v1.1)
+
+### P15.1 🤖 Specs da v1.1: janelas, filtros e leitura do mapa
+
+- **Depende de:** P13.4
+- **Pronto quando:** SPEC-004 §5 e SPEC-007 atualizadas em commit `docs(specs)`; as tasks P15.2 a P15.9 estão no roadmap e nos `tasks.md`
+- **Passos:**
+  - Medidas com janela (`gross_revenue_t3m`, `gross_revenue_ytd`, `revenue_mom_change`) e as regras de consulta na SPEC-004 §5 e §8
+  - Filtros `pos_type` e `distributor`, `/api/filters` e `/api/reading` na SPEC-007 §3, §4 e §6
+  - Fase 15 no roadmap; índice de specs atualizado
+
+### P15.3 🤖 Backend: filtros `pos_type` e `distributor` + `/api/filters`
+
+- **Depende de:** P15.1
+- **Pronto quando:** Os critérios de filtro da SPEC-007 §6 passam em teste unitário com warehouse simulado; a soma das UFs e a das regiões batem com o KPI filtrado
+- **Passos:**
+  - `kpis.py` e `map_data.py` recebem `pos_type` e `distributor` como parâmetros vinculados; a chave do cache inclui os dois
+  - `GET /api/filters` lê os valores distintos da metric view (cache de 10 min); `pos_type` valida contra a lista fechada e `distributor` contra o resultado de `/api/filters`
+  - Mês que existe sem recarga no recorte devolve `200` com listas vazias e KPIs zerados; `404` só para mês sem dados no total
+  - Atualizar `scripts/check_web_kpis.py` e `scripts/check_web_map.py` com um recorte filtrado (`pharmacy`) comparado ao SQL direto no gold
+
+### P15.4 🤖 Frontend: seletores de tipo de PDV e de distribuidor
+
+- **Depende de:** P15.3
+- **Pronto quando:** Os filtros recolorem mapa, KPIs e ranking mantendo nível e zoom; o estado vazio aparece numa combinação sem recarga; build, `tsc`, `eslint` e `vitest` no CI
+- **Passos:**
+  - Dois seletores com "Todos" como padrão, carregados de `/api/filters`; "Limpar filtros" no estado vazio; foco e rótulos acessíveis (SPEC-007 §5)
+  - Testes de componente (troca de filtro mantém o nível, estado vazio, erro de `/api/filters`); o frontend não calcula nem soma valor
+  - Build versionado em `apps/web/static` atualizado (o CI confere)
+
+### P15.7 🤖 `atlas-web` lê o `mom_change` de `revenue_mom_change`
+
+- **Depende de:** P15.5, P15.3
+- **Pronto quando:** O critério do `mom_change` da SPEC-007 §6 passa: valores iguais, com 2 casas, aos de antes nos 3 níveis; o backend não faz mais a divisão
+- **Passos:**
+  - **Antes de apagar** o cálculo em Python, um teste (ou `scripts/check_web_map.py`) compara os dois caminhos no `dev`; só então a conta sai do backend
+  - Conversão da fração para pontos percentuais com `Decimal`; `null` sem base
+  - Se o ADR-0025 mantiver a conta no backend, esta task vira "documentar a exceção" e fecha sem código
+
+### P15.8 🤖 Painel "Leitura do mapa": `/api/reading` + componente
+
+- **Depende de:** P15.4, P15.7
+- **Pronto quando:** O critério da leitura da SPEC-007 §6 passa em teste contra o SQL direto no gold; 400 para `level=municipality`; o bloco some nos níveis UF e município
+- **Passos:**
+  - `reading.py`: só escolhe e ordena valores de `MEASURE()`, sem somar nem dividir; itens `top_revenue`, `top_rise` e `top_drop`
+  - Componente com as frases montadas pelos formatadores existentes; sem frase quando não há mês anterior
+  - Testes: ordem dos itens, variação `null` fora, ausência de mês anterior, filtros aplicados
+
+### P15.9 🤝 Deploy no `dev` e conferência da v1.1
+
+- **Depende de:** P15.6, P15.8
+- **Pronto quando:** Critérios novos da SPEC-004 §8 e da SPEC-007 §6 conferidos no `dev`; `check_consistency.py` ok com e sem filtro; o p95 de `/api/map/municipality` com e sem filtro abaixo de 3 s; o visual dos filtros e da leitura conferido por você
+- **Passos:**
+  - `bundle deploy -t dev`, jobs `atlas_semantic_deploy` e `atlas_eval_sync`, `make apps-start`
+  - `scripts/measure_web_p95.py` com recorte filtrado; `scripts/check_consistency.py` com `pos_type`
+  - Registrar o que **não** foi conferido, como nas fases anteriores
