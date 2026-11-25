@@ -22,7 +22,7 @@ O `atlas-web` calcula o `mom_change` no backend, o que contraria o princípio 1 
 
 
 ## Decisão
-Escolhemos **A: janelas na `mv_recharges`**, porque o spike mostrou que `window` aceita `version: 1.1` com `synonyms` e `format`, que a janela sobrevive ao filtro de mês e ao agrupamento geográfico, que o filtro de PDV vale antes dela e que os valores batem com o gold ao centavo (`revenue_mom_change` em 4 casas). A latência com janela não diferiu da sem janela. Descartadas: **B** (view separada, sem ganho e com custo de grants, Genie e MCP) e **C** (manter no backend, que deixaria a métrica no consumidor). A SPEC-004 §5 não muda de ramo; o formato de consulta e os detalhes (`trailing 2` mais o mês atual, `COALESCE`, `recharge_year`) entram nela e na P15.5.
+Escolhemos **A: janelas na `mv_recharges`**, porque o spike mostrou que `window` aceita `version: 1.1` com `synonyms` e `format`, que a janela sobrevive ao filtro de mês e ao agrupamento geográfico, que o filtro `pos_type` vale antes dela (o de distribuidor fica para o `check_mv_windows.py` da P15.5) e que os valores batem com o gold ao centavo (`revenue_mom_change` em 4 casas), em 3 meses e 2 recortes (ver "Não conferido" no spike). Uma consulta isolada por UF levou o mesmo tempo com e sem janela; o p95 do dashboard (< 3 s) não foi medido e fica para a P15.9. Descartadas: **B** (view separada, sem ganho e com custo de grants, Genie e MCP) e **C** (manter no backend, que deixaria a métrica no consumidor). A SPEC-004 §5 não muda de ramo; o formato de consulta e os detalhes (`trailing 2` mais o mês atual, `COALESCE`, `recharge_year`) entram nela e na P15.5.
 
 ## Prós e contras das opções
 ### A. Janelas na `mv_recharges`

@@ -9,11 +9,11 @@ O mantenedor roda isto no `dev` (a metric view e o warehouse só existem no work
         --warehouse-id <id>
 
 Modos:
-- `run`: cria `<catalog>.semantic.mv_recharges_window_spike` (tenta `version: 1.1` e, se a
-  criação falhar, `version: 0.1`), consulta as medidas com janela e compara cada resultado com
-  o SQL direto no gold. Imprime uma linha por item do spike (1 a 7) e sai com 1 se algum
-  item de valor divergir. Os itens 1 e 3 a 7 vêm do resultado; o 2 e o 6 vêm das comparações
-  agrupadas e filtradas.
+- `run`: cria `<catalog>.semantic.mv_recharges_window_spike` com `version: 1.1` (se a criação
+  falhar, o run reprova o item 1 e `0.1` roda só como diagnóstico), consulta as medidas com
+  janela e compara cada resultado com o SQL direto no gold. Imprime uma linha por item do
+  spike e sai com 1 se algum item divergir. O item 1 vem da criação, o 3 a 5 das comparações
+  de `cur`, `t3`, `ytd` e `mom`, o 2 e o 6 dos agrupamentos e filtros, o 7 da medição de tempo.
 - `drop`: apaga a view descartável.
 
 Só cria a view do spike; não toca em `mv_recharges`. O texto do resultado vai para
@@ -250,44 +250,51 @@ def _run(profile: str, warehouse_id: str, statement: str) -> list[list[str | Non
         "databricks", "--profile", profile, "api", "post", "/api/2.0/sql/statements",
         "--json", json.dumps(body), "-o", "json",
     ]  # fmt: skip
-    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+    except OSError as exc:
+        raise RuntimeError(f"CLI do Databricks indisponível: {exc}") from exc
     if result.returncode != 0:
         raise RuntimeError(f"consulta falhou: {result.stderr.strip()}")
-    response = json.loads(result.stdout)
+    try:
+        response = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"saída não é JSON: {result.stdout[:200]!r}") from exc
     status = response.get("status", {})
     if status.get("state") != "SUCCEEDED":
         raise RuntimeError(f"consulta não terminou: {status.get('error') or status}")
+    manifest = response.get("manifest", {})
+    if manifest.get("truncated") or manifest.get("total_chunk_count", 1) > 1:
+        raise RuntimeError("resultado em mais de um bloco ou truncado: o spike não o segue")
     return list(response.get("result", {}).get("data_array", []))
 
 
 def _timed(profile: str, warehouse_id: str, statement: str) -> float:
-    """Mediana em ms de `REPEATS` execuções."""
-    samples = []
-    for _ in range(REPEATS):
-        start = time.perf_counter()
-        _run(profile, warehouse_id, statement)
-        samples.append((time.perf_counter() - start) * 1000)
-    return statistics.median(samples)
+    """Tempo em ms de uma execução."""
+    start = time.perf_counter()
+    _run(profile, warehouse_id, statement)
+    return (time.perf_counter() - start) * 1000
 
 
 def cmd_run(catalog: str, profile: str, warehouse_id: str) -> int:
     lines: list[str] = []
     failed = False
 
-    created = None
-    for version in ("1.1", "0.1"):
-        try:
-            _run(profile, warehouse_id, build_create_ddl(catalog, version))
-            created = version
-            lines.append(f"ok    item 1: janela aceita com version: {version}")
-            break
-        except RuntimeError as exc:
-            lines.append(f"FALHA item 1: version: {version} recusada: {exc}")
-    if created is None:
+    try:
+        _run(profile, warehouse_id, build_create_ddl(catalog, "1.1"))
+        lines.append("ok    item 1: janela aceita com version: 1.1 (synonyms, format, comment)")
+    except RuntimeError as exc:
+        lines.append(f"FALHA item 1: version: 1.1 não criou a view: {exc}")
+        lines.append(
+            "      (confira se é sintaxe ou outra causa, como warehouse frio ou permissão)"
+        )
+        try:  # só diagnóstico: o spike não segue com 0.1, que não tem synonyms nem format
+            _run(profile, warehouse_id, build_create_ddl(catalog, "0.1"))
+            lines.append("      version: 0.1 cria a view; apague-a com `drop` antes de repetir")
+        except RuntimeError as exc_01:
+            lines.append(f"      version: 0.1 também falhou: {exc_01}")
         print("\n".join(lines))
         return 1
-    if created != "1.1":
-        lines.append("aviso item 1: só `0.1` (sem synonyms/format/comment) criou a view")
 
     for group in GROUPS:
         key_width = 1 if group == "recharge_month" else 2  # (grupo, mês) ou só o mês
@@ -317,9 +324,18 @@ def cmd_run(catalog: str, profile: str, warehouse_id: str) -> int:
         f"SELECT uf, CAST(MEASURE(revenue_trailing2) AS STRING) FROM {catalog}.semantic.{VIEW} "
         "WHERE recharge_month = DATE'2026-10-01' GROUP BY uf"
     )
-    t_plain = _timed(profile, warehouse_id, plain)
-    t_window = _timed(profile, warehouse_id, windowed)
-    lines.append(f"item 7: sem janela {t_plain:.0f} ms, com janela {t_window:.0f} ms (mediana)")
+    _run(profile, warehouse_id, plain)  # aquece o warehouse e o cache antes de medir
+    _run(profile, warehouse_id, windowed)
+    plain_ms: list[float] = []
+    window_ms: list[float] = []
+    for _ in range(REPEATS):  # alterna as duas para o cache não favorecer uma só
+        plain_ms.append(_timed(profile, warehouse_id, plain))
+        window_ms.append(_timed(profile, warehouse_id, windowed))
+    lines.append(
+        f"item 7: sem janela {statistics.median(plain_ms):.0f} ms, "
+        f"com janela {statistics.median(window_ms):.0f} ms "
+        "(mediana de uma consulta por UF, não o p95 do App)"
+    )
 
     print("\n".join(lines))
     print("\nItens 3, 4 e 5: leia as linhas `cur`/`t2`/`t3`/`ytd`/`mom` conferidas acima;")
@@ -330,7 +346,7 @@ def cmd_run(catalog: str, profile: str, warehouse_id: str) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("mode", choices=("run", "drop"))
-    parser.add_argument("--target", choices=sorted(CATALOGS), required=True)
+    parser.add_argument("--target", choices=["dev"], required=True, help="o spike roda só no dev")
     parser.add_argument("--profile", required=True, help="perfil da CLI do Databricks (explícito)")
     parser.add_argument("--warehouse-id", required=True)
     args = parser.parse_args(argv)
