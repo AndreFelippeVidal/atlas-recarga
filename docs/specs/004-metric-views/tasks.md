@@ -56,7 +56,7 @@
 - **Depende de:** P15.2
 - **Pronto quando:** Os 3 critérios novos da SPEC-004 §8 passam no `dev` (a conferência fica com o mantenedor); o que a task faz depende do ramo do ADR-0025 (SPEC-004 §5)
 - **Passos:**
-  - Medidas no YAML (ou na view que o ADR-0025 escolher), com `comment` literal, `synonyms` e `format`
+  - Medidas no YAML da `mv_recharges` (ramo A do ADR-0025), com `comment` literal, `synonyms` e `format`: `gross_revenue_t3m` = `trailing 2 month` + mês atual com `COALESCE(…, 0)` em cada parcela (o `trailing N` exclui o mês atual), `gross_revenue_ytd` com a dimensão `recharge_year` e duas entradas em `window`, `revenue_mom_change` com `NULLIF` na base (ver `docs/spikes/P15.2-window-measures.md`)
   - `scripts/check_mv_windows.py`: compara cada medida com o SQL direto no gold para os 12 meses, em 3 recortes (sem filtro, `pos_type`, `distributor`); janeiro e o primeiro mês da série incluídos
   - Teste unitário do script com warehouse simulado; `check_mv_recharges.py` segue ok
 
