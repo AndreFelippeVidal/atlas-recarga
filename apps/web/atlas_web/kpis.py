@@ -9,9 +9,12 @@ from __future__ import annotations
 import re
 from datetime import date, datetime
 from decimal import ROUND_HALF_EVEN, Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from atlas_web.sql_client import Executor
+
+if TYPE_CHECKING:
+    from atlas_web.filters import Filters
 
 VIEW = "mv_recharges"
 SEMANTIC_SCHEMA = "semantic"
@@ -70,23 +73,46 @@ def _delta_pct(current: Decimal, previous: Decimal | None) -> Decimal | None:
     return ((current - previous) / previous * 100).quantize(PCT_PLACES, ROUND_HALF_EVEN)
 
 
-def kpis(catalog: str, execute: Executor, month: str) -> dict[str, Any]:
+def _empty(measure: str) -> Decimal | None:
+    """Valor de um recorte sem recarga: zero, e `avg_ticket` sem base fica `None`."""
+    if measure == "avg_ticket":
+        return None
+    return Decimal("0.00") if measure == "gross_revenue" else Decimal(0)
+
+
+def kpis(
+    catalog: str, execute: Executor, month: str, filters: Filters | None = None
+) -> dict[str, Any]:
     first = parse_month(month)
     prev = previous_month(first)
     measures = ", ".join(f"MEASURE(`{m}`) AS `{m}`" for m in KPI_MEASURES)
+    extra, extra_params = filters.sql() if filters is not None else ("", {})
     sql = (
         f"SELECT `recharge_month`, {measures} FROM {_table(catalog)} "  # noqa: S608
-        "WHERE `recharge_month` IN (:month, :previous) GROUP BY ALL"
+        f"WHERE `recharge_month` IN (:month, :previous){extra} GROUP BY ALL"
     )
-    columns, rows = execute(sql, {"month": first, "previous": prev})
+    columns, rows = execute(sql, {"month": first, "previous": prev, **extra_params})
     by_month = {_as_date(r[0]): dict(zip(columns[1:], r[1:], strict=True)) for r in rows}
     current = by_month.get(first)
     if current is None or current["gross_revenue"] is None:
-        raise MonthNotFound(month)
+        if filters is None or not filters.active:
+            raise MonthNotFound(month)
+        series = list_months(catalog, execute)  # o filtro não muda a existência do mês
+        if month not in series:
+            raise MonthNotFound(month)
+        current = {m: _empty(m) for m in KPI_MEASURES}
     before = by_month.get(prev)
+    if (
+        filters is not None
+        and filters.active
+        and (before is None or before["gross_revenue"] is None)
+        and prev.strftime("%Y-%m") in list_months(catalog, execute)
+    ):
+        before = {m: _empty(m) for m in KPI_MEASURES}  # `previous` só é null no 1º mês da série
     result: dict[str, Any] = {"month": month, "previous_month": prev.strftime("%Y-%m")}
     for m in KPI_MEASURES:
-        value = Decimal(str(current[m]))
+        value = None if current[m] is None else Decimal(str(current[m]))
         previous = None if before is None or before[m] is None else Decimal(str(before[m]))
-        result[m] = {"value": value, "previous": previous, "delta_pct": _delta_pct(value, previous)}
+        delta = None if value is None else _delta_pct(value, previous)
+        result[m] = {"value": value, "previous": previous, "delta_pct": delta}
     return result

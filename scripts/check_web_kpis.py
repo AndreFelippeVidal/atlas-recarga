@@ -11,7 +11,9 @@ Sobe o app em processo (sem deploy; o App é da P12.8) e confere:
 2. `gross_revenue` e `recharge_count` de `/api/kpis` batem, ao centavo, com um SQL direto sobre
    `gold.fct_recharges` (independente da metric view);
 3. `/api/kpis` pela 2ª vez vem do cache (sem nova consulta);
-4. `delta_pct` é coerente com o mês anterior.
+4. `delta_pct` é coerente com o mês anterior;
+5. (P15.3) com `pos_type=pharmacy`, `gross_revenue` e `recharge_count` batem com o SQL direto no
+   gold com o mesmo filtro, `/api/filters` lista `pharmacy` e `pos_type=foo` dá 400.
 O valor de `gross_revenue` impresso deve ser o mesmo do card do AI/BI "Visão Comercial".
 """
 
@@ -73,7 +75,29 @@ def main(argv: list[str] | None = None) -> int:
         if abs(Decimal(rev["delta_pct"]) - expected * 100) > Decimal("0.01"):
             problems.append(f"delta_pct incoerente: {rev}")
 
+    filters = client.get("/api/filters").json()
+    if "pharmacy" not in filters.get("pos_types", []):
+        problems.append(f"/api/filters sem pharmacy: {filters}")
+    cut = client.get("/api/kpis", params={"month": month, "pos_type": "pharmacy"}).json()
+    _, rows = real(
+        f"SELECT SUM(f.amount_brl), COUNT(1) FROM {catalog}.gold.fct_recharges f "  # noqa: S608
+        f"JOIN {catalog}.gold.dim_pos p ON f.pos_id = p.pos_id "
+        "WHERE f.status = 'approved' AND p.pos_type = 'pharmacy' "
+        "AND date_trunc('MONTH', f.recharge_date) = :m",
+        {"m": f"{month}-01"},
+    )
+    cut_revenue = Decimal(str(rows[0][0] or 0))
+    cut_count = Decimal(str(rows[0][1] or 0))
+    if Decimal(cut["gross_revenue"]["value"]) != cut_revenue:
+        problems.append(f"pharmacy: gross_revenue {cut['gross_revenue']['value']} != {cut_revenue}")
+    if Decimal(cut["recharge_count"]["value"]) != cut_count:
+        problems.append(f"pharmacy: recharge_count {cut['recharge_count']['value']} != {cut_count}")
+    bad = client.get("/api/kpis", params={"month": month, "pos_type": "foo"}).status_code
+    if bad != 400:
+        problems.append(f"pos_type=foo: esperado 400, veio {bad}")
+
     print(f"health: {client.get('/api/health').json()}")
+    print(f"pharmacy {month}: gross_revenue {cut['gross_revenue']['value']} (gold {cut_revenue})")
     print(f"gross_revenue {month}: {rev['value']} (compare com o AI/BI)")
     for problem in problems:
         print(f"FALHA: {problem}")
