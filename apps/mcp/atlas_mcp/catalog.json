@@ -43,6 +43,10 @@
           "description": "Mês de negócio da recarga, em America/Sao_Paulo."
         },
         {
+          "name": "recharge_year",
+          "description": "Ano de negócio da recarga, em America/Sao_Paulo. Existe para o acumulado no ano zerar a cada janeiro; para filtrar por período use recharge_month."
+        },
+        {
           "name": "recharge_hour_local",
           "description": "Hora da recarga, de 0 a 23, no fuso da UF do PDV."
         },

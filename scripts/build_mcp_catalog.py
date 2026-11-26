@@ -26,6 +26,18 @@ CATALOG_PATH = ROOT / "apps" / "mcp" / "atlas_mcp" / "catalog.json"
 # Dimensão de mês de cada view: `month_from`/`month_to` filtram por ela (SPEC-006 §3).
 PERIOD_DIMENSION = {"mv_recharges": "recharge_month", "mv_commission": "reference_month"}
 
+# Medidas com janela (SPEC-004 §5): ficam fora da lista fechada até a P15.6 definir a regra de
+# consulta (só com `recharge_month`). As `aux_*` são pedaços de composição e nunca entram.
+AUX_PREFIX = "aux_"
+WINDOW_MEASURES_PENDING_P15_6 = frozenset(
+    {"gross_revenue_t3m", "gross_revenue_ytd", "revenue_mom_change"}
+)
+
+
+def _is_consumable(measure: dict[str, Any]) -> bool:
+    name = str(measure["name"])
+    return not name.startswith(AUX_PREFIX) and name not in WINDOW_MEASURES_PENDING_P15_6
+
 
 def _items(entries: list[dict[str, Any]]) -> list[dict[str, str]]:
     return [
@@ -44,7 +56,7 @@ def build_catalog(directory: Path = SEMANTIC_DIR) -> dict[str, Any]:
         views[view] = {
             "description": " ".join(str(doc["comment"]).split()),
             "period_dimension": period,
-            "measures": _items(doc["measures"]),
+            "measures": _items([m for m in doc["measures"] if _is_consumable(m)]),
             "dimensions": dimensions,
         }
     return {"views": views}

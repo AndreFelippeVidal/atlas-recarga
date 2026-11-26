@@ -17,6 +17,7 @@ SEMANTIC = ROOT / "semantic"
 DIMENSIONS = {
     "recharge_date",
     "recharge_month",
+    "recharge_year",
     "recharge_hour_local",
     "region",
     "uf",
@@ -27,6 +28,22 @@ DIMENSIONS = {
     "distributor_name",
 }
 MEASURES = {
+    "gross_revenue",
+    "recharge_count",
+    "avg_ticket",
+    "active_pos",
+    "revenue_per_active_pos",
+    "reversal_rate",
+    "distinct_subscribers",
+    "aux_revenue_cur",
+    "aux_revenue_prev",
+    "aux_revenue_trailing2",
+    "gross_revenue_t3m",
+    "gross_revenue_ytd",
+    "revenue_mom_change",
+}
+# As 7 medidas do MVP: `check_mv_recharges.py` as confere; as janelas são do `check_mv_windows.py`.
+BASE_MEASURES = {
     "gross_revenue",
     "recharge_count",
     "avg_ticket",
@@ -165,9 +182,9 @@ def _load_check() -> ModuleType:
 
 def test_check_script_covers_every_measure_and_flags_empty_values() -> None:
     check = _load_check()
-    assert set(check.MEASURES) == MEASURES
+    assert set(check.MEASURES) == BASE_MEASURES
     query = check.build_totals_query("atlas_dev")
-    assert all(f"MEASURE({m})" in query for m in MEASURES)
+    assert all(f"MEASURE({m})" in query for m in BASE_MEASURES)
     assert "atlas_dev.semantic.mv_recharges" in query
     row = ["100.00"] * len(check.MEASURES)
     assert not [line for line in check.totals_lines(row) if line.startswith("FALHA")]
@@ -288,3 +305,41 @@ def test_check_mv_commission_queries_and_lines(monkeypatch: pytest.MonkeyPatch) 
     answers = iter([[], [["2026-10-01", "1.00", "1.00"]]])
     monkeypatch.setattr(check, "_run", lambda *_: next(answers))
     assert check.main(argv) == 0
+
+
+def test_window_measures_keep_the_structure_validated_in_the_spike() -> None:
+    measures = {m["name"]: m for m in _mv()["measures"]}
+    windows = {
+        name: [(w["order"], w["range"]) for w in measures[name]["window"]]
+        for name in ("aux_revenue_cur", "aux_revenue_prev", "aux_revenue_trailing2")
+    }
+    assert windows["aux_revenue_cur"] == [("recharge_month", "current")]
+    assert windows["aux_revenue_prev"] == [("recharge_month", "trailing 1 month")]
+    assert windows["aux_revenue_trailing2"] == [("recharge_month", "trailing 2 month")]
+    ytd = measures["gross_revenue_ytd"]
+    assert [(w["order"], w["range"]) for w in ytd["window"]] == [
+        ("recharge_year", "current"),
+        ("recharge_month", "cumulative"),
+    ]
+    t3m = measures["gross_revenue_t3m"]["expr"]
+    assert t3m.count("COALESCE(") == 2 and "aux_revenue_trailing2" in t3m
+    assert "NULLIF(MEASURE(aux_revenue_prev), 0)" in measures["revenue_mom_change"]["expr"]
+    for name in ("gross_revenue_t3m", "gross_revenue_ytd", "revenue_mom_change"):
+        assert measures[name]["format"] and measures[name]["synonyms"], name
+
+
+def test_mcp_catalog_and_functions_exclude_the_same_measures() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "build_mcp_catalog", ROOT / "scripts" / "build_mcp_catalog.py"
+    )
+    assert spec and spec.loader
+    catalog = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(catalog)
+    funcs = importlib.util.spec_from_file_location(
+        "apply_functions", SEMANTIC / "apply_functions.py"
+    )
+    assert funcs and funcs.loader
+    fn = importlib.util.module_from_spec(funcs)
+    funcs.loader.exec_module(fn)
+    assert catalog.AUX_PREFIX == fn.AUX_PREFIX
+    assert catalog.WINDOW_MEASURES_PENDING_P15_6 == fn.WINDOW_MEASURES_PENDING_P15_6
