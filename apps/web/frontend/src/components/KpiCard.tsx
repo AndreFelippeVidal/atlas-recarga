@@ -34,7 +34,9 @@ export default function KpiCard({ measure, kpi, previousMonthLabel, failed }: Pr
   return (
     <div className="card" role="group" aria-label={label}>
       <div className="card-label">{label}</div>
-      <div className="card-value">{formatMeasure(measure, kpi.value)}</div>
+      <div className="card-value">
+        {kpi.value === null ? "—" : formatMeasure(measure, kpi.value)}
+      </div>
       <div className={`card-delta ${trend}`}>
         <span aria-hidden="true">{arrow}</span> {formatDelta(kpi.delta_pct)}
         {kpi.previous !== null && (

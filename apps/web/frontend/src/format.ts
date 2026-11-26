@@ -74,3 +74,16 @@ export const MEASURE_LABELS: Record<MapMeasure, string> = {
   active_pos: "PDVs ativos",
   mom_change: "Variação da receita (Δ%)",
 };
+
+// Rótulos dos tipos de PDV (lista fechada da SPEC-007 §3); valor desconhecido sai como veio.
+const POS_TYPE_LABELS: Record<string, string> = {
+  newsstand: "Banca",
+  pharmacy: "Farmácia",
+  grocery: "Mercearia",
+  lottery: "Lotérica",
+  partner_app: "App parceiro",
+};
+
+export function posTypeLabel(value: string): string {
+  return POS_TYPE_LABELS[value] ?? value;
+}

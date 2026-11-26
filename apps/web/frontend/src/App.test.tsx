@@ -78,6 +78,8 @@ const down = () => json({ detail: { code: "WAREHOUSE_UNAVAILABLE", message: "x" 
 function route(overrides: Record<string, Handler> = {}): Handler {
   const base: Record<string, Handler> = {
     "/api/months": () => json({ months: ["2026-10", "2026-09"] }),
+    "/api/filters": () =>
+      json({ pos_types: ["newsstand", "pharmacy"], distributors: ["Abreu", "Zanetti"] }),
     "/api/kpis": () => json(KPIS),
     "/api/map/region": (url) => {
       const measure = new URL(url, "http://x").searchParams.get("measure") as keyof typeof REGIONS;
@@ -439,5 +441,89 @@ describe("Aquecimento sem meses (P12.7)", () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
     expect(screen.queryByText("Aquecendo o banco de dados…")).not.toBeInTheDocument();
+  });
+  describe("filtros (v1.1)", () => {
+    it("carrega as opções de /api/filters com Todos como padrão", async () => {
+      mockFetch(route());
+      render(<App />);
+      const type = await screen.findByLabelText(/Tipo de PDV/);
+      expect(type).toHaveValue("");
+      await waitFor(() => expect(type).toBeEnabled());
+      expect(within(type).getByRole("option", { name: "Farmácia" })).toBeInTheDocument();
+      const dist = screen.getByLabelText(/Distribuidor/);
+      expect(within(dist).getByRole("option", { name: "Zanetti" })).toBeInTheDocument();
+      expect(within(dist).getByRole("option", { name: "Todos" })).toBeInTheDocument();
+    });
+
+    it("manda os filtros a KPIs e mapa e mantém o nível e o zoom", async () => {
+      const fetchMock = mockFetch(route());
+      render(<App />);
+      const user = userEvent.setup();
+      const type = await screen.findByLabelText(/Tipo de PDV/);
+      await waitFor(() => expect(type).toBeEnabled());
+      await user.click(await screen.findByRole("button", { name: /PA, região Norte/ }));
+      expect(await screen.findByRole("button", { name: /Ver o Brasil inteiro/ })).toBeVisible();
+      await user.selectOptions(type, "pharmacy");
+      await user.selectOptions(screen.getByLabelText(/Distribuidor/), "Abreu");
+      await waitFor(() => {
+        const urls = fetchMock.mock.calls.map((c) => c[0]);
+        expect(
+          urls.some(
+            (u) =>
+              u.startsWith("/api/map/uf") &&
+              u.includes("pos_type=pharmacy") &&
+              u.includes("distributor=Abreu"),
+          ),
+        ).toBe(true);
+        expect(urls.some((u) => u.startsWith("/api/kpis") && u.includes("pos_type=pharmacy"))).toBe(
+          true,
+        );
+      });
+      // o zoom na região continua
+      expect(screen.getByRole("button", { name: /Ver o Brasil inteiro/ })).toBeVisible();
+    });
+
+    it("mostra o estado vazio no mapa, mantém os KPIs e Limpar filtros restaura", async () => {
+      mockFetch(
+        route({
+          "/api/map/region": (url) =>
+            new URL(url, "http://x").searchParams.has("pos_type")
+              ? json([])
+              : json(REGIONS.gross_revenue),
+          "/api/kpis": (url) =>
+            new URL(url, "http://x").searchParams.has("pos_type")
+              ? json({
+                  ...KPIS,
+                  gross_revenue: kpi("0.00", "10.00", "-100.00"),
+                  avg_ticket: kpi(null as unknown as string, null, null),
+                })
+              : json(KPIS),
+        }),
+      );
+      render(<App />);
+      const user = userEvent.setup();
+      const type = await screen.findByLabelText(/Tipo de PDV/);
+      await waitFor(() => expect(type).toBeEnabled());
+      await user.selectOptions(type, "newsstand");
+      expect(await screen.findByText("Sem recargas neste recorte")).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Ticket médio" })).toHaveTextContent("—");
+      expect(screen.queryByRole("list", { name: /Ranking/ })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Limpar filtros" }));
+      expect(type).toHaveValue("");
+      await waitFor(() =>
+        expect(screen.queryByText("Sem recargas neste recorte")).not.toBeInTheDocument(),
+      );
+      expect(await screen.findByRole("list", { name: /Ranking/ })).toBeInTheDocument();
+    });
+
+    it("com /api/filters fora do ar mostra o banner e deixa só Todos", async () => {
+      mockFetch(route({ "/api/filters": down }));
+      render(<App />);
+      expect(await screen.findByRole("alert")).toHaveTextContent("WAREHOUSE_UNAVAILABLE");
+      expect(screen.getByLabelText(/Tipo de PDV/)).toBeDisabled();
+      expect(screen.getByLabelText(/Distribuidor/)).toBeDisabled();
+      // KPIs e mapa seguem funcionando
+      expect(await screen.findByText(/4\.122\.460,00/)).toBeInTheDocument();
+    });
   });
 });

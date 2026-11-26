@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { MapFocus, MapMeasure, Region } from "../api";
+import type { Filters, MapFocus, MapMeasure, Region } from "../api";
 import { buildGeometry } from "../geoShapes";
 import { useMapData, useMunTopology, useSlow, useUfTopology } from "../hooks";
 import { buildStats } from "../mapStats";
@@ -15,6 +15,8 @@ interface Props {
   measure: MapMeasure;
   // Os meses ainda podem estar chegando (sem erro): conta como espera do warehouse.
   monthLoading: boolean;
+  filters: Filters;
+  onClearFilters: () => void;
 }
 
 const BRAZIL: MapFocus = { level: "brazil" };
@@ -37,11 +39,11 @@ function focusId(focus: MapFocus): string {
   return focus.level === "region" ? `region:${focus.region}` : "brazil";
 }
 
-export default function MapPanel({ month, measure, monthLoading }: Props) {
+export default function MapPanel({ month, measure, monthLoading, filters, onClearFilters }: Props) {
   const [focus, setFocus] = useState<MapFocus>(BRAZIL);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const geo = useUfTopology();
-  const mapData = useMapData(month, measure, focus);
+  const mapData = useMapData(month, measure, focus, filters);
 
   // Em erro mantém o mapa anterior (com mês, medida e foco a que ele pertence); carregando,
   // mostra o esqueleto do foco pedido.
@@ -112,6 +114,9 @@ export default function MapPanel({ month, measure, monthLoading }: Props) {
     expected.length > 0 ? expected.length : new Set(geometry?.shapes.map((x) => x.statKey)).size;
   const mapPending = month === null ? monthLoading : mapData.data === null && !mapData.error;
   const warming = useSlow(mapPending);
+  // Recorte filtrado sem nenhuma recarga no nível atual: o nível e o zoom ficam, só o vazio aparece.
+  const filtered = Boolean(filters.pos_type || filters.distributor);
+  const emptySlice = filtered && mapData.data !== null && mapData.data.items.length === 0;
   const hasEmpty = geometry !== null && stats !== null && stats.size < totalItems;
 
   return (
@@ -131,7 +136,14 @@ export default function MapPanel({ month, measure, monthLoading }: Props) {
             ← Ver o Brasil inteiro
           </button>
         )}
-        {geometry ? (
+        {emptySlice ? (
+          <div className="empty-slice" role="status">
+            <p>Sem recargas neste recorte</p>
+            <button type="button" className="back-button" onClick={onClearFilters}>
+              Limpar filtros
+            </button>
+          </div>
+        ) : geometry ? (
           <div key={focusId(view)} className="map-zoom">
             <RegionMap
               geometry={geometry}
@@ -147,7 +159,7 @@ export default function MapPanel({ month, measure, monthLoading }: Props) {
         ) : (
           <div className="skeleton-map" aria-busy="true" aria-label="Carregando o mapa" />
         )}
-        {stats && geometry && (
+        {stats && geometry && !emptySlice && (
           <Legend measure={shownMeasure} scale={scale} classes={classes} hasEmpty={hasEmpty} />
         )}
       </section>
@@ -183,16 +195,18 @@ export default function MapPanel({ month, measure, monthLoading }: Props) {
             </>
           )}
         </nav>
-        <Ranking
-          measure={shownMeasure}
-          stats={stats}
-          noun={NOUNS[view.level]}
-          expected={expected}
-          highlighted={highlighted}
-          interactive={view.level !== "uf"}
-          onHighlight={setHighlighted}
-          onSelect={select}
-        />
+        {!emptySlice && (
+          <Ranking
+            measure={shownMeasure}
+            stats={stats}
+            noun={NOUNS[view.level]}
+            expected={expected}
+            highlighted={highlighted}
+            interactive={view.level !== "uf"}
+            onHighlight={setHighlighted}
+            onSelect={select}
+          />
+        )}
       </aside>
     </>
   );

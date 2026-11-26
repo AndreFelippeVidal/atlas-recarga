@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
+  fetchFilters,
   fetchKpis,
   fetchMonths,
   fetchMap,
   fetchMunTopology,
   fetchUfTopology,
+  type Filters,
+  type FilterOptions,
   type KpisResponse,
   type MapFocus,
   type MapItem,
@@ -64,8 +67,19 @@ export function useMonths() {
   };
 }
 
-export function useKpis(month: string | null) {
-  const api = useApi<KpisResponse>(month, (s) => fetchKpis(month as string, s));
+function filtersKey(f: Filters): string {
+  return `${f.pos_type ?? ""}|${f.distributor ?? ""}`;
+}
+
+export function useFilterOptions() {
+  const api = useApi<FilterOptions>("filters", fetchFilters);
+  return { options: api.data, error: api.error, retry: api.retry };
+}
+
+export function useKpis(month: string | null, filters: Filters = {}) {
+  const api = useApi<KpisResponse>(month === null ? null : `${month}|${filtersKey(filters)}`, (s) =>
+    fetchKpis(month as string, filters, s),
+  );
   return { kpis: api.data, error: api.error, retry: api.retry };
 }
 
@@ -83,13 +97,19 @@ function focusKey(focus: MapFocus): string {
 
 // O resultado carrega mês, medida e foco a que pertence, para que o mapa anterior mantido em erro
 // continue com a legenda, a unidade e a geometria certas.
-export function useMapData(month: string | null, measure: MapMeasure, focus: MapFocus) {
-  const cacheKey = month === null ? null : `${month}|${measure}|${focusKey(focus)}`;
+export function useMapData(
+  month: string | null,
+  measure: MapMeasure,
+  focus: MapFocus,
+  filters: Filters = {},
+) {
+  const cacheKey =
+    month === null ? null : `${month}|${measure}|${focusKey(focus)}|${filtersKey(filters)}`;
   const api = useApi<MapData>(cacheKey, async (s) => ({
     month: month as string,
     measure,
     focus,
-    items: await fetchMap(month as string, measure, focus, s),
+    items: await fetchMap(month as string, measure, focus, filters, s),
   }));
   return { data: api.data, stale: api.stale, error: api.error, retry: api.retry };
 }
