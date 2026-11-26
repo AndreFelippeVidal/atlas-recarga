@@ -43,7 +43,7 @@ def test_counts_and_unique_ids() -> None:
         k: sum(c["category"] == k for c in CASES)
         for k in ("metric", "comparison", "refusal", "no_period")
     }
-    assert by_category == {"metric": 20, "comparison": 5, "refusal": 5, "no_period": 1}
+    assert by_category == {"metric": 23, "comparison": 5, "refusal": 5, "no_period": 1}
 
 
 def test_no_period_case_has_no_month_in_the_question_and_a_month_sql() -> None:

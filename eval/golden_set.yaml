@@ -296,3 +296,30 @@
     )
   expected_source_view: mv_recharges
   tolerance_pct: 0.5
+- id: GS-032
+  category: metric
+  question: "Qual a receita dos últimos 3 meses até outubro de 2026?"
+  reference_sql: |
+    SELECT MEASURE(gross_revenue_t3m) AS value
+    FROM atlas.semantic.mv_recharges
+    WHERE recharge_month = DATE'2026-10-01'
+  expected_source_view: mv_recharges
+  tolerance_pct: 0.5
+- id: GS-033
+  category: metric
+  question: "Qual a receita acumulada no ano até outubro de 2026?"
+  reference_sql: |
+    SELECT MEASURE(gross_revenue_ytd) AS value
+    FROM atlas.semantic.mv_recharges
+    WHERE recharge_month = DATE'2026-10-01'
+  expected_source_view: mv_recharges
+  tolerance_pct: 0.5
+- id: GS-034
+  category: metric
+  question: "De quantos por cento foi a variação da receita de outubro de 2026 contra o mês anterior?"
+  reference_sql: |
+    SELECT MEASURE(revenue_mom_change) * 100 AS value
+    FROM atlas.semantic.mv_recharges
+    WHERE recharge_month = DATE'2026-10-01'
+  expected_source_view: mv_recharges
+  tolerance_pct: 1.0

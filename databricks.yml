@@ -218,6 +218,15 @@ resources:
             - id: "00000000000000000000000000000014"
               question: ["Como a receita de outubro variou contra setembro, por região?"]
               sql: ["WITH monthly AS (SELECT mv_recharges.region, mv_recharges.recharge_month, MEASURE(mv_recharges.gross_revenue) AS gross_revenue FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month IN (DATE'2026-09-01', DATE'2026-10-01') GROUP BY mv_recharges.region, mv_recharges.recharge_month) SELECT cur.region, prev.gross_revenue AS september, cur.gross_revenue AS october, ROUND((cur.gross_revenue - prev.gross_revenue) / prev.gross_revenue * 100, 2) AS change_pct FROM monthly cur JOIN monthly prev ON cur.region = prev.region AND cur.recharge_month = DATE'2026-10-01' AND prev.recharge_month = DATE'2026-09-01' ORDER BY change_pct"]
+            - id: "00000000000000000000000000000015"
+              question: ["Qual a receita dos últimos 3 meses até outubro?"]
+              sql: ["SELECT MEASURE(mv_recharges.gross_revenue_t3m) AS gross_revenue_t3m FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01'"]
+            - id: "00000000000000000000000000000016"
+              question: ["Qual a receita acumulada no ano até outubro, por região?"]
+              sql: ["SELECT mv_recharges.region, MEASURE(mv_recharges.gross_revenue_ytd) AS gross_revenue_ytd FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.region ORDER BY gross_revenue_ytd DESC"]
+            - id: "00000000000000000000000000000017"
+              question: ["Como a receita de outubro variou contra setembro, por UF?"]
+              sql: ["SELECT mv_recharges.uf, MEASURE(mv_recharges.revenue_mom_change) AS revenue_mom_change FROM ${var.catalog}.semantic.mv_recharges AS mv_recharges WHERE mv_recharges.recharge_month = DATE'2026-10-01' GROUP BY mv_recharges.uf ORDER BY revenue_mom_change DESC"]
           text_instructions:
             - id: "0000000000000000000000000000001f"
               content:
@@ -229,7 +238,8 @@ resources:
                 - "- PDV ativo é o PDV com pelo menos 1 recarga aprovada no período filtrado (medida active_pos)."
                 - "- Sem período na pergunta, use o último mês fechado (2026-10) e diga qual mês usou."
                 - "- A coluna region guarda siglas: N, NE, CO, SE, S. A coluna uf guarda a sigla da UF."
-                - "- Para variação contra o mês anterior, consulte os dois meses e calcule a diferença na consulta; não existe medida de variação."
+                - "- Variação da receita contra o mês anterior: medida revenue_mom_change (fração, 0,05 = 5%). Para as outras medidas, consulte os dois meses e calcule a diferença."
+                - "- Medidas com janela (gross_revenue_t3m, gross_revenue_ytd, revenue_mom_change): filtre um único mês em recharge_month; nunca use as medidas aux_*."
                 - ""
                 - "## CONSTRAINTS"
                 - "- Comissão é a medida commission_total de mv_commission (base: commission_base; taxa efetiva: effective_rate; beneficiários: paid_beneficiaries). Só existem lotes travados; rascunhos não aparecem. O mês fica em reference_month."

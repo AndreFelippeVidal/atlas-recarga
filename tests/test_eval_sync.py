@@ -37,7 +37,7 @@ def test_dataset_name_per_catalog() -> None:
 
 def test_one_record_per_case_without_computed_values() -> None:
     records = sync.to_records(CASES)
-    assert len(records) == len(CASES) == 31
+    assert len(records) == len(CASES) == 34
     for case, record in zip(CASES, records, strict=True):
         assert record["inputs"] == {"question": case["question"]}
         expectations = record["expectations"]

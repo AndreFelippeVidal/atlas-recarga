@@ -80,6 +80,32 @@ def _check_filters(filters: Mapping[str, Any], dimensions: Sequence[str]) -> dic
     return checked
 
 
+def _check_windows(
+    spec: Mapping[str, Any],
+    measures: Sequence[str],
+    dimensions: Sequence[str],
+    start: str,
+    end: str,
+) -> None:
+    """Medida com janela (SPEC-004 §5): um único mês e sem `recharge_year` (SPEC-006 §3).
+
+    Com mais de um mês no filtro, ou agrupando por ano, a janela deixa de ser a validada no spike
+    P15.2 e o valor sairia sem aviso. Falhar aqui evita o resultado enganoso.
+    """
+    windowed = {m["name"] for m in spec["measures"] if m.get("window")}
+    used = [m for m in measures if m in windowed]
+    if not used:
+        return
+    if start != end:
+        raise InvalidArgument(
+            f"{', '.join(used)} (medida com janela) exige month_from igual a month_to: um mês só"
+        )
+    if "recharge_year" in dimensions:
+        raise InvalidArgument(
+            f"{', '.join(used)} (medida com janela) não combina com recharge_year"
+        )
+
+
 def _order_clause(order_by: str | None, measures: Sequence[str], dimensions: Sequence[str]) -> str:
     """`order_by`: coluna do resultado + `asc`/`desc` (padrão: medida desc, dimensão asc)."""
     if order_by is None:
@@ -120,6 +146,7 @@ def build_query(
     start, end = _check_month(month_from, "month_from"), _check_month(month_to, "month_to")
     if start > end:
         raise InvalidArgument("month_from deve ser anterior ou igual a month_to")
+    _check_windows(spec, ms, ds, start, end)
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= max_limit:
         raise InvalidArgument(f"limit deve estar entre 1 e {max_limit}")
 

@@ -35,7 +35,8 @@ O campo `source` de toda resposta repete o contrato de citação do agente (view
 - `limit` acima de 500 é `INVALID_ARGUMENT`; o `RESULT_TOO_LARGE` do §4 fica para o `compare_months`, que não tem `limit` (o `top_regions` é limitado por `n ≤ 50`).
 - `sql_fingerprint` é o sha1 do SQL parametrizado, sem o comentário `request_id` e sem os valores.
 - A lista fechada de medidas e dimensões vem de `apps/mcp/atlas_mcp/catalog.json`, gerado de `semantic/*.yaml` por `scripts/build_mcp_catalog.py` (o App só leva `apps/mcp` no deploy); um teste falha se o snapshot ficar velho.
-- Até a P15.6, o snapshot não inclui as medidas com janela (`gross_revenue_t3m`, `gross_revenue_ytd`, `revenue_mom_change`) nem as auxiliares `aux_*` (SPEC-004 §5); a P15.6 libera as 3 primeiras com a regra de consulta. A dimensão `recharge_year` já entra.
+- O snapshot inclui as medidas com janela de `mv_recharges` (`gross_revenue_t3m`, `gross_revenue_ytd`, `revenue_mom_change`), marcadas com `"window": true` no `catalog.json` e no retorno de `list_metrics`, e nunca as auxiliares `aux_*` (SPEC-004 §5). A dimensão `recharge_year` também entra no snapshot.
+- **Regra das medidas com janela (SPEC-004 §5, spike P15.2):** a janela só se mantém com **um único mês** no filtro. Se `measures` tiver uma medida com janela, `month_from` deve ser igual a `month_to` e `dimensions` não pode conter `recharge_year`; fora disso, `INVALID_ARGUMENT` sem executar query. Qualquer outra dimensão e os filtros de PDV (`pos_type`, `distributor_name`) valem, e as janelas são calculadas sobre o recorte. `top_regions` e `compare_months` já consultam um mês por vez, então aceitam as medidas com janela (o Δ de `revenue_mom_change` é a diferença de duas frações, sem pedir a variação de uma variação).
 - O erro de argumento chega ao cliente como erro de tool com a mensagem prefixada por `INVALID_ARGUMENT:`.
 
 **Detalhes de `top_regions` e `compare_months` (P11.3):**
@@ -48,7 +49,7 @@ O campo `source` de toda resposta repete o contrato de citação do agente (view
 
 | Código | Quando |
 |---|---|
-| `INVALID_ARGUMENT` | Medida, dimensão ou filtro fora da lista fechada; `limit` acima do máximo; mês inválido |
+| `INVALID_ARGUMENT` | Medida, dimensão ou filtro fora da lista fechada; `limit` acima do máximo; mês inválido; medida com janela com mais de um mês ou com `recharge_year` |
 | `PERMISSION_DENIED` | O usuário não tem `SELECT` na metric view |
 | `WAREHOUSE_UNAVAILABLE` | Warehouse parado ou em timeout depois de 1 nova tentativa (20s) |
 | `RESULT_TOO_LARGE` | Mais de 500 linhas: sugere agregar mais ou filtrar |

@@ -77,7 +77,7 @@ Regras:
 - **Exceção declarada.** O Δ% de `recharge_count`, `avg_ticket` e `active_pos` (cards do `atlas-web`) e o `compare_months` do MCP continuam calculados no consumidor, como no MVP; o ADR-0025 registra a exceção e o roadmap a lista em "Depois do MVP".
 - **A decisão do ADR-0025 define o que as P15.5 e P15.6 fazem.** Ramo A (janelas na `mv_recharges`): as tasks seguem como escritas. Ramo B (view separada `mv_recharges_trend`, `version: 0.1`): a view repete as dimensões `recharge_month`, `region`, `uf`, `municipality_ibge_code`, `municipality_name`, `pos_type` e `distributor_name`, entra em `semantic_grants`, no Genie e na lista fechada do MCP, e a SPEC-004 §6 e §7 e a SPEC-006 são corrigidas antes do código. Ramo C (manter no backend): P15.5, P15.6 e P15.7 fecham como "documentar a exceção" e a P15.8 usa o `mom_change` do backend.
 - **Medidas auxiliares `aux_*`.** O `MEASURE()` só compõe medidas nomeadas, então a `mv_recharges` leva `aux_revenue_cur`, `aux_revenue_prev` e `aux_revenue_trailing2` (os pedaços `revenue_cur`, `revenue_prev` e `revenue_trailing2` do spike). Elas **nunca** entram no catálogo do MCP, nas `fn_*` nem em exemplos; o `comment` diz "Não consulte". O Genie lê a view inteira e as vê: risco aceito, tratado só pelo `comment`.
-- **Até a P15.6**, o catálogo do MCP (`catalog.json`) e as `fn_*` também deixam de fora `gross_revenue_t3m`, `gross_revenue_ytd` e `revenue_mom_change`, porque a regra de consulta (só com `recharge_month`) é da P15.6, que **remove** essa exclusão. A dimensão `recharge_year` entra no catálogo e nas `fn_*` como as demais.
+- **Regra de consulta dos consumidores (P15.6).** O catálogo do MCP (`catalog.json`) e as `fn_*` expõem as 3 medidas com janela, nunca as `aux_*`. O `query_metric` as aceita só com `month_from = month_to` e sem `recharge_year` nas dimensões (`INVALID_ARGUMENT` fora disso; SPEC-006 §3); as `fn_*` e as consultas do `atlas-web` já usam um mês por vez. `recharge_year` fica no catálogo como dimensão, mas não se combina com as medidas com janela.
 - Cada medida tem `comment` com a definição literal, porque o agente lê.
 
 ## 6. Consumidores
@@ -85,7 +85,7 @@ Regras:
 | Consumidor | Como usa |
 |---|---|
 | **AI/BI Dashboard** `Atlas — Visão Comercial` | Páginas: Brasil (KPIs + ranking de UFs), Região/UF (tabela municipal), Rede (PDVs ativos por tipo), Comissão (só `mv_commission`). Filtros globais: mês, região, UF. O mapa coroplético fica na SPEC-007 (React): o mapa nativo do AI/BI não reconhece UFs do Brasil e não há lat/lon no MVP (ADR-0004) |
-| **Genie Space** `Atlas Recarga` | Fontes: **só** `mv_recharges` e `mv_commission`. Instruções em PT-BR com as definições oficiais e 10 perguntas de exemplo (subconjunto do golden set); a Fase 15 acrescenta 3 exemplos com as medidas com janela. Usado pelo agente (SPEC-005) |
+| **Genie Space** `Atlas Recarga` | Fontes: **só** `mv_recharges` e `mv_commission`. Instruções em PT-BR com as definições oficiais e 10 perguntas de exemplo (subconjunto do golden set); a Fase 15 acrescenta 3 exemplos com as medidas com janela, e a instrução de variação deixa de dizer que não existe medida (a de receita é `revenue_mom_change`; as de outras medidas seguem pela diferença entre dois meses). Usado pelo agente (SPEC-005) |
 | **Agente, MCP e React** | Consultam via SQL warehouse com `MEASURE()`. Nunca leem `gold.*` diretamente |
 
 ## 7. Permissões

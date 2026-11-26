@@ -211,3 +211,60 @@ def test_query_failure_does_not_leak_details(monkeypatch: pytest.MonkeyPatch) ->
 
     message = asyncio.run(run())
     assert message and "segredo" not in message
+
+
+WINDOWS = ["gross_revenue_t3m", "gross_revenue_ytd", "revenue_mom_change"]
+
+
+def test_catalog_lists_window_measures_flagged_and_never_the_aux_ones() -> None:
+    measures = {m["name"]: m for m in load_catalog()["views"]["mv_recharges"]["measures"]}
+    assert all(measures[name].get("window") is True for name in WINDOWS)
+    assert not any(n.startswith("aux_") for n in measures)
+    assert not any(m.get("window") for n, m in measures.items() if n not in WINDOWS)
+    assert "mv_commission" in load_catalog()["views"]
+
+
+@pytest.mark.parametrize("measure", WINDOWS)
+def test_window_measure_with_one_month_runs_with_a_single_month_filter(measure: str) -> None:
+    rec = Recorder()
+    _run(rec, measures=[measure], dimensions=["region"])
+    sql, params = rec.calls[0]
+    assert f"MEASURE(`{measure}`) AS `{measure}`" in sql
+    assert params == {"month_from": "2026-10-01", "month_to": "2026-10-01"}
+
+
+def test_window_measure_accepts_pos_filters_and_geographic_dimensions() -> None:
+    rec = Recorder()
+    _run(
+        rec,
+        measures=["gross_revenue_t3m", "gross_revenue"],
+        dimensions=["recharge_month", "uf"],
+        filters={"pos_type": "pharmacy"},
+    )
+    assert "`pos_type` = :f0" in rec.calls[0][0]
+
+
+@pytest.mark.parametrize("measure", WINDOWS)
+def test_window_measure_over_a_range_of_months_is_invalid_and_runs_nothing(measure: str) -> None:
+    rec = Recorder()
+    with pytest.raises(InvalidArgument, match="um mês só"):
+        _run(rec, measures=[measure], month_from="2026-08")
+    assert rec.calls == []
+
+
+def test_window_measure_with_recharge_year_is_invalid_and_runs_nothing() -> None:
+    rec = Recorder()
+    with pytest.raises(InvalidArgument, match="recharge_year"):
+        _run(rec, measures=["gross_revenue_ytd"], dimensions=["recharge_year"])
+    assert rec.calls == []
+
+
+def test_plain_measures_keep_ranges_and_recharge_year() -> None:
+    rec = Recorder()
+    _run(rec, dimensions=["recharge_year"], month_from="2026-08")
+    assert rec.calls[0][1]["month_from"] == "2026-08-01"
+
+
+def test_aux_measures_are_not_queryable() -> None:
+    with pytest.raises(InvalidArgument):
+        _run(Recorder(), measures=["aux_revenue_cur"])
