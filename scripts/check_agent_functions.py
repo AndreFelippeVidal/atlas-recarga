@@ -11,7 +11,7 @@ funções só existem no workspace, então o **mantenedor** roda este script dep
 
 Só lê. Para cada medida e cada nível compara `fn_metric_by_region` com `MEASURE()` direto na
 `mv_recharges` (igual ao centavo); confere `fn_compare_months` contra a diferença das duas
-consultas diretas; confere que `fn_list_metrics` lista as 7 medidas e as 10 dimensões; e que
+consultas diretas; confere que `fn_list_metrics` lista as 10 medidas e as 11 dimensões; e que
 medida e nível inválidos falham com `INVALID_MEASURE` e `INVALID_LEVEL`. Sai com 0 se tudo bate.
 """
 
@@ -34,6 +34,9 @@ MEASURES = (
     "revenue_per_active_pos",
     "reversal_rate",
     "distinct_subscribers",
+    "gross_revenue_t3m",  # medidas com janela (SPEC-004 §5, P15.6)
+    "gross_revenue_ytd",
+    "revenue_mom_change",
 )
 LEVEL_KEYS = {
     "region": "region",
@@ -41,7 +44,7 @@ LEVEL_KEYS = {
     "municipality": "municipality_ibge_code",
     "ddd": "ddd",
 }
-N_DIMENSIONS = 10
+N_DIMENSIONS = 11  # inclui `recharge_year`
 _DATE = re.compile(r"^\d{4}-\d{2}-01$")
 TOLERANCE = Decimal("0.000001")  # a função arredonda para DECIMAL(24, 6)
 

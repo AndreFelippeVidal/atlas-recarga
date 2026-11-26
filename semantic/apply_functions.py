@@ -104,8 +104,8 @@ def build_metric_by_region(catalog: str, definition: dict[str, Any]) -> str:
             f"    SELECT {_lit(level)} AS level, CAST({key} AS STRING) AS key,\n"
             f"           CAST({label} AS STRING) AS label, {cols}\n"
             f"    FROM {view}\n"
-            f"    WHERE recharge_month = DATE_TRUNC('MONTH', {fq}.month)\n"
-            f"      AND ({fq}.uf IS NULL OR uf = {fq}.uf)\n"
+            "    WHERE recharge_month = (SELECT m FROM p)\n"
+            "      AND ((SELECT u FROM p) IS NULL OR uf = (SELECT u FROM p))\n"
             f"    GROUP BY {', '.join(dict.fromkeys((key, label)))}"
         )
     union = "\n    UNION ALL\n".join(branches)
@@ -134,7 +134,10 @@ def build_metric_by_region(catalog: str, definition: dict[str, Any]) -> str:
         "Medida ou nível fora da lista falha com INVALID_MEASURE ou INVALID_LEVEL. "
         "Somente leitura.'\n"
         "RETURN\n"
-        f"WITH guard AS {guard},\n"
+        # Os parâmetros entram por um CTE de 1 linha: com medidas com janela, o parâmetro direto no
+        # WHERE falha com MISSING_ATTRIBUTES (verificado no dev, P15.6).
+        f"WITH p AS (SELECT DATE_TRUNC('MONTH', {fq}.month) AS m, {fq}.uf AS u),\n"
+        f"guard AS {guard},\n"
         f"all_measures AS (\n{union}\n),\n"
         f"picked AS (\n  SELECT a.level, a.key, a.label, CASE {fq}.measure\n{pick}\n"
         "        END AS value\n"

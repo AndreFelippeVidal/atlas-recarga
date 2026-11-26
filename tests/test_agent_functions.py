@@ -77,7 +77,11 @@ def test_levels_use_dimensions_that_exist() -> None:
 def test_params_are_qualified_by_the_function_name() -> None:
     # coluna `uf`/`level` vence o parâmetro de mesmo nome: sem qualificar, `uf = uf` é sempre true
     ddl = _ddl()["fn_metric_by_region"].split("RETURN\n", 1)[1]
-    assert "uf = fn_metric_by_region.uf" in ddl
+    # os parâmetros entram só pelo CTE `p`; a metric view nunca os lê direto (medidas com janela
+    # falham com MISSING_ATTRIBUTES), e o filtro usa o valor do CTE
+    assert "fn_metric_by_region.uf AS u" in ddl and "fn_metric_by_region.month) AS m" in ddl
+    assert "uf = (SELECT u FROM p)" in ddl and "recharge_month = (SELECT m FROM p)" in ddl
+    assert "uf = fn_metric_by_region.uf" not in ddl
     assert "a.level = fn_metric_by_region.level" in ddl
     assert not re.search(r"(?<![.\w])month\)", ddl)
 
