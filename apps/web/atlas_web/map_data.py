@@ -10,6 +10,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+from atlas_web.filters import NO_FILTERS, Filters
 from atlas_web.kpis import (
     KPI_MEASURES,
     MonthNotFound,
@@ -57,6 +58,7 @@ def _values(
     measure: str,
     keys: tuple[str, ...],
     where: tuple[str, str, str] | None,
+    filters: Filters = NO_FILTERS,
 ) -> list[dict[str, Any]]:
     """Linhas `{<keys>, value}` do mês; `where` = (dimensão, nome do parâmetro, valor)."""
     first = parse_month(month)
@@ -66,6 +68,9 @@ def _values(
         dim, name, value = where
         extra = f" AND `{dim}` = :{name}"
         params[name] = value
+    filter_sql, filter_params = filters.sql()
+    extra += filter_sql
+    params.update(filter_params)
     key_list = ", ".join(f"`{k}`" for k in keys)
     if measure != MOM:
         sql = (
@@ -119,24 +124,36 @@ def _checked(
     return items
 
 
-def map_region(catalog: str, execute: Executor, month: str, measure: str) -> list[dict[str, Any]]:
+def map_region(
+    catalog: str, execute: Executor, month: str, measure: str, filters: Filters = NO_FILTERS
+) -> list[dict[str, Any]]:
     keys = ("region",)
-    items = _values(catalog, execute, month, measure, keys, None)
+    items = _values(catalog, execute, month, measure, keys, None, filters)
     return _sorted(_checked(items, catalog, execute, month), keys)
 
 
 def map_uf(
-    catalog: str, execute: Executor, month: str, measure: str, region: str | None
+    catalog: str,
+    execute: Executor,
+    month: str,
+    measure: str,
+    region: str | None,
+    filters: Filters = NO_FILTERS,
 ) -> list[dict[str, Any]]:
     keys = ("uf",)
     where = None if region is None else ("region", "region", region)
-    items = _values(catalog, execute, month, measure, keys, where)
+    items = _values(catalog, execute, month, measure, keys, where, filters)
     return _sorted(_checked(items, catalog, execute, month), keys)
 
 
 def map_municipality(
-    catalog: str, execute: Executor, month: str, measure: str, uf: str
+    catalog: str,
+    execute: Executor,
+    month: str,
+    measure: str,
+    uf: str,
+    filters: Filters = NO_FILTERS,
 ) -> list[dict[str, Any]]:
     keys = ("municipality_ibge_code", "municipality_name")
-    items = _values(catalog, execute, month, measure, keys, ("uf", "uf", uf))
+    items = _values(catalog, execute, month, measure, keys, ("uf", "uf", uf), filters)
     return _sorted(_checked(items, catalog, execute, month), keys)

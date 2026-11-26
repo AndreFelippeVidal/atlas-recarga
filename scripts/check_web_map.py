@@ -10,7 +10,9 @@ Sobe o app em processo e confere:
 1. a soma das regiões e a das UFs de `gross_revenue` e `recharge_count` são iguais ao KPI;
 2. a soma dos municípios de uma UF é igual à UF (medida aditiva);
 3. `mom_change` responde nos 3 níveis e `measure=foo` / `region=XX` / `uf=XX` dão 400;
-4. `avg_ticket` e `active_pos` respondem por região (valores vêm de `MEASURE()`, não de soma).
+4. `avg_ticket` e `active_pos` respondem por região (valores vêm de `MEASURE()`, não de soma);
+5. (P15.3) com `pos_type=pharmacy`, a soma das regiões e a das UFs de `gross_revenue` e
+   `recharge_count` são iguais ao KPI filtrado, e `pos_type=foo` dá 400.
 """
 
 from __future__ import annotations
@@ -76,7 +78,17 @@ def main(argv: list[str] | None = None) -> int:
     for measure in ("avg_ticket", "active_pos"):
         print(f"{measure} por região: {get('/api/map/region', measure=measure)}")
 
+    cut = {"pos_type": "pharmacy"}
+    cut_kpis = client.get("/api/kpis", params={**base, **cut}).json()
+    for measure in ("gross_revenue", "recharge_count"):
+        want = Decimal(cut_kpis[measure]["value"])
+        for path, level in (("/api/map/region", "regiões"), ("/api/map/uf", "UFs")):
+            got = total(get(path, measure=measure, **cut))
+            if got != want:
+                problems.append(f"pharmacy {measure}: soma das {level} {got} != KPI {want}")
+
     bad = [
+        ("/api/map/region", {"measure": "gross_revenue", "pos_type": "foo"}),
         ("/api/map/region", {"measure": "foo"}),
         ("/api/map/uf", {"measure": "gross_revenue", "region": "XX"}),
         ("/api/map/municipality", {"measure": "gross_revenue", "uf": "XX"}),

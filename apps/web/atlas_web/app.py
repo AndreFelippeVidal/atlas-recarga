@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from atlas_web import chat, map_data
+from atlas_web import filters as filters_mod
 from atlas_web import kpis as kpis_mod
 from atlas_web.cache import TTLCache
 from atlas_web.sql_client import Executor, make_executor
@@ -53,17 +54,18 @@ Task = tuple[tuple[Any, ...], Callable[[], Any]]
 
 def warm_tasks(catalog: str, run: Executor, month: str) -> list[Task]:
     """Consultas da tela do mês, com as mesmas chaves de cache dos endpoints."""
-    tasks: list[Task] = [(("kpis", month), lambda: kpis_mod.kpis(catalog, run, month))]
+    nf = filters_mod.NO_FILTERS.key
+    tasks: list[Task] = [(("kpis", month, nf), lambda: kpis_mod.kpis(catalog, run, month))]
     for measure in map_data.MAP_MEASURES:
         tasks.append(
             (
-                ("map", "region", month, measure),
+                ("map", "region", month, measure, nf),
                 partial(map_data.map_region, catalog, run, month, measure),
             )
         )
         tasks.append(
             (
-                ("map", "uf", month, measure, None),
+                ("map", "uf", month, measure, None, nf),
                 partial(map_data.map_uf, catalog, run, month, measure, None),
             )
         )
@@ -172,15 +174,48 @@ def create_app(
             log.exception("consulta falhou")
             raise unavailable() from None
 
+    def filter_values(*, reread: bool = False) -> dict[str, list[str]]:
+        key = ("filters",)
+        compute = partial(filters_mod.list_filters, catalog, run)
+        try:
+            values: dict[str, list[str]] = (
+                store.refresh(key, compute) if reread else store.get_or_set(key, compute)
+            )
+            return values
+        except Exception:
+            log.exception("consulta falhou")
+            raise unavailable() from None
+
+    def checked_filters(pos_type: str | None, distributor: str | None) -> filters_mod.Filters:
+        """Valida os filtros; um distribuidor fora do cache força **uma** releitura antes do 400."""
+        if pos_type is not None:
+            filters_mod.check_pos_type(pos_type)
+        if (
+            distributor is not None
+            and distributor not in filter_values()["distributors"]
+            and distributor not in filter_values(reread=True)["distributors"]
+        ):
+            raise filters_mod.InvalidFilter("distributor deve ser um valor de /api/filters")
+        return filters_mod.Filters(pos_type, distributor)
+
+    @app.get("/api/filters")
+    def filters() -> dict[str, list[str]]:
+        return filter_values()
+
     @app.get("/api/kpis")
-    def kpis(month: str = Query(...)) -> dict[str, Any]:
+    def kpis(
+        month: str = Query(...),
+        pos_type: str | None = Query(None),
+        distributor: str | None = Query(None),
+    ) -> dict[str, Any]:
         try:
             kpis_mod.parse_month(month)
-        except kpis_mod.InvalidMonth as exc:
+            flt = checked_filters(pos_type, distributor)
+        except (kpis_mod.InvalidMonth, filters_mod.InvalidFilter) as exc:
             raise HTTPException(400, {"code": "INVALID_ARGUMENT", "message": str(exc)}) from None
         try:
             result: dict[str, Any] = store.get_or_set(
-                ("kpis", month), lambda: kpis_mod.kpis(catalog, run, month)
+                ("kpis", month, flt.key), lambda: kpis_mod.kpis(catalog, run, month, flt)
             )
             return result
         except kpis_mod.MonthNotFound:
@@ -202,48 +237,64 @@ def create_app(
             raise unavailable() from None
 
     @app.get("/api/map/region")
-    def map_region(month: str = Query(...), measure: str = Query(...)) -> list[dict[str, Any]]:
+    def map_region(
+        month: str = Query(...),
+        measure: str = Query(...),
+        pos_type: str | None = Query(None),
+        distributor: str | None = Query(None),
+    ) -> list[dict[str, Any]]:
         try:
             kpis_mod.parse_month(month)
             map_data.check_measure(measure)
-        except (kpis_mod.InvalidMonth, map_data.InvalidArgument) as exc:
+            flt = checked_filters(pos_type, distributor)
+        except (kpis_mod.InvalidMonth, map_data.InvalidArgument, filters_mod.InvalidFilter) as exc:
             raise invalid(exc) from None
         result: list[dict[str, Any]] = serve(
-            ("map", "region", month, measure),
-            lambda: map_data.map_region(catalog, run, month, measure),
+            ("map", "region", month, measure, flt.key),
+            lambda: map_data.map_region(catalog, run, month, measure, flt),
         )
         return result
 
     @app.get("/api/map/uf")
     def map_uf(
-        month: str = Query(...), measure: str = Query(...), region: str | None = Query(None)
+        month: str = Query(...),
+        measure: str = Query(...),
+        region: str | None = Query(None),
+        pos_type: str | None = Query(None),
+        distributor: str | None = Query(None),
     ) -> list[dict[str, Any]]:
         try:
             kpis_mod.parse_month(month)
             map_data.check_measure(measure)
             if region is not None:
                 map_data.check_region(region)
-        except (kpis_mod.InvalidMonth, map_data.InvalidArgument) as exc:
+            flt = checked_filters(pos_type, distributor)
+        except (kpis_mod.InvalidMonth, map_data.InvalidArgument, filters_mod.InvalidFilter) as exc:
             raise invalid(exc) from None
         result: list[dict[str, Any]] = serve(
-            ("map", "uf", month, measure, region),
-            lambda: map_data.map_uf(catalog, run, month, measure, region),
+            ("map", "uf", month, measure, region, flt.key),
+            lambda: map_data.map_uf(catalog, run, month, measure, region, flt),
         )
         return result
 
     @app.get("/api/map/municipality")
     def map_municipality(
-        month: str = Query(...), measure: str = Query(...), uf: str | None = Query(None)
+        month: str = Query(...),
+        measure: str = Query(...),
+        uf: str | None = Query(None),
+        pos_type: str | None = Query(None),
+        distributor: str | None = Query(None),
     ) -> list[dict[str, Any]]:
         try:
             kpis_mod.parse_month(month)
             map_data.check_measure(measure)
             map_data.check_uf(uf or "")
-        except (kpis_mod.InvalidMonth, map_data.InvalidArgument) as exc:
+            flt = checked_filters(pos_type, distributor)
+        except (kpis_mod.InvalidMonth, map_data.InvalidArgument, filters_mod.InvalidFilter) as exc:
             raise invalid(exc) from None
         result: list[dict[str, Any]] = serve(
-            ("map", "municipality", month, measure, uf),
-            lambda: map_data.map_municipality(catalog, run, month, measure, uf or ""),
+            ("map", "municipality", month, measure, uf, flt.key),
+            lambda: map_data.map_municipality(catalog, run, month, measure, uf or "", flt),
         )
         return result
 
