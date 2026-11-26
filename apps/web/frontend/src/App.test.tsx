@@ -550,3 +550,22 @@ describe("mapa antigo em erro", () => {
     expect(screen.queryByRole("button", { name: /1º Sudeste/ })).not.toBeInTheDocument();
   });
 });
+
+describe("nome das linhas do mapa", () => {
+  it("mostra SE como Sergipe no nível região (não como Sudeste)", async () => {
+    mockFetch(
+      route({
+        "/api/map/uf": () =>
+          json([
+            { uf: "PA", value: "300000.00" },
+            { uf: "SE", value: "20000.00" },
+          ]),
+      }),
+    );
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /PA, região Norte/ }));
+    const ranking = await screen.findByRole("list", { name: /Ranking/ });
+    expect(within(ranking).getByRole("button", { name: /2º SE:/ })).toBeInTheDocument();
+    expect(within(ranking).queryByText(/Sudeste/)).not.toBeInTheDocument();
+  });
+});

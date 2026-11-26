@@ -133,7 +133,11 @@ export async function fetchMap(
   const rows = await getJson<RawRow[]>(`${path}?${qs}`, signal);
   return rows.map((r) => {
     const id = r.municipality_ibge_code ?? r.uf ?? r.region ?? "";
-    const name = r.municipality_name ?? REGION_NAMES[id as Region] ?? id;
+    // Só o nível Brasil traz regiões: "SE" é Sudeste ali, mas Sergipe nas linhas de UF.
+    const name =
+      r.municipality_name ??
+      (focus.level === "brazil" ? REGION_NAMES[id as Region] : undefined) ??
+      id;
     return { id, name, value: r.value };
   });
 }
