@@ -28,6 +28,12 @@ dimensions:
     expr: DATE_TRUNC('MONTH', source.recharge_date)
     comment: Mês de negócio da recarga, em America/Sao_Paulo.
     synonyms: [mês]
+  - name: recharge_year
+    expr: YEAR(source.recharge_date)
+    comment: >-
+      Ano de negócio da recarga, em America/Sao_Paulo. Existe para o acumulado no ano zerar a cada
+      janeiro; para filtrar por período use recharge_month.
+    synonyms: [ano]
   - name: recharge_hour_local
     expr: source.recharge_hour_local
     comment: Hora da recarga, de 0 a 23, no fuso da UF do PDV.
@@ -132,3 +138,78 @@ measures:
       decimal_places:
         type: exact
         places: 0
+  # Medidas com janela (SPEC-004 §5, ADR-0025 ramo A). Consulte-as sempre com
+  # `WHERE recharge_month = DATE'M'` e `GROUP BY` na dimensão geográfica: o filtro de mês mantém a
+  # janela. Os filtros de PDV valem antes da janela. As `aux_*` são só pedaços de composição
+  # (o `MEASURE()` precisa de medidas nomeadas) e não são para consumo.
+  - name: aux_revenue_cur
+    expr: SUM(source.amount_brl) FILTER (WHERE source.status = 'approved')
+    comment: Auxiliar de gross_revenue_t3m e revenue_mom_change (receita do mês). Não consulte.
+    synonyms: [auxiliar receita do mês]
+    window:
+      - order: recharge_month
+        range: current
+        semiadditive: last
+  - name: aux_revenue_prev
+    expr: SUM(source.amount_brl) FILTER (WHERE source.status = 'approved')
+    comment: Auxiliar de revenue_mom_change (receita do mês anterior). Não consulte.
+    synonyms: [auxiliar receita do mês anterior]
+    window:
+      - order: recharge_month
+        range: trailing 1 month
+        semiadditive: last
+  - name: aux_revenue_trailing2
+    expr: SUM(source.amount_brl) FILTER (WHERE source.status = 'approved')
+    comment: >-
+      Auxiliar de gross_revenue_t3m (receita dos 2 meses anteriores, sem o mês atual). Não consulte.
+    synonyms: [auxiliar receita dois meses anteriores]
+    window:
+      - order: recharge_month
+        range: trailing 2 month
+        semiadditive: last
+  - name: gross_revenue_t3m
+    expr: COALESCE(MEASURE(aux_revenue_trailing2), 0) + COALESCE(MEASURE(aux_revenue_cur), 0)
+    comment: >-
+      Receita bruta em reais (BRL) dos últimos 3 meses: o mês filtrado e os 2 anteriores (janela
+      móvel). Consulte com recharge_month = um mês. Vale 0,00, e não nulo, quando não há recarga
+      aprovada na janela.
+    synonyms: [últimos 3 meses, trimestre móvel]
+    format:
+      type: currency
+      currency_code: BRL
+      decimal_places:
+        type: exact
+        places: 2
+  - name: gross_revenue_ytd
+    expr: SUM(source.amount_brl) FILTER (WHERE source.status = 'approved')
+    comment: >-
+      Receita bruta em reais (BRL) acumulada de janeiro até o mês filtrado, zerando a cada janeiro
+      (em janeiro é a receita de janeiro). Consulte com recharge_month = um mês.
+    synonyms: [acumulado no ano, YTD]
+    window:
+      - order: recharge_year
+        range: current
+        semiadditive: last
+      - order: recharge_month
+        range: cumulative
+        semiadditive: last
+    format:
+      type: currency
+      currency_code: BRL
+      decimal_places:
+        type: exact
+        places: 2
+  - name: revenue_mom_change
+    expr: >-
+      (MEASURE(aux_revenue_cur) - MEASURE(aux_revenue_prev))
+      / NULLIF(MEASURE(aux_revenue_prev), 0)
+    comment: >-
+      Variação da receita bruta contra o mês anterior, como fração (0,05 = 5%): (receita do mês -
+      receita do mês anterior) / receita do mês anterior. Nulo sem mês anterior ou com base zero.
+      Consulte com recharge_month = um mês.
+    synonyms: [variação contra o mês anterior, crescimento]
+    format:
+      type: percentage
+      decimal_places:
+        type: max
+        places: 4

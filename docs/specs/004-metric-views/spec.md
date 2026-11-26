@@ -22,6 +22,7 @@ Metric views via `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML AS $$ ..
 |---|---|---|
 | `recharge_date` | `recharge_date` | data, dia |
 | `recharge_month` | `DATE_TRUNC('MONTH', recharge_date)` | mês |
+| `recharge_year` | `YEAR(recharge_date)` | ano (v1.1; existe para o `gross_revenue_ytd` zerar em janeiro) |
 | `recharge_hour_local` | `recharge_hour_local` | hora, horário, horário de pico (hora local do PDV, 0 a 23) |
 | `region` | `pos.municipality.region` | região |
 | `uf` | `pos.municipality.uf` | estado, UF |
@@ -75,6 +76,8 @@ Regras:
 - **Unidade na API.** O `mom_change` do `atlas-web` continua em pontos percentuais com 2 casas; a conversão da fração (× 100, em Decimal) é só formatação, não métrica.
 - **Exceção declarada.** O Δ% de `recharge_count`, `avg_ticket` e `active_pos` (cards do `atlas-web`) e o `compare_months` do MCP continuam calculados no consumidor, como no MVP; o ADR-0025 registra a exceção e o roadmap a lista em "Depois do MVP".
 - **A decisão do ADR-0025 define o que as P15.5 e P15.6 fazem.** Ramo A (janelas na `mv_recharges`): as tasks seguem como escritas. Ramo B (view separada `mv_recharges_trend`, `version: 0.1`): a view repete as dimensões `recharge_month`, `region`, `uf`, `municipality_ibge_code`, `municipality_name`, `pos_type` e `distributor_name`, entra em `semantic_grants`, no Genie e na lista fechada do MCP, e a SPEC-004 §6 e §7 e a SPEC-006 são corrigidas antes do código. Ramo C (manter no backend): P15.5, P15.6 e P15.7 fecham como "documentar a exceção" e a P15.8 usa o `mom_change` do backend.
+- **Medidas auxiliares `aux_*`.** O `MEASURE()` só compõe medidas nomeadas, então a `mv_recharges` leva `aux_revenue_cur`, `aux_revenue_prev` e `aux_revenue_trailing2` (os pedaços `revenue_cur`, `revenue_prev` e `revenue_trailing2` do spike). Elas **nunca** entram no catálogo do MCP, nas `fn_*` nem em exemplos; o `comment` diz "Não consulte". O Genie lê a view inteira e as vê: risco aceito, tratado só pelo `comment`.
+- **Até a P15.6**, o catálogo do MCP (`catalog.json`) e as `fn_*` também deixam de fora `gross_revenue_t3m`, `gross_revenue_ytd` e `revenue_mom_change`, porque a regra de consulta (só com `recharge_month`) é da P15.6, que **remove** essa exclusão. A dimensão `recharge_year` entra no catálogo e nas `fn_*` como as demais.
 - Cada medida tem `comment` com a definição literal, porque o agente lê.
 
 ## 6. Consumidores

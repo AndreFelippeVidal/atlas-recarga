@@ -32,6 +32,24 @@ LEVELS: dict[str, tuple[str, str]] = {
 GUARD_KEY = "__guard__"  # chave da linha sentinela que força a validação (nunca sai da função)
 VALUE_TYPE = "DECIMAL(24, 6)"  # nunca DOUBLE/FLOAT (tech-stack, Proibido)
 
+# Medidas com janela (SPEC-004 §5): fora das `fn_*` até a P15.6 definir a regra de consulta (só
+# com `recharge_month`). As `aux_*` são pedaços de composição e nunca entram.
+AUX_PREFIX = "aux_"
+WINDOW_MEASURES_PENDING_P15_6 = frozenset(
+    {"gross_revenue_t3m", "gross_revenue_ytd", "revenue_mom_change"}
+)
+
+
+def consumable(definition: dict[str, Any]) -> dict[str, Any]:
+    """Cópia da definição sem as medidas auxiliares e sem as com janela (até a P15.6)."""
+    kept = [
+        m
+        for m in definition["measures"]
+        if not str(m["name"]).startswith(AUX_PREFIX)
+        and m["name"] not in WINDOW_MEASURES_PENDING_P15_6
+    ]
+    return {**definition, "measures": kept}
+
 
 def check_identifier(value: str, what: str) -> str:
     if not _IDENTIFIER.fullmatch(value):
@@ -169,6 +187,7 @@ def build_compare_months(catalog: str) -> str:
 
 def build_all(catalog: str, definition: dict[str, Any]) -> list[tuple[str, str]]:
     """`(nome da função, DDL)` na ordem de criação (a terceira usa a segunda)."""
+    definition = consumable(definition)
     return [
         ("fn_list_metrics", build_list_metrics(catalog, definition)),
         ("fn_metric_by_region", build_metric_by_region(catalog, definition)),

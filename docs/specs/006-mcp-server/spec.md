@@ -35,6 +35,7 @@ O campo `source` de toda resposta repete o contrato de citação do agente (view
 - `limit` acima de 500 é `INVALID_ARGUMENT`; o `RESULT_TOO_LARGE` do §4 fica para o `compare_months`, que não tem `limit` (o `top_regions` é limitado por `n ≤ 50`).
 - `sql_fingerprint` é o sha1 do SQL parametrizado, sem o comentário `request_id` e sem os valores.
 - A lista fechada de medidas e dimensões vem de `apps/mcp/atlas_mcp/catalog.json`, gerado de `semantic/*.yaml` por `scripts/build_mcp_catalog.py` (o App só leva `apps/mcp` no deploy); um teste falha se o snapshot ficar velho.
+- Até a P15.6, o snapshot não inclui as medidas com janela (`gross_revenue_t3m`, `gross_revenue_ytd`, `revenue_mom_change`) nem as auxiliares `aux_*` (SPEC-004 §5); a P15.6 libera as 3 primeiras com a regra de consulta. A dimensão `recharge_year` já entra.
 - O erro de argumento chega ao cliente como erro de tool com a mensagem prefixada por `INVALID_ARGUMENT:`.
 
 **Detalhes de `top_regions` e `compare_months` (P11.3):**

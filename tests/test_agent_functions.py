@@ -33,7 +33,8 @@ af = _load()
 def _mv() -> dict[str, Any]:
     loaded = yaml.safe_load((SEMANTIC / "mv_recharges.yaml").read_text(encoding="utf-8"))
     assert isinstance(loaded, dict)
-    return loaded
+    consumable: dict[str, Any] = af.consumable(loaded)  # janelas só entram nas `fn_*` na P15.6
+    return consumable
 
 
 def _ddl() -> dict[str, str]:
@@ -158,3 +159,12 @@ def test_bundle_runs_the_functions_after_the_metric_views() -> None:
     assert tasks["apply_agent_functions"]["spark_python_task"]["python_file"] == (
         "semantic/apply_functions.py"
     )
+
+
+def test_window_and_aux_measures_stay_out_of_the_functions_until_p15_6() -> None:
+    raw = yaml.safe_load((SEMANTIC / "mv_recharges.yaml").read_text(encoding="utf-8"))
+    ddl = "\n".join(_ddl().values())
+    for measure in raw["measures"]:
+        name = measure["name"]
+        window = name.startswith("aux_") or name in af.WINDOW_MEASURES_PENDING_P15_6
+        assert (name in ddl) is not window, name
