@@ -32,22 +32,15 @@ LEVELS: dict[str, tuple[str, str]] = {
 GUARD_KEY = "__guard__"  # chave da linha sentinela que força a validação (nunca sai da função)
 VALUE_TYPE = "DECIMAL(24, 6)"  # nunca DOUBLE/FLOAT (tech-stack, Proibido)
 
-# Medidas com janela (SPEC-004 §5): fora das `fn_*` até a P15.6 definir a regra de consulta (só
-# com `recharge_month`). As `aux_*` são pedaços de composição e nunca entram.
+# Medidas com janela (SPEC-004 §5) entram nas `fn_*`: elas filtram um único mês, que é a condição
+# da janela. As `aux_*` são pedaços de composição e nunca entram.
 AUX_PREFIX = "aux_"
-WINDOW_MEASURES_PENDING_P15_6 = frozenset(
-    {"gross_revenue_t3m", "gross_revenue_ytd", "revenue_mom_change"}
-)
+WINDOW_MEASURES = frozenset({"gross_revenue_t3m", "gross_revenue_ytd", "revenue_mom_change"})
 
 
 def consumable(definition: dict[str, Any]) -> dict[str, Any]:
-    """Cópia da definição sem as medidas auxiliares e sem as com janela (até a P15.6)."""
-    kept = [
-        m
-        for m in definition["measures"]
-        if not str(m["name"]).startswith(AUX_PREFIX)
-        and m["name"] not in WINDOW_MEASURES_PENDING_P15_6
-    ]
+    """Cópia da definição sem as medidas auxiliares."""
+    kept = [m for m in definition["measures"] if not str(m["name"]).startswith(AUX_PREFIX)]
     return {**definition, "measures": kept}
 
 

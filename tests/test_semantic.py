@@ -328,7 +328,7 @@ def test_window_measures_keep_the_structure_validated_in_the_spike() -> None:
         assert measures[name]["format"] and measures[name]["synonyms"], name
 
 
-def test_mcp_catalog_and_functions_exclude_the_same_measures() -> None:
+def test_mcp_catalog_and_functions_share_the_window_and_aux_rules() -> None:
     spec = importlib.util.spec_from_file_location(
         "build_mcp_catalog", ROOT / "scripts" / "build_mcp_catalog.py"
     )
@@ -342,4 +342,4 @@ def test_mcp_catalog_and_functions_exclude_the_same_measures() -> None:
     fn = importlib.util.module_from_spec(funcs)
     funcs.loader.exec_module(fn)
     assert catalog.AUX_PREFIX == fn.AUX_PREFIX
-    assert catalog.WINDOW_MEASURES_PENDING_P15_6 == fn.WINDOW_MEASURES_PENDING_P15_6
+    assert catalog.WINDOW_MEASURES == fn.WINDOW_MEASURES

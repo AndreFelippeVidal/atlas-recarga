@@ -4,7 +4,7 @@ Golden set e scorers do agente. Governado pela [SPEC-008](../docs/specs/008-agen
 
 ## `golden_set.yaml` (P9.1)
 
-31 casos: 20 `metric`, 5 `comparison`, 5 `refusal` e 1 `no_period` (P10.6: pergunta sem mês, o agente assume o último mês com dados e diz isso). Cada caso guarda a SQL de referência, não o número; a SQL sempre devolve 1 valor (`AS value`) e lê só `atlas.semantic`. O `no_period` tem também a `reference_month_sql`, que devolve o último mês com dados (`AAAA-MM-DD`); as duas olham o mês mais recente da view, então nada fixa outubro. O catálogo `atlas` vira `atlas_dev` no `dev` (`scripts/check_golden_set.py`). Mês de referência: outubro de 2026.
+34 casos: 23 `metric`, 5 `comparison`, 5 `refusal` e 1 `no_period` (P10.6: pergunta sem mês, o agente assume o último mês com dados e diz isso). Cada caso guarda a SQL de referência, não o número; a SQL sempre devolve 1 valor (`AS value`) e lê só `atlas.semantic`. O `no_period` tem também a `reference_month_sql`, que devolve o último mês com dados (`AAAA-MM-DD`); as duas olham o mês mais recente da view, então nada fixa outubro. O catálogo `atlas` vira `atlas_dev` no `dev` (`scripts/check_golden_set.py`). Mês de referência: outubro de 2026.
 
 ## `sync_golden_set.py` (P9.2)
 
@@ -46,7 +46,7 @@ O resultado vira um comentário no PR (atualizado a cada push) com a acurácia, 
 
 Configuração (uma vez, no Environment `ci-databricks` do [ADR-0015](../docs/adr/0015-ci-databricks-auth.md)): os secrets `DATABRICKS_HOST` e `DATABRICKS_TOKEN` já existem; faltam as **variáveis** `ATLAS_WAREHOUSE_ID` e `ATLAS_GENIE_SPACE_ID`. PRs de fork e do Dependabot não recebem secrets: o job é pulado.
 
-Custo: ~31 chamadas ao agente por execução, com o limite de 30 req/min do gateway (ADR-0021): cerca de 10 a 20 minutos.
+Custo: ~34 chamadas ao agente por execução, com o limite de 30 req/min do gateway (ADR-0021): cerca de 10 a 20 minutos.
 
 Teste local da decisão: `uv run pytest tests/test_eval_gate.py`.
 

@@ -27,9 +27,9 @@ def test_space_reads_only_the_metric_views() -> None:
         assert "measure(" in sql
 
 
-def test_space_has_ten_examples_with_the_ddd_one() -> None:
+def test_space_has_thirteen_examples_with_the_ddd_one() -> None:
     examples = SPACE["instructions"]["example_question_sqls"]
-    assert len(examples) == 10
+    assert len(examples) == 13
     ddd = [e for e in examples if "DDD" in e["question"][0]]
     assert ddd and "ddd" in ddd[0]["sql"][0] and "gross_revenue" in ddd[0]["sql"][0]
 

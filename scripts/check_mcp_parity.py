@@ -9,9 +9,10 @@ roda isto depois do deploy:
     uv run python scripts/check_mcp_parity.py --profile andrevidal \\
         --warehouse-id <id> --catalog atlas_dev
 
-Cobre os 20 casos `metric`. Os casos `comparison` usam fórmulas próprias (variação %, diferença em
-pontos) e ficam fora; `compare_months` é conferido por `check_mcp_tools.py`. Só lê. São ~20
-chamadas: fica abaixo do limite de 30 por minuto do MCP.
+Cobre os 23 casos `metric` (os 3 últimos usam medida com janela, com um mês só). Os casos
+`comparison` usam fórmulas próprias (variação %, diferença em pontos) e ficam fora;
+`compare_months` é conferido por `check_mcp_tools.py`. Só lê. São ~23 chamadas: fica abaixo do
+limite de 30 por minuto do MCP.
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ CATALOGS = {"atlas": "atlas", "atlas_dev": "atlas_dev"}
 REL_TOLERANCE = Decimal("0.000000001")  # só o ruído de ponto flutuante das taxas
 
 _SELECT = re.compile(
-    r"SELECT\s+MEASURE\((?P<measure>[a-z_]+)\)\s*(?:\*\s*(?P<scale>\d+)\s*)?AS\s+value\s+"
+    r"SELECT\s+MEASURE\((?P<measure>[a-z0-9_]+)\)\s*(?:\*\s*(?P<scale>\d+)\s*)?AS\s+value\s+"
     r"FROM\s+atlas\.semantic\.(?P<view>[a-z_]+)\s+WHERE\s+(?P<where>.+?)\s*$",
     re.IGNORECASE | re.DOTALL,
 )

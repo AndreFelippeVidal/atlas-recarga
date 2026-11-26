@@ -24,7 +24,7 @@ def test_every_metric_case_translates_to_a_closed_list_query() -> None:
 
     views = load_catalog()["views"]
     metric = [c for c in CASES if c["category"] == "metric"]
-    assert len(metric) == 20
+    assert len(metric) == 23
     for case in metric:
         call = mod.translate(case["reference_sql"])
         assert call is not None, case["id"]

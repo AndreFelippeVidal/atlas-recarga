@@ -31,6 +31,21 @@
         {
           "name": "distinct_subscribers",
           "description": "Assinantes distintos com pelo menos 1 recarga aprovada no período filtrado."
+        },
+        {
+          "name": "gross_revenue_t3m",
+          "description": "Receita bruta em reais (BRL) dos últimos 3 meses: o mês filtrado e os 2 anteriores (janela móvel). Consulte com recharge_month = um mês. Vale 0,00, e não nulo, quando não há recarga aprovada na janela.",
+          "window": true
+        },
+        {
+          "name": "gross_revenue_ytd",
+          "description": "Receita bruta em reais (BRL) acumulada de janeiro até o mês filtrado, zerando a cada janeiro (em janeiro é a receita de janeiro). Consulte com recharge_month = um mês.",
+          "window": true
+        },
+        {
+          "name": "revenue_mom_change",
+          "description": "Variação da receita bruta contra o mês anterior, como fração (0,05 = 5%): (receita do mês - receita do mês anterior) / receita do mês anterior. Nulo sem mês anterior ou com base zero. Consulte com recharge_month = um mês.",
+          "window": true
         }
       ],
       "dimensions": [
