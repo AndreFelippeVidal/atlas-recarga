@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import ChatPanel from "./components/ChatPanel";
 import ErrorBanner from "./components/ErrorBanner";
 import KpiCard from "./components/KpiCard";
@@ -23,6 +23,7 @@ export default function App() {
     () => ({ pos_type: posType || undefined, distributor: distributor || undefined }),
     [posType, distributor],
   );
+  const posTypeRef = useRef<HTMLSelectElement>(null);
   const filterOptions = useFilterOptions();
   const kpis = useKpis(month, filters);
   const error = months.error ?? kpis.error ?? filterOptions.error;
@@ -34,6 +35,8 @@ export default function App() {
   const clearFilters = () => {
     setPosType("");
     setDistributor("");
+    // O bloco do estado vazio some: devolve o foco ao primeiro filtro.
+    posTypeRef.current?.focus();
   };
 
   return (
@@ -68,6 +71,7 @@ export default function App() {
           <label className="month-picker">
             Tipo de PDV{" "}
             <select
+              ref={posTypeRef}
               value={posType}
               disabled={!filterOptions.options}
               onChange={(e) => setPosType(e.target.value)}

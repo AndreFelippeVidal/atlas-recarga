@@ -139,6 +139,9 @@ export default function MapPanel({ month, measure, monthLoading, filters, onClea
         {emptySlice ? (
           <div className="empty-slice" role="status">
             <p>Sem recargas neste recorte</p>
+            {view.level !== "brazil" && (
+              <p>Neste nível do mapa; os KPIs mostram o total do recorte.</p>
+            )}
             <button type="button" className="back-button" onClick={onClearFilters}>
               Limpar filtros
             </button>
