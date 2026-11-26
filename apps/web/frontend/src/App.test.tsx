@@ -508,7 +508,7 @@ describe("filtros (v1.1)", () => {
     await waitFor(() => expect(type).toBeEnabled());
     await user.selectOptions(type, "newsstand");
     expect(await screen.findByText("Sem recargas neste recorte")).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Ticket médio" })).toHaveTextContent("—");
+    expect(screen.getByRole("group", { name: /Ticket médio/ })).toHaveTextContent("—");
     expect(screen.queryByRole("list", { name: /Ranking/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Limpar filtros" }));
     expect(type).toHaveValue("");
@@ -527,5 +527,26 @@ describe("filtros (v1.1)", () => {
     expect(screen.getByLabelText(/Distribuidor/)).toBeDisabled();
     // KPIs e mapa seguem funcionando
     expect(await screen.findByText(/4\.122\.460,00/)).toBeInTheDocument();
+  });
+});
+
+describe("mapa antigo em erro", () => {
+  it("não mantém o mapa sem filtro quando a consulta filtrada falha", async () => {
+    mockFetch(
+      route({
+        "/api/map/region": (url) =>
+          new URL(url, "http://x").searchParams.has("pos_type")
+            ? down()
+            : json(REGIONS.gross_revenue),
+      }),
+    );
+    render(<App />);
+    const user = userEvent.setup();
+    const type = await screen.findByLabelText(/Tipo de PDV/);
+    await waitFor(() => expect(type).toBeEnabled());
+    await screen.findByRole("button", { name: /1º Sudeste/ });
+    await user.selectOptions(type, "pharmacy");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /1º Sudeste/ })).not.toBeInTheDocument();
   });
 });

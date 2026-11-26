@@ -67,8 +67,8 @@ export function useMonths() {
   };
 }
 
-function filtersKey(f: Filters): string {
-  return `${f.pos_type ?? ""}|${f.distributor ?? ""}`;
+export function filtersKey(f: Filters): string {
+  return JSON.stringify([f.pos_type ?? "", f.distributor ?? ""]);
 }
 
 export function useFilterOptions() {
@@ -85,6 +85,7 @@ export function useKpis(month: string | null, filters: Filters = {}) {
 
 export interface MapData {
   month: string;
+  filtersKey: string;
   measure: MapMeasure;
   focus: MapFocus;
   items: MapItem[];
@@ -107,6 +108,7 @@ export function useMapData(
     month === null ? null : `${month}|${measure}|${focusKey(focus)}|${filtersKey(filters)}`;
   const api = useApi<MapData>(cacheKey, async (s) => ({
     month: month as string,
+    filtersKey: filtersKey(filters),
     measure,
     focus,
     items: await fetchMap(month as string, measure, focus, filters, s),

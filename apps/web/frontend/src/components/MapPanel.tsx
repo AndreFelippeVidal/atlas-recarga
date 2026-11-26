@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Filters, MapFocus, MapMeasure, Region } from "../api";
 import { buildGeometry } from "../geoShapes";
-import { useMapData, useMunTopology, useSlow, useUfTopology } from "../hooks";
+import { filtersKey, useMapData, useMunTopology, useSlow, useUfTopology } from "../hooks";
 import { buildStats } from "../mapStats";
 import { REGION_NAMES, REGIONS } from "../regions";
 import { buildScale, legendClasses } from "../scale";
@@ -47,7 +47,10 @@ export default function MapPanel({ month, measure, monthLoading, filters, onClea
 
   // Em erro mantém o mapa anterior (com mês, medida e foco a que ele pertence); carregando,
   // mostra o esqueleto do foco pedido.
-  const shown = mapData.data ?? (mapData.error ? mapData.stale : null);
+  // O mapa anterior só vale se for do mesmo recorte: sem isso, números sem filtro apareceriam
+  // ao lado de um filtro selecionado.
+  const stale = mapData.stale?.filtersKey === filtersKey(filters) ? mapData.stale : null;
+  const shown = mapData.data ?? (mapData.error ? stale : null);
   const view = shown?.focus ?? focus;
   const mun = useMunTopology(view.level === "uf" ? view.uf : null);
 
