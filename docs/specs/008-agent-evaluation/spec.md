@@ -15,7 +15,7 @@ Medir se o agente (SPEC-005) **acerta, cita a fonte e recusa o que deve recusar*
 
 ## 3. Golden set
 - **Dataset de avaliação do MLflow** versionado no UC: `atlas.eval.agent_golden_set`. A fonte de verdade é `eval/golden_set.yaml` no repo; o dataset no UC é sincronizado por um script e nunca editado à mão.
-- **~30 casos**: 20 de métrica direta, 5 comparativos ou causais, 5 adversariais (recusa) e 1 de período ausente (`no_period`: pergunta sem mês, em que o agente assume o último mês fechado e diz isso; SPEC-005 §4, regra 4). A categoria cresce quando a produção mostrar outras formas de pergunta sem período.
+- **~34 casos**: 23 de métrica direta (os 3 últimos, GS-032 a GS-034, cobrem T3M, YTD e variação mês a mês com as medidas com janela da SPEC-004 §5), 5 comparativos ou causais, 5 adversariais (recusa) e 1 de período ausente (`no_period`: pergunta sem mês, em que o agente assume o último mês fechado e diz isso; SPEC-005 §4, regra 4). A categoria cresce quando a produção mostrar outras formas de pergunta sem período.
 - Cada caso guarda **a SQL de referência, não o número**. O valor esperado é recalculado a cada rodada sobre as metric views. Assim, gerar os dados de novo com o CLI não invalida o golden set.
 
 ```yaml

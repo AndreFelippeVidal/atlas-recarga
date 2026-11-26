@@ -34,7 +34,8 @@ flowchart LR
 | `atlas.semantic.fn_compare_months(measure, month_a, month_b, level, uf)` | UC function SQL | Variação absoluta e percentual entre dois meses | `EXECUTE` |
 
 **Contrato das UC functions** (P10.1):
-- `fn_list_metrics()` devolve `(kind, name, description, synonyms)`, gerado de `semantic/mv_recharges.yaml`; só `mv_recharges` (a comissão não é consultada pelo agente).
+- `fn_list_metrics()` devolve `(kind, name, description, synonyms)`, gerado de `semantic/mv_recharges.yaml`; só `mv_recharges` (a comissão não é consultada pelo agente). Inclui as medidas com janela (`gross_revenue_t3m`, `gross_revenue_ytd`, `revenue_mom_change`, SPEC-004 §5) e nunca as auxiliares `aux_*`.
+- As medidas com janela valem em `fn_metric_by_region` sem regra extra: a função filtra um único mês, que é a condição da janela. Em `fn_compare_months` comparam o valor da medida em dois meses; para a variação da receita contra o mês anterior o agente usa `revenue_mom_change`, não o `pct_change` de uma variação.
 - `fn_metric_by_region` devolve `(level, key, label, value)`; `key` é o código da dimensão (`region`, `uf`, código IBGE ou `ddd`) e `label` o nome legível. `uf` é opcional (`NULL` = todas) e `month` é qualquer dia do mês de negócio.
 - `fn_compare_months` devolve `(level, key, label, value_a, value_b, abs_change, pct_change)`, com `abs_change = value_b - value_a` e `pct_change` em pontos percentuais com 2 casas; `pct_change` é `NULL` quando `value_a` é zero ou ausente.
 - `value` é sempre `DECIMAL(24,6)`, nunca `DOUBLE`; a escala maior que a de `DECIMAL(14,2)` existe porque o mesmo tipo carrega `avg_ticket` e `reversal_rate` (fração). Aplicar o arredondamento monetário é do consumidor.
