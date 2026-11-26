@@ -6,7 +6,8 @@ import { REGION_NAMES } from "./regions";
 export type KpiMeasure = "gross_revenue" | "recharge_count" | "avg_ticket" | "active_pos";
 
 export interface Kpi {
-  value: string;
+  // `null` só em avg_ticket de um recorte sem recarga (SPEC-007 §3).
+  value: string | null;
   previous: string | null;
   delta_pct: string | null;
 }
@@ -52,12 +53,41 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await res.json()) as T;
 }
 
+// Filtros opcionais (SPEC-007 §3, v1.1): ausente = "Todos".
+export interface Filters {
+  pos_type?: string;
+  distributor?: string;
+}
+
+export interface FilterOptions {
+  pos_types: string[];
+  distributors: string[];
+}
+
+function filterQs(filters: Filters): string {
+  let qs = "";
+  if (filters.pos_type) qs += `&pos_type=${encodeURIComponent(filters.pos_type)}`;
+  if (filters.distributor) qs += `&distributor=${encodeURIComponent(filters.distributor)}`;
+  return qs;
+}
+
+export function fetchFilters(signal?: AbortSignal): Promise<FilterOptions> {
+  return getJson<FilterOptions>("/api/filters", signal);
+}
+
 export async function fetchMonths(signal?: AbortSignal): Promise<string[]> {
   return (await getJson<{ months: string[] }>("/api/months", signal)).months;
 }
 
-export function fetchKpis(month: string, signal?: AbortSignal): Promise<KpisResponse> {
-  return getJson<KpisResponse>(`/api/kpis?month=${encodeURIComponent(month)}`, signal);
+export function fetchKpis(
+  month: string,
+  filters: Filters = {},
+  signal?: AbortSignal,
+): Promise<KpisResponse> {
+  return getJson<KpisResponse>(
+    `/api/kpis?month=${encodeURIComponent(month)}${filterQs(filters)}`,
+    signal,
+  );
 }
 
 export type Region = "N" | "NE" | "CO" | "SE" | "S";
@@ -88,9 +118,10 @@ export async function fetchMap(
   month: string,
   measure: MapMeasure,
   focus: MapFocus,
+  filters: Filters = {},
   signal?: AbortSignal,
 ): Promise<MapItem[]> {
-  let qs = `month=${encodeURIComponent(month)}&measure=${encodeURIComponent(measure)}`;
+  let qs = `month=${encodeURIComponent(month)}&measure=${encodeURIComponent(measure)}${filterQs(filters)}`;
   let path = "/api/map/region";
   if (focus.level === "region") {
     path = "/api/map/uf";
@@ -102,7 +133,11 @@ export async function fetchMap(
   const rows = await getJson<RawRow[]>(`${path}?${qs}`, signal);
   return rows.map((r) => {
     const id = r.municipality_ibge_code ?? r.uf ?? r.region ?? "";
-    const name = r.municipality_name ?? REGION_NAMES[id as Region] ?? id;
+    // Só o nível Brasil traz regiões: "SE" é Sudeste ali, mas Sergipe nas linhas de UF.
+    const name =
+      r.municipality_name ??
+      (focus.level === "brazil" ? REGION_NAMES[id as Region] : undefined) ??
+      id;
     return { id, name, value: r.value };
   });
 }

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import ChatPanel from "./components/ChatPanel";
 import ErrorBanner from "./components/ErrorBanner";
 import KpiCard from "./components/KpiCard";
 import MapPanel from "./components/MapPanel";
-import { formatMonth, MEASURE_LABELS } from "./format";
-import { useKpis, useMonths } from "./hooks";
-import type { KpiMeasure, MapMeasure } from "./api";
+import { formatMonth, MEASURE_LABELS, posTypeLabel } from "./format";
+import { useFilterOptions, useKpis, useMonths } from "./hooks";
+import type { Filters, KpiMeasure, MapMeasure } from "./api";
 
 const MEASURES: KpiMeasure[] = ["gross_revenue", "recharge_count", "avg_ticket", "active_pos"];
 const MAP_MEASURES: MapMeasure[] = [...MEASURES, "mom_change"];
@@ -16,11 +16,27 @@ export default function App() {
   const [measure, setMeasure] = useState<MapMeasure>("gross_revenue");
   // Padrão: último mês fechado (o mais recente da lista).
   const month = chosen ?? months.months[0] ?? null;
-  const kpis = useKpis(month);
-  const error = months.error ?? kpis.error;
+  // Filtros só em memória (SPEC-007 §4); "" = Todos.
+  const [posType, setPosType] = useState("");
+  const [distributor, setDistributor] = useState("");
+  const filters = useMemo<Filters>(
+    () => ({ pos_type: posType || undefined, distributor: distributor || undefined }),
+    [posType, distributor],
+  );
+  const posTypeRef = useRef<HTMLSelectElement>(null);
+  const filterOptions = useFilterOptions();
+  const kpis = useKpis(month, filters);
+  const error = months.error ?? kpis.error ?? filterOptions.error;
   const retry = () => {
     if (months.error) months.retry();
     if (kpis.error) kpis.retry();
+    if (filterOptions.error) filterOptions.retry();
+  };
+  const clearFilters = () => {
+    setPosType("");
+    setDistributor("");
+    // O bloco do estado vazio some: devolve o foco ao primeiro filtro.
+    posTypeRef.current?.focus();
   };
 
   return (
@@ -52,6 +68,37 @@ export default function App() {
               ))}
             </select>
           </label>
+          <label className="month-picker">
+            Tipo de PDV{" "}
+            <select
+              ref={posTypeRef}
+              value={posType}
+              disabled={!filterOptions.options}
+              onChange={(e) => setPosType(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {(filterOptions.options?.pos_types ?? []).map((t) => (
+                <option key={t} value={t}>
+                  {posTypeLabel(t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="month-picker">
+            Distribuidor{" "}
+            <select
+              value={distributor}
+              disabled={!filterOptions.options}
+              onChange={(e) => setDistributor(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {(filterOptions.options?.distributors ?? []).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </header>
 
@@ -70,7 +117,13 @@ export default function App() {
       </section>
 
       <main className="content">
-        <MapPanel month={month} measure={measure} monthLoading={months.loading} />
+        <MapPanel
+          month={month}
+          measure={measure}
+          monthLoading={months.loading}
+          filters={filters}
+          onClearFilters={clearFilters}
+        />
       </main>
 
       <ChatPanel />

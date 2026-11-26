@@ -27,6 +27,15 @@ export default function KpiCard({ measure, kpi, previousMonthLabel, failed }: Pr
       </div>
     );
   }
+  if (kpi.value === null) {
+    return (
+      <div className="card" role="group" aria-label={`${label}: sem recargas no recorte`}>
+        <div className="card-label">{label}</div>
+        <div className="card-value">—</div>
+        <div className="card-delta flat">sem recargas no recorte</div>
+      </div>
+    );
+  }
   const delta = kpi.delta_pct === null ? 0 : roundedDelta(kpi.delta_pct);
   // A informação não depende só da cor: o sinal e a seta repetem o sentido.
   const trend = kpi.delta_pct === null ? "flat" : delta > 0 ? "up" : delta < 0 ? "down" : "flat";
